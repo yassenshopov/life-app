@@ -14,16 +14,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   LineChart,
+  AreaChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import { Inter, Outfit } from 'next/font/google';
 import { Pencil, X } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -38,6 +42,7 @@ interface SleepEntry {
   deepSleepPercentage: number;
   remSleepPercentage: number;
   awakeTimeMinutes: number;
+  restingHeartRate: number | null;
 }
 
 interface SleepAnalysis {
@@ -54,20 +59,26 @@ export default function Home() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [entries, setEntries] = useState<SleepEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoadingCharts, setIsLoadingCharts] = useState(false);
   const [sleepTime, setSleepTime] = useState('');
   const [wakeTime, setWakeTime] = useState('');
-  const [dateRange, setDateRange] = useState({
-    from: new Date(new Date().getFullYear(), new Date().getMonth() - 9, 1),
-    to: new Date(new Date().getFullYear(), new Date().getMonth() - 6, 0),
+  const [dateRange, setDateRange] = useState(() => {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    return { from, to };
   });
   const [deepSleep, setDeepSleep] = useState('');
   const [remSleep, setRemSleep] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [awakeTime, setAwakeTime] = useState('');
+  const [restingHeartRate, setRestingHeartRate] = useState('');
+  const [activeTab, setActiveTab] = useState<string | null>("30");
 
   useEffect(() => {
     const fetchEntries = async () => {
+      setIsLoadingCharts(true);
       try {
         const response = await fetch(
           `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
@@ -78,6 +89,7 @@ export default function Home() {
         console.error('Failed to fetch entries:', error);
       } finally {
         setLoading(false);
+        setIsLoadingCharts(false);
       }
     };
 
@@ -204,6 +216,19 @@ export default function Home() {
                       className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-600 dark:text-slate-400">
+                      Resting Heart Rate (bpm)
+                    </label>
+                    <input
+                      type="number"
+                      min="30"
+                      max="200"
+                      value={restingHeartRate}
+                      onChange={(e) => setRestingHeartRate(e.target.value)}
+                      className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -274,6 +299,19 @@ export default function Home() {
                   className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm text-slate-600 dark:text-slate-400">
+                  Resting Heart Rate (bpm)
+                </label>
+                <input
+                  type="number"
+                  min="30"
+                  max="200"
+                  value={restingHeartRate}
+                  onChange={(e) => setRestingHeartRate(e.target.value)}
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                />
+              </div>
             </div>
           </>
         )}
@@ -288,6 +326,7 @@ export default function Home() {
                 !deepSleep ||
                 !remSleep ||
                 !awakeTime ||
+                !restingHeartRate ||
                 isSubmitting
               }
             >
@@ -340,7 +379,7 @@ export default function Home() {
   };
 
   const handleSubmit = async () => {
-    if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime)
+    if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime || !restingHeartRate)
       return;
 
     setIsSubmitting(true);
@@ -369,6 +408,7 @@ export default function Home() {
           deepSleepPercentage: parseInt(deepSleep),
           remSleepPercentage: parseInt(remSleep),
           awakeTimeMinutes: parseInt(awakeTime),
+          restingHeartRate: restingHeartRate ? parseInt(restingHeartRate) : null,
         }),
       });
 
@@ -380,6 +420,7 @@ export default function Home() {
       setDeepSleep('');
       setRemSleep('');
       setAwakeTime('');
+      setRestingHeartRate('');
       setSubmitSuccess(true);
 
       // Refresh entries
@@ -402,14 +443,23 @@ export default function Home() {
         const entryDate = new Date(entry.date);
         return entryDate >= dateRange.from && entryDate <= dateRange.to;
       })
+      .reverse()
       .map((entry) => ({
-        date: new Date(entry.date).toLocaleDateString(),
+        date: new Date(entry.date).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short'
+        }).replace(/(\d+)/, (match) => {
+          const day = parseInt(match);
+          const suffix = ['th', 'st', 'nd', 'rd'][(day % 10 > 3 ? 0 : day % 10)] || 'th';
+          return `${day}${suffix}`;
+        }),
         totalSleep: Number(
           (entry.totalSleepHours + entry.totalSleepMinutes / 60).toFixed(2)
         ),
         deepSleep: entry.deepSleepPercentage,
         remSleep: entry.remSleepPercentage,
         awakeTime: entry.awakeTimeMinutes,
+        restingHeartRate: entry.restingHeartRate,
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
@@ -553,9 +603,7 @@ export default function Home() {
             activeDot={false}
           />
           {data.map((entry, index) => {
-            // Calculate x position based on index and total width
             const xPercent = 9 + index * 3.005;
-
             return (
               <line
                 key={index}
@@ -573,6 +621,174 @@ export default function Home() {
           })}
         </LineChart>
       </ResponsiveContainer>
+    );
+  };
+
+  const RHRChart = ({ data }: { data: any[] }) => {
+    return (
+      <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+          Resting Heart Rate
+        </h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={data} margin={{ bottom: 50 }}>
+            <defs>
+              <linearGradient id="rhrGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="date" 
+              angle={-45}
+              textAnchor="end"
+              height={60}
+              interval={0}
+              tick={{ dy: 10 }}
+            />
+            <YAxis domain={['dataMin - 5', 'dataMax + 5']} />
+            <Tooltip
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        RHR: {payload[0].value} bpm
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <ReferenceLine 
+              y={data
+                .filter(entry => entry.rhr && entry.rhr > 0)
+                .reduce((acc, curr) => acc + curr.rhr, 0) / 
+                data.filter(entry => entry.rhr && entry.rhr > 0).length}
+              stroke="#ef4444"
+              strokeOpacity={0.5}
+              label={{ 
+                value: 'Avg RHR',
+                position: 'right',
+                fill: '#ef4444',
+                opacity: 0.5
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="rhr"
+              stroke="#ef4444"
+              fill="url(#rhrGradient)"
+              name="RHR (bpm)"
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  const RHRAnalytics = ({ data }: { data: any[] }) => {
+    // Filter out null values
+    const validData = data.filter(entry => entry.rhr !== null);
+    
+    if (validData.length === 0) {
+      return (
+        <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+          <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+            RHR Analytics
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400">No RHR data available for this period.</p>
+        </div>
+      );
+    }
+
+    const average = Math.round(validData.reduce((acc, curr) => acc + curr.rhr, 0) / validData.length);
+    const min = Math.min(...validData.map(d => d.rhr));
+    const max = Math.max(...validData.map(d => d.rhr));
+    
+    // Calculate trend (comparing first and last valid readings)
+    const firstReading = validData[validData.length - 1].rhr;
+    const lastReading = validData[0].rhr;
+    const trend = lastReading - firstReading;
+    
+    // Calculate variability (standard deviation)
+    const meanSquaredDiff = validData.reduce((acc, curr) => 
+      acc + Math.pow(curr.rhr - average, 2), 0) / validData.length;
+    const standardDeviation = Math.round(Math.sqrt(meanSquaredDiff) * 10) / 10;
+
+    return (
+      <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+          RHR Analytics
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {average} <span className="text-sm font-normal text-slate-500">bpm</span>
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              Average RHR
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {min} <span className="text-xs font-normal text-slate-500">bpm</span>
+              </div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Lowest
+              </div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {max} <span className="text-xs font-normal text-slate-500">bpm</span>
+              </div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Highest
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-600 dark:text-slate-400">Period Trend</span>
+              <div className={`flex items-center gap-1 text-sm ${
+                trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-500'
+              }`}>
+                {trend !== 0 && (
+                  <svg
+                    className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                    />
+                  </svg>
+                )}
+                {Math.abs(trend)} bpm
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-600 dark:text-slate-400">Variability</span>
+              <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                ±{standardDeviation} bpm
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -954,6 +1170,18 @@ export default function Home() {
     };
   };
 
+  const ChartLoadingOverlay = () => (
+    <div className="absolute inset-0 top-[52px] flex items-center justify-center">
+      {/* Semi-opaque background */}
+      <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
+      {/* Loading spinner and text */}
+      <div className="flex flex-col items-center gap-2 z-10">
+        <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-slate-600 dark:text-slate-400">Loading data...</span>
+      </div>
+    </div>
+  );
+
   return (
     <div
       className={`min-h-screen p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 ${inter.className}`}
@@ -986,52 +1214,69 @@ export default function Home() {
               Sleep History
             </h2>
             <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDateRangeFilter(3)}
-                >
-                  Last 3 days
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDateRangeFilter(7)}
-                >
-                  Last 7 days
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDateRangeFilter(30)}
-                >
-                  Last 30 days
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={dateRange.from.toISOString().split('T')[0]}
-                  onChange={(e) =>
-                    setDateRange((prev) => ({
-                      ...prev,
-                      from: new Date(e.target.value),
-                    }))
-                  }
-                  className="rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                />
-                <input
-                  type="date"
-                  value={dateRange.to.toISOString().split('T')[0]}
-                  onChange={(e) =>
-                    setDateRange((prev) => ({
-                      ...prev,
-                      to: new Date(e.target.value),
-                    }))
-                  }
-                  className="rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                />
+              <Tabs value={activeTab || ""} onValueChange={(value) => {
+                setActiveTab(value);
+                if (value === "3") handleDateRangeFilter(3);
+                if (value === "7") handleDateRangeFilter(7);
+                if (value === "30") handleDateRangeFilter(30);
+                if (value === "90") handleDateRangeFilter(90);
+                if (value === "365") {
+                  // Set range to exactly 1 year back from today
+                  const to = new Date();
+                  const from = new Date();
+                  from.setFullYear(from.getFullYear() - 1);
+                  from.setDate(from.getDate() + 1); // Add one day to make it exactly 1 year
+                  setDateRange({ from, to });
+                }
+                if (value === "year") {
+                  // Set range from January 1st of current year to today
+                  const to = new Date();
+                  const from = new Date(to.getFullYear(), 0, 1); // January 1st of current year
+                  setDateRange({ from, to });
+                }
+              }}>
+                <TabsList>
+                  <TabsTrigger value="3">3D</TabsTrigger>
+                  <TabsTrigger value="7">7D</TabsTrigger>
+                  <TabsTrigger value="30">30D</TabsTrigger>
+                  <TabsTrigger value="90">90D</TabsTrigger>
+                  <TabsTrigger value="365">1Y</TabsTrigger>
+                  <TabsTrigger value="year">YTD</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="flex gap-2 items-center">
+                <label htmlFor="from" className="text-sm text-slate-600 dark:text-slate-400">From:</label>
+                <div className="flex flex-col">
+                  <input
+                    id="from"
+                    type="date"
+                    value={dateRange.from.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      setActiveTab(null);
+                      setDateRange((prev) => ({
+                        ...prev,
+                        from: new Date(e.target.value),
+                      }));
+                    }}
+                    className="rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2 cursor-pointer"
+                  />
+                </div>
+                <label htmlFor="to" className="text-sm text-slate-600 dark:text-slate-400">To:</label>
+                <div className="flex flex-col">
+                  <input
+                    id="to"
+                    type="date"
+                    value={dateRange.to.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      setActiveTab(null);
+                      setDateRange((prev) => ({
+                        ...prev,
+                        to: new Date(e.target.value),
+                      }));
+                    }}
+                    className="rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2 cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1042,30 +1287,64 @@ export default function Home() {
             </p>
           ) : entries.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="md:col-span-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                <h3
-                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                >
+              <div className="md:col-span-2 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}>
                   Sleep Duration Over Time
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={prepareChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="totalSleep"
-                      stroke="#8884d8"
-                      name="Total Sleep (hours)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={prepareChartData()} margin={{ bottom: 50, right: 20 }}>
+                      <defs>
+                        <linearGradient id="sleepGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        interval={0}
+                        tick={{ dy: 10 }}
+                        minTickGap={-200}
+                      />
+                      <YAxis 
+                        domain={[0, 'auto']}
+                        allowDataOverflow={true}
+                      />
+                      <Tooltip />
+                      <Legend />
+                      <ReferenceLine 
+                        y={prepareChartData()
+                          .filter(entry => entry.totalSleep > 0)
+                          .reduce((acc, curr) => acc + curr.totalSleep, 0) / 
+                          prepareChartData().filter(entry => entry.totalSleep > 0).length}
+                        stroke="#8884d8"
+                        strokeOpacity={0.5}
+                        label={{ 
+                          value: 'Avg Sleep',
+                          position: 'right',
+                          fill: '#8884d8',
+                          opacity: 0.5
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="totalSleep"
+                        stroke="#8884d8"
+                        fill="url(#sleepGradient)"
+                        name="Total Sleep (hours)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                {isLoadingCharts && <ChartLoadingOverlay />}
               </div>
 
-              <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+              <div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
                 <h3
                   className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
                 >
@@ -1136,48 +1415,98 @@ export default function Home() {
                 })()}
               </div>
 
-              <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                <h3
-                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                >
+              <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}>
                   Sleep Quality Metrics
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={prepareChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="deepSleep"
-                      stroke="#8884d8"
-                      name="Deep Sleep %"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="remSleep"
-                      stroke="#82ca9d"
-                      name="REM Sleep %"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="awakeTime"
-                      stroke="#ffc658"
-                      name="Awake Time (min)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={prepareChartData()} margin={{ bottom: 50, right: 20 }}>
+                      <defs>
+                        <linearGradient id="deepSleepGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="remSleepGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2dd4bf" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#2dd4bf" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="awakeGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ffc658" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#ffc658" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        interval={0}
+                        tick={{ dy: 10 }}
+                        minTickGap={-200}
+                      />
+                      <YAxis 
+                        domain={[0, 100]}
+                        allowDataOverflow={true}
+                      />
+                      <Tooltip />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="deepSleep"
+                        stroke="#1d4ed8"
+                        fill="url(#deepSleepGradient)"
+                        name="Deep Sleep %"
+                        strokeWidth={2}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="remSleep"
+                        stroke="#2dd4bf"
+                        fill="url(#remSleepGradient)"
+                        name="REM Sleep %"
+                        strokeWidth={2}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="awakeTime"
+                        stroke="#ffc658"
+                        fill="url(#awakeGradient)"
+                        name="Awake Time (min)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                {isLoadingCharts && <ChartLoadingOverlay />}
               </div>
 
-              <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                <h3
-                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                >
+              <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}>
                   Sleep Patterns
                 </h3>
-                <SleepPatternChart data={prepareSleepPatternData()} />
+                <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+                  <SleepPatternChart data={prepareSleepPatternData()} />
+                </div>
+                {isLoadingCharts && <ChartLoadingOverlay />}
+              </div>
+
+              <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div className="lg:col-span-3 relative">
+                  <RHRChart
+                    data={prepareChartData().map(entry => ({
+                      date: entry.date,
+                      rhr: entry.restingHeartRate,
+                    }))}
+                  />
+                </div>
+                <RHRAnalytics
+                  data={prepareChartData().map(entry => ({
+                    date: entry.date,
+                    rhr: entry.restingHeartRate,
+                  }))}
+                />
               </div>
 
               <div className="lg:col-span-3">

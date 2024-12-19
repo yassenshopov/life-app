@@ -13,33 +13,46 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate') || new Date().toISOString();
     const endDate = searchParams.get('endDate') || new Date().toISOString();
 
-    const response = await notion.databases.query({
-      database_id: DATABASE_ID!,
-      filter: {
-        and: [
+    let allResults: any[] = [];
+    let hasMore = true;
+    let nextCursor: string | undefined = undefined;
+
+    // Keep fetching pages while there are more results
+    while (hasMore) {
+      const response = await notion.databases.query({
+        database_id: DATABASE_ID!,
+        filter: {
+          and: [
+            {
+              property: 'Date',
+              date: {
+                on_or_after: startDate,
+              },
+            },
+            {
+              property: 'Date',
+              date: {
+                on_or_before: endDate,
+              },
+            },
+          ],
+        },
+        sorts: [
           {
             property: 'Date',
-            date: {
-              on_or_after: startDate,
-            },
-          },
-          {
-            property: 'Date',
-            date: {
-              on_or_before: endDate,
-            },
+            direction: 'descending',
           },
         ],
-      },
-      sorts: [
-        {
-          property: 'Date',
-          direction: 'descending',
-        },
-      ],
-    });
+        start_cursor: nextCursor,
+        page_size: 100, // Maximum allowed by Notion
+      });
 
-    const entries = response.results.map((page: any) => {
+      allResults = [...allResults, ...response.results];
+      hasMore = response.has_more;
+      nextCursor = response.next_cursor || undefined;
+    }
+
+    const entries = allResults.map((page: any) => {
       let sleepH = page.properties.GoneToSleepH?.number || 0;
       let sleepM = page.properties.GoneToSleepM?.number || 0;
       let wakeH = page.properties.AwokeH?.number || 0;
@@ -89,6 +102,7 @@ export async function GET(request: Request) {
           0,
           page.properties['AwakeTime [min]']?.number || 0
         ),
+        restingHeartRate: page.properties['RHR [bpm]']?.number || null,
       };
     });
 
@@ -115,6 +129,7 @@ export async function POST(request: Request) {
       remSleepPercentage,
       pageId,
       awakeTimeMinutes,
+      restingHeartRate,
     } = body;
 
     // If pageId is provided, update existing entry
@@ -150,6 +165,10 @@ export async function POST(request: Request) {
             type: 'number',
             number: awakeTimeMinutes || 0,
           },
+          'RHR [bpm]': {
+            type: 'number',
+            number: restingHeartRate || null,
+          },
         },
       });
       return NextResponse.json(response);
@@ -180,6 +199,7 @@ export async function POST(request: Request) {
           'Deep Sleep %': { type: 'number', number: deepSleepPercentage / 100 },
           'REM Sleep %': { type: 'number', number: remSleepPercentage / 100 },
           'AwakeTime [min]': { type: 'number', number: awakeTimeMinutes || 0 },
+          'RHR [bpm]': { type: 'number', number: restingHeartRate || null },
         },
       });
       return NextResponse.json(response);
@@ -220,6 +240,10 @@ export async function POST(request: Request) {
         'AwakeTime [min]': {
           type: 'number',
           number: awakeTimeMinutes || 0,
+        },
+        'RHR [bpm]': {
+          type: 'number',
+          number: restingHeartRate || null,
         },
       },
     });
