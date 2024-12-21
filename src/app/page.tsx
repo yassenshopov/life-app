@@ -57,6 +57,9 @@ interface SleepAnalysis {
   recommendations: string[];
 }
 
+// Add this type near the top with other type definitions
+type DisplaySection = 'all' | 'sleep' | 'rhr' | 'steps' | 'weight';
+
 export default function Home() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [entries, setEntries] = useState<SleepEntry[]>([]);
@@ -83,6 +86,9 @@ export default function Home() {
   // Add initial loading state
   const [initialLoading, setInitialLoading] = useState(true);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+
+  // Add this state variable with other useState declarations
+  const [activeSection, setActiveSection] = useState<DisplaySection>('all');
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -839,20 +845,22 @@ export default function Home() {
   };
 
   const RHRChart = ({ data }: { data: any[] }) => {
+    // Filter out null/undefined RHR values and map to correct format
+    const validData = data
+      .filter(entry => entry.restingHeartRate != null)
+      .map(entry => ({
+        date: entry.date,
+        rhr: entry.restingHeartRate
+      }));
+
     return (
       <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3
-          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-        >
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
           Resting Heart Rate
         </h3>
-        <div
-          className={`transition-opacity duration-200 ${
-            isLoadingCharts ? 'opacity-50' : 'opacity-100'
-          }`}
-        >
+        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={data} margin={{ bottom: 50 }}>
+            <AreaChart data={validData} margin={{ bottom: 50 }}>
               <defs>
                 <linearGradient id="rhrGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
@@ -884,22 +892,6 @@ export default function Home() {
                     );
                   }
                   return null;
-                }}
-              />
-              <ReferenceLine
-                y={
-                  data
-                    .filter((entry) => entry.rhr && entry.rhr > 0)
-                    .reduce((acc, curr) => acc + curr.rhr, 0) /
-                  data.filter((entry) => entry.rhr && entry.rhr > 0).length
-                }
-                stroke="#ef4444"
-                strokeOpacity={0.5}
-                label={{
-                  value: 'Avg RHR',
-                  position: 'right',
-                  fill: '#ef4444',
-                  opacity: 0.5,
                 }}
               />
               <Area
@@ -1842,458 +1834,459 @@ export default function Home() {
     <div
       className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 ${inter.className}`}
     >
-      {/* Header section with theme toggle and time period selection */}
-      <div className="fixed top-0 right-0 left-0 z-50 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-end sm:items-center justify-end gap-4">
-          <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-4 items-end sm:items-center">
-            <Tabs
-              value={activeTab || ''}
-              onValueChange={(value) => {
-                setActiveTab(value);
-                if (value === '3') handleDateRangeFilter(3);
-                if (value === '7') handleDateRangeFilter(7);
-                if (value === '30') handleDateRangeFilter(30);
-                if (value === '90') handleDateRangeFilter(90);
-                if (value === '365') {
-                  const to = new Date();
-                  const from = new Date();
-                  from.setFullYear(from.getFullYear() - 1);
-                  from.setDate(from.getDate() + 1);
-                  setDateRange({ from, to });
-                }
-                if (value === 'year') {
-                  const to = new Date();
-                  const from = new Date(to.getFullYear(), 0, 1);
-                  setDateRange({ from, to });
-                }
-              }}
-              className="w-full sm:w-auto"
-            >
-              <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full sm:w-auto">
-                <TabsTrigger value="3">3D</TabsTrigger>
-                <TabsTrigger value="7">7D</TabsTrigger>
-                <TabsTrigger value="30">30D</TabsTrigger>
-                <TabsTrigger value="90">90D</TabsTrigger>
-                <TabsTrigger value="365">1Y</TabsTrigger>
-                <TabsTrigger value="year">YTD</TabsTrigger>
-              </TabsList>
-            </Tabs>
+      {/* Update the header section styling */}
+      <div className="fixed top-0 right-0 left-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
+        {/* Update navigation tabs border */}
+        <div className="border-b border-slate-200 dark:border-slate-800">
+          <div className="max-w-7xl mx-auto px-4">
+            <nav className="flex space-x-4">
+              {['All', 'Sleep', 'RHR', 'Steps', 'Weight'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveSection(tab.toLowerCase().replace(' ', '') as DisplaySection)}
+                  className={`py-4 px-2 text-sm font-medium transition-colors ${
+                    activeSection === tab.toLowerCase().replace(' ', '')
+                      ? 'text-purple-600 dark:text-white border-b-2 border-purple-600 dark:border-white'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
 
-            <div className="flex flex-row gap-2 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-initial">
-                <input
-                  type="date"
-                  value={dateRange.from.toISOString().split('T')[0]}
-                  onChange={(e) => {
-                    setActiveTab(null);
-                    setDateRange((prev) => ({
-                      ...prev,
-                      from: new Date(e.target.value),
-                    }));
+        {/* Update date range controls border and styling */}
+        <div className="border-b border-slate-200 dark:border-slate-800">
+          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              {['3D', '7D', '30D', '90D', '1Y', 'YTD'].map((period) => (
+                <button
+                  key={period}
+                  onClick={() => {
+                    setActiveTab(period);
+                    const days = parseInt(period);
+                    if (!isNaN(days)) handleDateRangeFilter(days);
+                    if (period === 'YTD') {
+                      const to = new Date();
+                      const from = new Date(to.getFullYear(), 0, 1);
+                      setDateRange({ from, to });
+                    }
                   }}
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2 text-sm"
-                />
-              </div>
-              <div className="flex-1 sm:flex-initial">
-                <input
-                  type="date"
-                  value={dateRange.to.toISOString().split('T')[0]}
-                  onChange={(e) => {
-                    setActiveTab(null);
-                    setDateRange((prev) => ({
-                      ...prev,
-                      to: new Date(e.target.value),
-                    }));
-                  }}
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2 text-sm"
-                />
-              </div>
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    activeTab === period
+                      ? 'bg-purple-100 text-purple-700 dark:bg-slate-800 dark:text-white'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {period}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="date"
+                value={dateRange.from.toISOString().split('T')[0]}
+                onChange={(e) => {
+                  setActiveTab(null);
+                  setDateRange((prev) => ({
+                    ...prev,
+                    from: new Date(e.target.value),
+                  }));
+                }}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs"
+              />
+              <input
+                type="date"
+                value={dateRange.to.toISOString().split('T')[0]}
+                onChange={(e) => {
+                  setActiveTab(null);
+                  setDateRange((prev) => ({
+                    ...prev,
+                    to: new Date(e.target.value),
+                  }));
+                }}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs"
+              />
+              <ThemeToggle />
             </div>
           </div>
-          <ThemeToggle />
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto pt-32 sm:pt-36">
-        {' '}
-        {/* Increased padding to account for fixed header */}
-        <h1
-          className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
-        >
+      {/* Update the main content top padding to account for the fixed header */}
+      <main className="max-w-7xl mx-auto pt-32">
+        <h1 className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}>
           Sleep Tracker
         </h1>
-        {renderManualEntryForm()}
-        {entries.length > 0 &&
-          (() => {
-            const todayEntry = entries.find(
-              (e) => e.date === new Date().toISOString().split('T')[0]
-            );
-            const hasMeaningfulSleepData =
-              todayEntry &&
-              (todayEntry.totalSleepHours > 0 ||
-                todayEntry.totalSleepMinutes > 0);
 
-            return hasMeaningfulSleepData ? (
-              <div className="mb-8">
-                <SleepAnalysisCard entry={todayEntry} />
-              </div>
-            ) : null;
-          })()}
+        {/* Only show entry form and analysis card when on Sleep or All tabs */}
+        {(activeSection === 'all' || activeSection === 'sleep') && (
+          <>
+            {renderManualEntryForm()}
+            {entries.length > 0 && (() => {
+              const todayEntry = entries.find(
+                (e) => e.date === new Date().toISOString().split('T')[0]
+              );
+              const hasMeaningfulSleepData = todayEntry &&
+                (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+
+              return hasMeaningfulSleepData ? (
+                <div className="mb-8">
+                  <SleepAnalysisCard entry={todayEntry} />
+                </div>
+              ) : null;
+            })()}
+          </>
+        )}
+
         <div className="space-y-4">
           <div className="flex flex-col gap-4">
-            <h2
-              className={`text-xl font-semibold text-slate-900 dark:text-slate-100 ${outfit.className}`}
-            >
-              Sleep History
-            </h2>
-
-            {/* Rest of the content */}
+            {/* Conditionally render chart sections based on activeSection */}
             {loading ? (
-              <p className="text-slate-600 dark:text-slate-400">
-                Loading entries...
-              </p>
+              <p className="text-slate-600 dark:text-slate-400">Loading entries...</p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Sleep Duration Chart */}
-                <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-                  <h3
-                    className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
-                  >
-                    Sleep Duration Over Time
-                  </h3>
-                  <div
-                    className={`transition-opacity duration-200 ${
-                      isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                    }`}
-                  >
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart
-                        data={prepareChartData()}
-                        margin={{ bottom: 50, right: 20 }}
+                {/* Sleep charts */}
+                {(activeSection === 'all' || activeSection === 'sleep') && (
+                  <>
+                    <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                      {/* Sleep Duration Chart */}
+                      <h3
+                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
                       >
-                        <defs>
-                          <linearGradient
-                            id="sleepGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
+                        Sleep Duration Over Time
+                      </h3>
+                      <div
+                        className={`transition-opacity duration-200 ${
+                          isLoadingCharts ? 'opacity-50' : 'opacity-100'
+                        }`}
+                      >
+                        <ResponsiveContainer width="100%" height={300}>
+                          <AreaChart
+                            data={prepareChartData()}
+                            margin={{ bottom: 50, right: 20 }}
                           >
-                            <stop
-                              offset="5%"
-                              stopColor="#8884d8"
-                              stopOpacity={0.8}
+                            <defs>
+                              <linearGradient
+                                id="sleepGradient"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor="#8884d8"
+                                  stopOpacity={0.8}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor="#8884d8"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                              interval={0}
+                              tick={{ dy: 10 }}
+                              minTickGap={-200}
                             />
-                            <stop
-                              offset="95%"
-                              stopColor="#8884d8"
-                              stopOpacity={0}
+                            <YAxis domain={[0, 'auto']} allowDataOverflow={true} />
+                            <Tooltip />
+                            <Legend />
+                            <ReferenceLine
+                              y={
+                                prepareChartData()
+                                  .filter((entry) => entry.totalSleep > 0)
+                                  .reduce((acc, curr) => acc + curr.totalSleep, 0) /
+                                prepareChartData().filter(
+                                  (entry) => entry.totalSleep > 0
+                                ).length
+                              }
+                              stroke="#8884d8"
+                              strokeOpacity={0.5}
+                              label={{
+                                value: 'Avg Sleep',
+                                position: 'right',
+                                fill: '#8884d8',
+                                opacity: 0.5,
+                              }}
                             />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          interval={0}
-                          tick={{ dy: 10 }}
-                          minTickGap={-200}
-                        />
-                        <YAxis domain={[0, 'auto']} allowDataOverflow={true} />
-                        <Tooltip />
-                        <Legend />
-                        <ReferenceLine
-                          y={
-                            prepareChartData()
-                              .filter((entry) => entry.totalSleep > 0)
-                              .reduce((acc, curr) => acc + curr.totalSleep, 0) /
-                            prepareChartData().filter(
-                              (entry) => entry.totalSleep > 0
-                            ).length
-                          }
-                          stroke="#8884d8"
-                          strokeOpacity={0.5}
-                          label={{
-                            value: 'Avg Sleep',
-                            position: 'right',
-                            fill: '#8884d8',
-                            opacity: 0.5,
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="totalSleep"
-                          stroke="#8884d8"
-                          fill="url(#sleepGradient)"
-                          name="Total Sleep (hours)"
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-                </div>
-
-                {/* Statistics Panel */}
-                <div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                  <h3
-                    className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                  >
-                    Period Statistics
-                  </h3>
-                  {(() => {
-                    const filteredEntries = entries.filter((entry) => {
-                      const entryDate = new Date(entry.date);
-                      return (
-                        entryDate >= dateRange.from && entryDate <= dateRange.to
-                      );
-                    });
-                    const stats = calculateStats(filteredEntries);
-
-                    if (!stats)
-                      return (
-                        <p className="text-slate-600 dark:text-slate-400">
-                          No data available
-                        </p>
-                      );
-
-                    return (
-                      <div className="space-y-4">
-                        <div>
-                          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                            {stats.avgSleepDurationHours}h {stats.avgSleepDurationMins}m
-                          </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Average Sleep Duration
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgSleepTime.hours.toString().padStart(2, '0')}:
-                              {stats.avgSleepTime.minutes.toString().padStart(2, '0')}
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg Bedtime
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgWakeTime.hours.toString().padStart(2, '0')}:
-                              {stats.avgWakeTime.minutes.toString().padStart(2, '0')}
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg Wake Time
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgDeepSleep.toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg Deep Sleep
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgRemSleep.toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg REM Sleep
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgAwakeTime.toFixed(0)}m
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg Awake Time
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.totalEntries}
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Total Entries
-                            </div>
-                          </div>
-                        </div>
+                            <Area
+                              type="monotone"
+                              dataKey="totalSleep"
+                              stroke="#8884d8"
+                              fill="url(#sleepGradient)"
+                              name="Total Sleep (hours)"
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
                       </div>
-                    );
-                  })()}
-                </div>
-
-                <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-                  <h3
-                    className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
-                  >
-                    Sleep Quality Metrics
-                  </h3>
-                  <div
-                    className={`transition-opacity duration-200 ${
-                      isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                    }`}
-                  >
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart
-                        data={prepareChartData()}
-                        margin={{ bottom: 50, right: 20 }}
+                      {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+                    </div>
+                    <div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                      {/* Sleep Statistics Panel */}
+                      <h3
+                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
                       >
-                        <defs>
-                          <linearGradient
-                            id="deepSleepGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#1d4ed8"
-                              stopOpacity={0.8}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#1d4ed8"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="remSleepGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#2dd4bf"
-                              stopOpacity={0.8}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#2dd4bf"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="awakeGradient"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#ffc658"
-                              stopOpacity={0.8}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#ffc658"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          interval={0}
-                          tick={{ dy: 10 }}
-                          minTickGap={-200}
-                        />
-                        <YAxis domain={[0, 100]} allowDataOverflow={true} />
-                        <Tooltip />
-                        <Legend />
-                        <Area
-                          type="monotone"
-                          dataKey="deepSleep"
-                          stroke="#1d4ed8"
-                          fill="url(#deepSleepGradient)"
-                          name="Deep Sleep %"
-                          strokeWidth={2}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="remSleep"
-                          stroke="#2dd4bf"
-                          fill="url(#remSleepGradient)"
-                          name="REM Sleep %"
-                          strokeWidth={2}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="awakeTime"
-                          stroke="#ffc658"
-                          fill="url(#awakeGradient)"
-                          name="Awake Time (min)"
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-                </div>
+                        Period Statistics
+                      </h3>
+                      {(() => {
+                        const filteredEntries = entries.filter((entry) => {
+                          const entryDate = new Date(entry.date);
+                          return (
+                            entryDate >= dateRange.from && entryDate <= dateRange.to
+                          );
+                        });
+                        const stats = calculateStats(filteredEntries);
 
-                <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-                  <h3
-                    className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
-                  >
-                    Sleep Patterns
-                  </h3>
-                  <div
-                    className={`transition-opacity duration-200 ${
-                      isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                    }`}
-                  >
-                    <SleepPatternChart data={prepareSleepPatternData()} />
-                  </div>
-                  {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-                </div>
+                        if (!stats)
+                          return (
+                            <p className="text-slate-600 dark:text-slate-400">
+                              No data available
+                            </p>
+                          );
 
-                <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
-                  <StepsAnalytics
-                    data={prepareChartData().map((entry) => ({
-                      date: entry.date,
-                      steps: entry.steps,
-                    }))}
-                  />
-                  <div className="lg:col-span-3 relative">
-                    <StepsChart
-                      data={prepareChartData().map((entry) => ({
-                        date: entry.date,
-                        steps: entry.steps,
-                      }))}
+                        return (
+                          <div className="space-y-4">
+                            <div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                {stats.avgSleepDurationHours}h {stats.avgSleepDurationMins}m
+                              </div>
+                              <div className="text-sm text-slate-600 dark:text-slate-400">
+                                Average Sleep Duration
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                  {stats.avgSleepTime.hours.toString().padStart(2, '0')}:
+                                  {stats.avgSleepTime.minutes.toString().padStart(2, '0')}
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  Avg Bedtime
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                  {stats.avgWakeTime.hours.toString().padStart(2, '0')}:
+                                  {stats.avgWakeTime.minutes.toString().padStart(2, '0')}
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  Avg Wake Time
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                  {stats.avgDeepSleep.toFixed(1)}%
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  Avg Deep Sleep
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                  {stats.avgRemSleep.toFixed(1)}%
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  Avg REM Sleep
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                  {stats.avgAwakeTime.toFixed(0)}m
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  Avg Awake Time
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                  {stats.totalEntries}
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  Total Entries
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                      {/* Sleep Quality Metrics Chart */}
+                      <h3
+                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
+                      >
+                        Sleep Quality Metrics
+                      </h3>
+                      <div
+                        className={`transition-opacity duration-200 ${
+                          isLoadingCharts ? 'opacity-50' : 'opacity-100'
+                        }`}
+                      >
+                        <ResponsiveContainer width="100%" height={300}>
+                          <AreaChart
+                            data={prepareChartData()}
+                            margin={{ bottom: 50, right: 20 }}
+                          >
+                            <defs>
+                              <linearGradient
+                                id="deepSleepGradient"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor="#1d4ed8"
+                                  stopOpacity={0.8}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor="#1d4ed8"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                              <linearGradient
+                                id="remSleepGradient"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor="#2dd4bf"
+                                  stopOpacity={0.8}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor="#2dd4bf"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                              <linearGradient
+                                id="awakeGradient"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor="#ffc658"
+                                  stopOpacity={0.8}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor="#ffc658"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                              interval={0}
+                              tick={{ dy: 10 }}
+                              minTickGap={-200}
+                            />
+                            <YAxis domain={[0, 100]} allowDataOverflow={true} />
+                            <Tooltip />
+                            <Legend />
+                            <Area
+                              type="monotone"
+                              dataKey="deepSleep"
+                              stroke="#1d4ed8"
+                              fill="url(#deepSleepGradient)"
+                              name="Deep Sleep %"
+                              strokeWidth={2}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="remSleep"
+                              stroke="#2dd4bf"
+                              fill="url(#remSleepGradient)"
+                              name="REM Sleep %"
+                              strokeWidth={2}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="awakeTime"
+                              stroke="#ffc658"
+                              fill="url(#awakeGradient)"
+                              name="Awake Time (min)"
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+                    </div>
+                    <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                      {/* Sleep Patterns Chart */}
+                      <h3
+                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
+                      >
+                        Sleep Patterns
+                      </h3>
+                      <div
+                        className={`transition-opacity duration-200 ${
+                          isLoadingCharts ? 'opacity-50' : 'opacity-100'
+                        }`}
+                      >
+                        <SleepPatternChart data={prepareSleepPatternData()} />
+                      </div>
+                      {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+                    </div>
+                  </>
+                )}
+
+                {/* Steps charts */}
+                {(activeSection === 'all' || activeSection === 'steps') && (
+                  <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <StepsAnalytics data={prepareChartData()} />
+                    <div className="lg:col-span-3 relative">
+                      <StepsChart data={prepareChartData()} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Heart Rate charts */}
+                {(activeSection === 'all' || activeSection === 'rhr') && (
+                  <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <div className="lg:col-span-3 relative">
+                      <RHRChart
+                        data={prepareChartData().filter(entry => entry.restingHeartRate != null)}
+                      />
+                    </div>
+                    <RHRAnalytics
+                      data={prepareChartData().filter(entry => entry.restingHeartRate != null)}
                     />
                   </div>
-                </div>
+                )}
 
-                <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
-                  <div className="lg:col-span-3 relative">
-                    <RHRChart
-                      data={prepareChartData().map((entry) => ({
-                        date: entry.date,
-                        rhr: entry.restingHeartRate,
-                      }))}
-                    />
-                  </div>
-                  <RHRAnalytics
-                    data={prepareChartData().map((entry) => ({
-                      date: entry.date,
-                      rhr: entry.restingHeartRate,
-                    }))}
-                  />
-                </div>
-
-                {/* Weight section - Reordered */}
-                <WeightAnalytics data={prepareChartData()} />
-                <WeightChart data={prepareChartData()} />
+                {/* Weight charts */}
+                {(activeSection === 'all' || activeSection === 'weight') && (
+                  <>
+                    <WeightAnalytics data={prepareChartData()} />
+                    <WeightChart data={prepareChartData()} />
+                  </>
+                )}
               </div>
             )}
           </div>
