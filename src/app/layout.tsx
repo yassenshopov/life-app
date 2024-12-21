@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers';
-import { Inter, Outfit } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { defaultMetadata } from "./metadata";
 
 const inter = Inter({ subsets: ['latin'] });
-const outfit = Outfit({ subsets: ['latin'] });
 
 export const metadata: Metadata = defaultMetadata;
 

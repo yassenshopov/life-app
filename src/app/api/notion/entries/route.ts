@@ -7,6 +7,16 @@ const notion = new Client({
 
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
+type NotionResponse = {
+  properties: {
+    [key: string]: {
+      type: string;
+      [key: string]: unknown;
+    };
+  };
+  id: string;
+};
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -53,10 +63,10 @@ export async function GET(request: Request) {
     }
 
     const entries = allResults.map((page: any) => {
-      let sleepH = page.properties.GoneToSleepH?.number || 0;
-      let sleepM = page.properties.GoneToSleepM?.number || 0;
-      let wakeH = page.properties.AwokeH?.number || 0;
-      let wakeM = page.properties.AwokeM?.number || 0;
+      const sleepH = parseInt(page.properties.GoneToSleepH?.number || 0);
+      const sleepM = parseInt(page.properties.GoneToSleepM?.number || 0);
+      const wakeH = parseInt(page.properties.AwokeH?.number || 0);
+      const wakeM = parseInt(page.properties.AwokeM?.number || 0);
 
       // Convert to minutes since midnight for calculations
       const sleepTimeInMinutes = sleepH * 60 + sleepM;

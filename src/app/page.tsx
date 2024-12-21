@@ -215,7 +215,8 @@ export default function Home() {
                     />
                   </svg>
                   <span className="text-slate-600 dark:text-slate-400">
-                    Today's sleep data has been recorded:{' '}
+                    Today&apos;s sleep data has been recorded:
+                    {' '}
                     {todayEntry.totalSleepHours}h {todayEntry.totalSleepMinutes}
                     m
                   </span>
@@ -1658,7 +1659,7 @@ export default function Home() {
         : 0;
 
     // Convert back to 24-hour format
-    let avgSleepHours = Math.floor(avgSleepTimeMinutes / 60) % 24;
+    const avgSleepHours = Math.floor(avgSleepTimeMinutes / 60) % 24;
     const avgSleepMins = Math.round(avgSleepTimeMinutes % 60);
 
     const avgWakeTimeMinutes =
