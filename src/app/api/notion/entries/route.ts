@@ -103,6 +103,7 @@ export async function GET(request: Request) {
           page.properties['AwakeTime [min]']?.number || 0
         ),
         restingHeartRate: page.properties['RHR [bpm]']?.number || null,
+        steps: page.properties['Steps']?.number || null,
       };
     });
 
@@ -130,46 +131,44 @@ export async function POST(request: Request) {
       pageId,
       awakeTimeMinutes,
       restingHeartRate,
+      steps,
     } = body;
+
+    const properties = {
+      GoneToSleepH: {
+        number: GoneToSleepH + 12,
+      },
+      GoneToSleepM: {
+        number: GoneToSleepM,
+      },
+      AwokeH: {
+        number: AwokeH,
+      },
+      AwokeM: {
+        number: AwokeM,
+      },
+      'Deep Sleep %': {
+        number: deepSleepPercentage / 100,
+      },
+      'REM Sleep %': {
+        number: remSleepPercentage / 100,
+      },
+      'AwakeTime [min]': {
+        number: awakeTimeMinutes || 0,
+      },
+      'RHR [bpm]': {
+        number: restingHeartRate || null,
+      },
+      Steps: {
+        number: steps || null,
+      },
+    };
 
     // If pageId is provided, update existing entry
     if (pageId) {
       const response = await notion.pages.update({
         page_id: pageId,
-        properties: {
-          GoneToSleepH: {
-            type: 'number',
-            number: GoneToSleepH + 12,
-          },
-          GoneToSleepM: {
-            type: 'number',
-            number: GoneToSleepM,
-          },
-          AwokeH: {
-            type: 'number',
-            number: AwokeH,
-          },
-          AwokeM: {
-            type: 'number',
-            number: AwokeM,
-          },
-          'Deep Sleep %': {
-            type: 'number',
-            number: deepSleepPercentage / 100,
-          },
-          'REM Sleep %': {
-            type: 'number',
-            number: remSleepPercentage / 100,
-          },
-          'AwakeTime [min]': {
-            type: 'number',
-            number: awakeTimeMinutes || 0,
-          },
-          'RHR [bpm]': {
-            type: 'number',
-            number: restingHeartRate || null,
-          },
-        },
+        properties: properties,
       });
       return NextResponse.json(response);
     }
@@ -191,16 +190,7 @@ export async function POST(request: Request) {
       const existingPageId = existingEntries.results[0].id;
       const response = await notion.pages.update({
         page_id: existingPageId,
-        properties: {
-          GoneToSleepH: { type: 'number', number: GoneToSleepH + 12 },
-          GoneToSleepM: { type: 'number', number: GoneToSleepM },
-          AwokeH: { type: 'number', number: AwokeH },
-          AwokeM: { type: 'number', number: AwokeM },
-          'Deep Sleep %': { type: 'number', number: deepSleepPercentage / 100 },
-          'REM Sleep %': { type: 'number', number: remSleepPercentage / 100 },
-          'AwakeTime [min]': { type: 'number', number: awakeTimeMinutes || 0 },
-          'RHR [bpm]': { type: 'number', number: restingHeartRate || null },
-        },
+        properties: properties,
       });
       return NextResponse.json(response);
     }
@@ -208,44 +198,7 @@ export async function POST(request: Request) {
     // If no existing entry found, create new one
     const response = await notion.pages.create({
       parent: { database_id: DATABASE_ID! },
-      properties: {
-        Date: {
-          type: 'date',
-          date: { start: date },
-        },
-        GoneToSleepH: {
-          type: 'number',
-          number: GoneToSleepH + 12,
-        },
-        GoneToSleepM: {
-          type: 'number',
-          number: GoneToSleepM,
-        },
-        AwokeH: {
-          type: 'number',
-          number: AwokeH,
-        },
-        AwokeM: {
-          type: 'number',
-          number: AwokeM,
-        },
-        'Deep Sleep %': {
-          type: 'number',
-          number: deepSleepPercentage / 100,
-        },
-        'REM Sleep %': {
-          type: 'number',
-          number: remSleepPercentage / 100,
-        },
-        'AwakeTime [min]': {
-          type: 'number',
-          number: awakeTimeMinutes || 0,
-        },
-        'RHR [bpm]': {
-          type: 'number',
-          number: restingHeartRate || null,
-        },
-      },
+      properties: properties,
     });
     return NextResponse.json(response);
   } catch (error) {
