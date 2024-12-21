@@ -7,15 +7,15 @@ const notion = new Client({
 
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
-type NotionResponse = {
+interface NotionData {
+  id: string;
   properties: {
     [key: string]: {
-      type: string;
-      [key: string]: unknown;
+      number?: number;
+      date?: { start: string };
     };
   };
-  id: string;
-};
+}
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate') || new Date().toISOString();
     const endDate = searchParams.get('endDate') || new Date().toISOString();
 
-    let allResults: any[] = [];
+    let allResults: NotionData[] = [];
     let hasMore = true;
     let nextCursor: string | undefined = undefined;
 
@@ -57,16 +57,16 @@ export async function GET(request: Request) {
         page_size: 100, // Maximum allowed by Notion
       });
 
-      allResults = [...allResults, ...response.results];
+      allResults = [...allResults, ...(response.results as NotionData[])];
       hasMore = response.has_more;
       nextCursor = response.next_cursor || undefined;
     }
 
-    const entries = allResults.map((page: any) => {
-      const sleepH = parseInt(page.properties.GoneToSleepH?.number || 0);
-      const sleepM = parseInt(page.properties.GoneToSleepM?.number || 0);
-      const wakeH = parseInt(page.properties.AwokeH?.number || 0);
-      const wakeM = parseInt(page.properties.AwokeM?.number || 0);
+    const entries = allResults.map((page: NotionData) => {
+      const sleepH = page.properties.GoneToSleepH?.number || 0;
+      const sleepM = page.properties.GoneToSleepM?.number || 0;
+      const wakeH = page.properties.AwokeH?.number || 0;
+      const wakeM = page.properties.AwokeM?.number || 0;
 
       // Convert to minutes since midnight for calculations
       const sleepTimeInMinutes = sleepH * 60 + sleepM;
