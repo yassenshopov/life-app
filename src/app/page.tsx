@@ -26,10 +26,12 @@ import {
   ReferenceLine,
   BarChart,
   Bar,
+  ComposedChart,
 } from 'recharts';
 import { Inter, Outfit } from 'next/font/google';
-import { Pencil, X } from 'lucide-react';
+import { Menu, Moon, Heart, Footprints, Weight, X, Pencil, CheckSquare } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from "@/components/ui/checkbox"
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -60,7 +62,7 @@ interface SleepAnalysis {
 }
 
 // Add this type near the top with other type definitions
-type DisplaySection = 'all' | 'sleep' | 'rhr' | 'steps' | 'weight';
+type DisplaySection = 'all' | 'sleep' | 'rhr' | 'steps' | 'weight' | 'checklist';
 
 // Add this helper function near the top of the file
 const getTickInterval = (dataLength: number) => {
@@ -99,6 +101,12 @@ export default function Home() {
 
   // Add this state variable with other useState declarations
   const [activeSection, setActiveSection] = useState<DisplaySection>('all');
+
+  // Add this state variable with other useState declarations
+  const [showAwakeTime, setShowAwakeTime] = useState(true);
+
+  // Add this inside your Home component, with other state declarations
+  const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -1231,10 +1239,18 @@ export default function Home() {
     );
   };
 
-  const handleDateRangeFilter = (days: number) => {
+  const handleDateRangeFilter = (days: number | string) => {
     const to = new Date();
     const from = new Date();
-    from.setDate(from.getDate() - days);
+
+    if (days === '1Y') {
+      // Set from date to 1 year ago from today
+      from.setFullYear(from.getFullYear() - 1);
+    } else {
+      // Handle numeric days as before
+      from.setDate(from.getDate() - Number(days));
+    }
+
     setDateRange({ from, to });
   };
 
@@ -1912,6 +1928,176 @@ export default function Home() {
     );
   };
 
+  const formatDuration = (hours: number | null) => {
+    if (!hours) return '0h 0m';
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${m}m`;
+  };
+
+  const SleepCompositionChart = ({ data }: { data: any[] }) => {
+    const [showAwakeTime, setShowAwakeTime] = useState(true);
+
+    return (
+      <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3
+            className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}
+          >
+            Sleep Composition
+          </h3>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="showAwakeTime"
+              checked={showAwakeTime}
+              onChange={(e) => setShowAwakeTime(e.target.checked)}
+              className="rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
+            />
+            <label
+              htmlFor="showAwakeTime"
+              className="text-sm text-slate-600 dark:text-slate-400"
+            >
+              Show Awake Time
+            </label>
+          </div>
+        </div>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart
+              data={data.map((entry) => {
+                const totalSleepHours = entry.totalSleep;
+                return {
+                  ...entry,
+                  deepSleepHours: (totalSleepHours * entry.deepSleep) / 100,
+                  remSleepHours: (totalSleepHours * entry.remSleep) / 100,
+                  lightSleepHours:
+                    (totalSleepHours *
+                      (100 - entry.deepSleep - entry.remSleep)) /
+                    100,
+                };
+              })}
+              margin={{ bottom: 50 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval={0}
+                tick={{ dy: 10 }}
+              />
+              <YAxis
+                yAxisId="left"
+                label={{
+                  value: 'Sleep Duration (hours)',
+                  angle: -90,
+                  position: 'insideLeft',
+                }}
+                domain={[0, 'auto']}
+              />
+              {showAwakeTime && (
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  label={{
+                    value: 'Awake Time (minutes)',
+                    angle: 90,
+                    position: 'insideRight',
+                  }}
+                  domain={[0, 'auto']}
+                />
+              )}
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const formatDuration = (hours: number) => {
+                      const h = Math.floor(hours);
+                      const m = Math.round((hours - h) * 60);
+                      return `${h}h ${m}m`;
+                    };
+
+                    return (
+                      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">
+                          {label}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Deep Sleep:{' '}
+                          {formatDuration(Number(payload[0].value) || 0)}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          REM Sleep:{' '}
+                          {formatDuration(Number(payload[1].value) || 0)}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Light Sleep:{' '}
+                          {formatDuration(Number(payload[2].value) || 0)}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Total Sleep:{' '}
+                          {formatDuration(
+                            (Number(payload[0].value) || 0) +
+                            (Number(payload[1].value) || 0) +
+                            (Number(payload[2].value) || 0)
+                          )}
+                        </p>
+                        {showAwakeTime && payload[3] && (
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Awake: {payload[3].value} min
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="deepSleepHours"
+                stackId="a"
+                fill="#3b82f6"
+                name="Deep Sleep"
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="remSleepHours"
+                stackId="a"
+                fill="#14b8a6"
+                name="REM Sleep"
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="lightSleepHours"
+                stackId="a"
+                fill="#60a5fa"
+                name="Light Sleep"
+              />
+              {showAwakeTime && (
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="awakeTime"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  dot={{ fill: '#ef4444' }}
+                  name="Awake Time"
+                />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+      </div>
+    );
+  };
+
   return (
     <div
       className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 ${inter.className}`}
@@ -1922,21 +2108,29 @@ export default function Home() {
         <div className="border-b border-slate-200 dark:border-slate-800">
           <div className="max-w-7xl mx-auto px-4">
             <nav className="flex space-x-4">
-              {['All', 'Sleep', 'RHR', 'Steps', 'Weight'].map((tab) => (
+              {[
+                { name: 'All', icon: <Menu className="w-4 h-4" /> },
+                { name: 'Sleep', icon: <Moon className="w-4 h-4" /> },
+                { name: 'RHR', icon: <Heart className="w-4 h-4" /> },
+                { name: 'Steps', icon: <Footprints className="w-4 h-4" /> },
+                { name: 'Weight', icon: <Weight className="w-4 h-4" /> },
+                { name: 'Checklist', icon: <CheckSquare className="w-4 h-4" /> },
+              ].map((tab) => (
                 <button
-                  key={tab}
+                  key={tab.name}
                   onClick={() =>
                     setActiveSection(
-                      tab.toLowerCase().replace(' ', '') as DisplaySection
+                      tab.name.toLowerCase().replace(' ', '') as DisplaySection
                     )
                   }
-                  className={`py-4 px-2 text-sm font-medium transition-colors ${
-                    activeSection === tab.toLowerCase().replace(' ', '')
+                  className={`py-4 px-2 text-sm font-medium transition-colors flex items-center gap-2 ${
+                    activeSection === tab.name.toLowerCase().replace(' ', '')
                       ? 'text-purple-600 dark:text-white border-b-2 border-purple-600 dark:border-white'
                       : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
                   }`}
                 >
-                  {tab}
+                  {tab.icon}
+                  {tab.name}
                 </button>
               ))}
             </nav>
@@ -1952,12 +2146,14 @@ export default function Home() {
                   key={period}
                   onClick={() => {
                     setActiveTab(period);
-                    const days = parseInt(period);
-                    if (!isNaN(days)) handleDateRangeFilter(days);
                     if (period === 'YTD') {
                       const to = new Date();
                       const from = new Date(to.getFullYear(), 0, 1);
                       setDateRange({ from, to });
+                    } else if (period === '1Y') {
+                      handleDateRangeFilter('1Y');
+                    } else {
+                      handleDateRangeFilter(parseInt(period));
                     }
                   }}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
@@ -2233,18 +2429,35 @@ export default function Home() {
 
             {/* Sleep Composition Chart */}
             <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative mb-8">
-              <h3
-                className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-              >
-                Sleep Composition
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3
+                  className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}
+                >
+                  Sleep Composition
+                </h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="showAwakeTime"
+                    checked={showAwakeTime}
+                    onChange={(e) => setShowAwakeTime(e.target.checked)}
+                    className="rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
+                  />
+                  <label
+                    htmlFor="showAwakeTime"
+                    className="text-sm text-slate-600 dark:text-slate-400"
+                  >
+                    Show Awake Time
+                  </label>
+                </div>
+              </div>
               <div
                 className={`transition-opacity duration-200 ${
                   isLoadingCharts ? 'opacity-50' : 'opacity-100'
                 }`}
               >
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
+                  <ComposedChart
                     data={prepareChartData().map((entry) => {
                       const totalSleepHours = entry.totalSleep;
                       return {
@@ -2255,7 +2468,7 @@ export default function Home() {
                         lightSleepHours:
                           (totalSleepHours *
                             (100 - entry.deepSleep - entry.remSleep)) /
-                          100,
+                            100,
                       };
                     })}
                     margin={{ bottom: 50 }}
@@ -2270,13 +2483,26 @@ export default function Home() {
                       tick={{ dy: 10 }}
                     />
                     <YAxis
+                      yAxisId="left"
                       label={{
-                        value: 'Hours',
+                        value: 'Sleep Duration (hours)',
                         angle: -90,
                         position: 'insideLeft',
                       }}
                       domain={[0, 'auto']}
                     />
+                    {showAwakeTime && (
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        label={{
+                          value: 'Awake Time (minutes)',
+                          angle: 90,
+                          position: 'insideRight',
+                        }}
+                        domain={[0, 'auto']}
+                      />
+                    )}
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
@@ -2293,45 +2519,29 @@ export default function Home() {
                               </p>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
                                 Deep Sleep:{' '}
-                                {formatDuration(
-                                  typeof payload[0].value === 'number'
-                                    ? payload[0].value
-                                    : 0
-                                )}
+                                {formatDuration(Number(payload[0].value) || 0)}
                               </p>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
                                 REM Sleep:{' '}
-                                {formatDuration(
-                                  typeof payload[1].value === 'number'
-                                    ? payload[1].value
-                                    : 0
-                                )}
+                                {formatDuration(Number(payload[1].value) || 0)}
                               </p>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
                                 Light Sleep:{' '}
-                                {formatDuration(
-                                  typeof payload[2].value === 'number'
-                                    ? payload[2].value
-                                    : 0
-                                )}
+                                {formatDuration(Number(payload[2].value) || 0)}
                               </p>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
                                 Total Sleep:{' '}
                                 {formatDuration(
-                                  (typeof payload[0].value === 'number'
-                                    ? payload[0].value
-                                    : 0) +
-                                    (typeof payload[1].value === 'number'
-                                      ? payload[1].value
-                                      : 0) +
-                                    (typeof payload[2].value === 'number'
-                                      ? payload[2].value
-                                      : 0)
+                                  (Number(payload[0].value) || 0) +
+                                  (Number(payload[1].value) || 0) +
+                                  (Number(payload[2].value) || 0)
                                 )}
                               </p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Awake: {payload[3].value} min
-                              </p>
+                              {showAwakeTime && payload[3] && (
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  Awake: {payload[3].value} min
+                                </p>
+                              )}
                             </div>
                           );
                         }
@@ -2339,25 +2549,38 @@ export default function Home() {
                       }}
                     />
                     <Bar
+                      yAxisId="left"
                       dataKey="deepSleepHours"
                       stackId="a"
                       fill="#3b82f6"
                       name="Deep Sleep"
                     />
                     <Bar
+                      yAxisId="left"
                       dataKey="remSleepHours"
                       stackId="a"
                       fill="#14b8a6"
                       name="REM Sleep"
                     />
                     <Bar
+                      yAxisId="left"
                       dataKey="lightSleepHours"
                       stackId="a"
                       fill="#60a5fa"
                       name="Light Sleep"
                     />
-                    <Bar dataKey="awakeTime" fill="#ef4444" name="Awake Time" />
-                  </BarChart>
+                    {showAwakeTime && (
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="awakeTime"
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                        dot={{ fill: '#ef4444' }}
+                        name="Awake Time"
+                      />
+                    )}
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
               {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
@@ -2426,6 +2649,59 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {activeSection === 'checklist' && (
+        <div className="space-y-8 max-w-2xl mx-auto">
+          <h2
+            className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
+          >
+            Daily Health Checklist
+          </h2>
+          <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
+            <div className="space-y-4">
+              {[
+                'Record today\'s sleep data',
+                'Log your morning weight',
+                'Take daily vitamins',
+                'Drink 8 glasses of water',
+                'Complete 30 minutes of exercise',
+                'Practice 10 minutes of meditation',
+                'Track your meals',
+                'Record your steps',
+                'Check your resting heart rate',
+                'Get 15 minutes of sunlight',
+              ].map((task, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center gap-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 transition-opacity ${
+                    checkedItems[`task-${index}`] ? 'opacity-60' : ''
+                  }`}
+                >
+                  <Checkbox
+                    id={`task-${index}`}
+                    className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                    checked={checkedItems[`task-${index}`]}
+                    onCheckedChange={(checked) => {
+                      setCheckedItems(prev => ({
+                        ...prev,
+                        [`task-${index}`]: checked === true
+                      }));
+                    }}
+                  />
+                  <label
+                    htmlFor={`task-${index}`}
+                    className={`flex-grow text-slate-700 dark:text-slate-300 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
+                      checkedItems[`task-${index}`] ? 'line-through' : ''
+                    }`}
+                  >
+                    {task}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
