@@ -3,6 +3,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/providers';
 import { Inter } from 'next/font/google';
 import { defaultMetadata } from "./metadata";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const inter = Inter({ subsets: ['latin'] });
 
