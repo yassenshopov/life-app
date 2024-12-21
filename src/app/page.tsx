@@ -44,6 +44,7 @@ interface SleepEntry {
   awakeTimeMinutes: number;
   restingHeartRate: number | null;
   steps: number | null;
+  weight: number | null;
 }
 
 interface SleepAnalysis {
@@ -77,6 +78,11 @@ export default function Home() {
   const [restingHeartRate, setRestingHeartRate] = useState('');
   const [activeTab, setActiveTab] = useState<string | null>('30');
   const [steps, setSteps] = useState('');
+  const [weight, setWeight] = useState('');
+
+  // Add initial loading state
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [showUpdateForm, setShowUpdateForm] = useState(false);
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -92,11 +98,26 @@ export default function Home() {
       } finally {
         setLoading(false);
         setIsLoadingCharts(false);
+        setInitialLoading(false); // Add this line
       }
     };
 
     fetchEntries();
   }, [dateRange]);
+
+  // Add initial loading screen
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <div className="text-slate-600 dark:text-slate-400 text-lg font-medium">
+            Loading Sleep Data...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const hasEntryForToday = entries.some((entry) => {
     const today = new Date().toISOString().split('T')[0];
@@ -104,7 +125,6 @@ export default function Home() {
   });
 
   const renderManualEntryForm = () => {
-    const [showUpdateForm, setShowUpdateForm] = useState(false);
     const todayEntry = entries.find(
       (entry) => entry.date === new Date().toISOString().split('T')[0]
     );
@@ -130,6 +150,7 @@ export default function Home() {
         setAwakeTime(Math.round(entry.awakeTimeMinutes).toString());
         setRestingHeartRate(entry.restingHeartRate?.toString() || '');
         setSteps(entry.steps?.toString() || '');
+        setWeight(entry.weight?.toString() || '');
       }
     };
 
@@ -144,6 +165,7 @@ export default function Home() {
         setAwakeTime('');
         setRestingHeartRate('');
         setSteps('');
+        setWeight('');
       }
       setShowUpdateForm(!showUpdateForm);
     };
@@ -329,6 +351,20 @@ export default function Home() {
                       className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-600 dark:text-slate-400">
+                      Weight (kg) - Optional
+                    </label>
+                    <input
+                      type="number"
+                      min="30"
+                      max="200"
+                      step="0.1"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                      className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                    />
+                  </div>
                 </div>
                 <div className="mt-4">
                   <Button
@@ -468,6 +504,20 @@ export default function Home() {
                   className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm text-slate-600 dark:text-slate-400">
+                  Weight (kg) - Optional
+                </label>
+                <input
+                  type="number"
+                  min="30"
+                  max="200"
+                  step="0.1"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                />
+              </div>
             </div>
             {/* Add the button below the grid of inputs */}
             <div className="mt-6">
@@ -565,6 +615,7 @@ export default function Home() {
             ? parseInt(restingHeartRate)
             : null,
           steps: steps ? parseInt(steps) : null,
+          weight: weight ? parseFloat(weight) : null,
         }),
       });
 
@@ -578,6 +629,7 @@ export default function Home() {
       setAwakeTime('');
       setRestingHeartRate('');
       setSteps('');
+      setWeight('');
       setSubmitSuccess(true);
 
       // Refresh entries
@@ -621,6 +673,7 @@ export default function Home() {
         awakeTime: entry.awakeTimeMinutes,
         restingHeartRate: entry.restingHeartRate,
         steps: entry.steps,
+        weight: entry.weight,
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
@@ -855,9 +908,7 @@ export default function Home() {
                 stroke="#ef4444"
                 fill="url(#rhrGradient)"
                 name="RHR (bpm)"
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-                strokeWidth={2}
+                strokeWidth={3}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -983,6 +1034,133 @@ export default function Home() {
               <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
                 ±{standardDeviation} bpm
               </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const WeightChart = ({ data }: { data: any[] }) => {
+    return (
+      <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+          Weight History
+        </h3>
+        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={data} margin={{ bottom: 50 }}>
+              <defs>
+                <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval={0}
+                tick={{ dy: 10 }}
+              />
+              <YAxis domain={['dataMin - 1', 'dataMax + 1']} />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Weight: {typeof payload[0].value === 'number' ? payload[0].value.toFixed(1) : payload[0].value} kg
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="weight"
+                stroke="#14b8a6"
+                fill="url(#weightGradient)"
+                name="Weight (kg)"
+                strokeWidth={3}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        {isLoadingCharts && <ChartLoadingOverlay color="teal" />}
+      </div>
+    );
+  };
+
+  const WeightAnalytics = ({ data }: { data: any[] }) => {
+    const validData = data.filter((entry) => entry.weight !== null);
+
+    if (validData.length === 0) {
+      return (
+        <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+          <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+            Weight Analytics
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400">
+            No weight data available for this period.
+          </p>
+        </div>
+      );
+    }
+
+    const average = validData.reduce((acc, curr) => acc + curr.weight, 0) / validData.length;
+    const min = Math.min(...validData.map((d) => d.weight));
+    const max = Math.max(...validData.map((d) => d.weight));
+    const firstReading = validData[validData.length - 1].weight;
+    const lastReading = validData[0].weight;
+    const trend = lastReading - firstReading;
+
+    return (
+      <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+          Weight Analytics
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {average.toFixed(1)} <span className="text-sm font-normal text-slate-500">kg</span>
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Average Weight</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {min.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span>
+              </div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Lowest</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {max.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span>
+              </div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Highest</div>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-600 dark:text-slate-400">Period Trend</span>
+              <div className={`flex items-center gap-1 text-sm ${
+                trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-500'
+              }`}>
+                {trend !== 0 && (
+                  <svg className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                )}
+                {Math.abs(trend).toFixed(1)} kg
+              </div>
             </div>
           </div>
         </div>
@@ -1376,11 +1554,41 @@ export default function Home() {
     if (validEntries.length === 0) return null;
 
     const totalSleep = validEntries.reduce(
-      (acc, entry) =>
-        acc + entry.totalSleepHours + entry.totalSleepMinutes / 60,
+      (acc, entry) => acc + entry.totalSleepHours + entry.totalSleepMinutes / 60,
       0
     );
     const avgSleep = totalSleep / validEntries.length;
+    
+    // Calculate average sleep and wake times - filter out entries with "00:00" times
+    const validSleepTimeEntries = validEntries.filter(entry => entry.sleepTime !== "00:00");
+    const validWakeTimeEntries = validEntries.filter(entry => entry.wakeTime !== "00:00");
+
+    const avgSleepTimeMinutes = validSleepTimeEntries.length > 0 
+      ? validSleepTimeEntries.reduce((acc, entry) => {
+          const [hours, minutes] = entry.sleepTime.split(':').map(Number);
+          // Adjust for times after midnight (e.g., 1:00 should be treated as 25:00)
+          const adjustedHours = hours < 12 ? hours + 24 : hours;
+          return acc + adjustedHours * 60 + minutes;
+        }, 0) / validSleepTimeEntries.length
+      : 0;
+
+    // Convert back to 24-hour format
+    let avgSleepHours = Math.floor(avgSleepTimeMinutes / 60) % 24;
+    const avgSleepMins = Math.round(avgSleepTimeMinutes % 60);
+
+    const avgWakeTimeMinutes = validWakeTimeEntries.length > 0
+      ? validWakeTimeEntries.reduce((acc, entry) => {
+          const [hours, minutes] = entry.wakeTime.split(':').map(Number);
+          return acc + hours * 60 + minutes;
+        }, 0) / validWakeTimeEntries.length
+      : 0;
+
+    const avgWakeHours = Math.floor(avgWakeTimeMinutes / 60);
+    const avgWakeMins = Math.round(avgWakeTimeMinutes % 60);
+    
+    // Convert average sleep duration to hours and minutes
+    const avgSleepDurationHours = Math.floor(avgSleep);
+    const avgSleepDurationMins = Math.round((avgSleep - avgSleepDurationHours) * 60);
 
     const avgDeepSleep =
       validEntries.reduce((acc, entry) => acc + entry.deepSleepPercentage, 0) /
@@ -1395,23 +1603,33 @@ export default function Home() {
       validEntries.length;
 
     return {
-      avgSleep,
+      avgSleepDurationHours,
+      avgSleepDurationMins,
+      avgSleepTime: {
+        hours: avgSleepHours,
+        minutes: avgSleepMins
+      },
+      avgWakeTime: {
+        hours: avgWakeHours,
+        minutes: avgWakeMins
+      },
       avgDeepSleep,
       avgRemSleep,
       avgAwakeTime,
-      totalEntries: validEntries.length, // Now shows count of valid entries only
+      totalEntries: validEntries.length,
     };
   };
 
   const ChartLoadingOverlay = ({
     color = 'purple',
   }: {
-    color?: 'purple' | 'yellow' | 'red';
+    color?: 'purple' | 'yellow' | 'red' | 'teal';
   }) => {
     const borderColorClass = {
       purple: 'border-purple-500',
       yellow: 'border-yellow-500',
       red: 'border-red-500',
+      teal: 'border-teal-500'
     }[color];
 
     return (
@@ -1845,13 +2063,31 @@ export default function Home() {
                       <div className="space-y-4">
                         <div>
                           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                            {stats.avgSleep.toFixed(1)}h
+                            {stats.avgSleepDurationHours}h {stats.avgSleepDurationMins}m
                           </div>
                           <div className="text-sm text-slate-600 dark:text-slate-400">
                             Average Sleep Duration
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                              {stats.avgSleepTime.hours.toString().padStart(2, '0')}:
+                              {stats.avgSleepTime.minutes.toString().padStart(2, '0')}
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              Avg Bedtime
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                              {stats.avgWakeTime.hours.toString().padStart(2, '0')}:
+                              {stats.avgWakeTime.minutes.toString().padStart(2, '0')}
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              Avg Wake Time
+                            </div>
+                          </div>
                           <div>
                             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                               {stats.avgDeepSleep.toFixed(1)}%
@@ -2054,6 +2290,10 @@ export default function Home() {
                     }))}
                   />
                 </div>
+
+                {/* Weight section - Reordered */}
+                <WeightAnalytics data={prepareChartData()} />
+                <WeightChart data={prepareChartData()} />
               </div>
             )}
           </div>

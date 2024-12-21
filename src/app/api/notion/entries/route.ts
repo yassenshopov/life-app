@@ -104,6 +104,7 @@ export async function GET(request: Request) {
         ),
         restingHeartRate: page.properties['RHR [bpm]']?.number || null,
         steps: page.properties['Steps']?.number || null,
+        weight: page.properties['Weight [kg]']?.number || null,
       };
     });
 
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
       awakeTimeMinutes,
       restingHeartRate,
       steps,
+      weight,
     } = body;
 
     const properties = {
@@ -161,6 +163,9 @@ export async function POST(request: Request) {
       },
       Steps: {
         number: steps || null,
+      },
+      'Weight [kg]': {
+        number: weight || null,
       },
     };
 
