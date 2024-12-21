@@ -24,6 +24,8 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  BarChart,
+  Bar,
 } from 'recharts';
 import { Inter, Outfit } from 'next/font/google';
 import { Pencil, X } from 'lucide-react';
@@ -59,6 +61,14 @@ interface SleepAnalysis {
 
 // Add this type near the top with other type definitions
 type DisplaySection = 'all' | 'sleep' | 'rhr' | 'steps' | 'weight';
+
+// Add this helper function near the top of the file
+const getTickInterval = (dataLength: number) => {
+  if (dataLength <= 7) return 0; // Show all ticks for 7 or fewer points
+  if (dataLength <= 14) return 1; // Show every other tick for up to 14 points
+  if (dataLength <= 30) return 2; // Show every third tick for up to 30 points
+  return Math.floor(dataLength / 10); // Show roughly 10 ticks for larger datasets
+};
 
 export default function Home() {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -724,6 +734,8 @@ export default function Home() {
   };
 
   const SleepPatternChart = ({ data }: { data: any[] }) => {
+    const tickInterval = getTickInterval(data.length);
+
     return (
       <ResponsiveContainer width="100%" height={400}>
         <LineChart
@@ -735,9 +747,11 @@ export default function Home() {
             dataKey="date"
             scale="point"
             padding={{ left: 20, right: 20 }}
-            tick={{ dy: 10 }}
-            interval="preserveStartEnd"
-            minTickGap={30}
+            tick={{ dy: 10, fontSize: 12 }}
+            interval={tickInterval}
+            angle={-45}
+            textAnchor="end"
+            height={60}
           />
           <YAxis
             domain={[16, 0]}
@@ -845,22 +859,28 @@ export default function Home() {
   };
 
   const RHRChart = ({ data }: { data: any[] }) => {
-    // Filter out null/undefined RHR values and map to correct format
-    const validData = data
-      .filter(entry => entry.restingHeartRate != null)
-      .map(entry => ({
-        date: entry.date,
-        rhr: entry.restingHeartRate
-      }));
+    const tickInterval = getTickInterval(data.length);
+
+    // Don't filter out nulls, just map the data
+    const chartData = data.map((item) => ({
+      date: item.date,
+      rhr: item.restingHeartRate,
+    }));
 
     return (
       <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Resting Heart Rate
         </h3>
-        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={validData} margin={{ bottom: 50 }}>
+            <AreaChart data={chartData} margin={{ bottom: 50 }}>
               <defs>
                 <linearGradient id="rhrGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
@@ -873,10 +893,10 @@ export default function Home() {
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval={0}
-                tick={{ dy: 10 }}
+                interval={tickInterval}
+                tick={{ dy: 10, fontSize: 12 }}
               />
-              <YAxis domain={['dataMin - 5', 'dataMax + 5']} />
+              <YAxis />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
@@ -899,8 +919,9 @@ export default function Home() {
                 dataKey="rhr"
                 stroke="#ef4444"
                 fill="url(#rhrGradient)"
-                name="RHR (bpm)"
                 strokeWidth={3}
+                name="Resting Heart Rate"
+                connectNulls={false}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -911,8 +932,12 @@ export default function Home() {
   };
 
   const RHRAnalytics = ({ data }: { data: any[] }) => {
-    // Filter out null values
-    const validData = data.filter((entry) => entry.rhr !== null);
+    // Filter out null/undefined RHR values and map to correct format
+    const validData = data
+      .filter((entry) => entry.restingHeartRate != null)
+      .map((entry) => ({
+        rhr: entry.restingHeartRate,
+      }));
 
     if (validData.length === 0) {
       return (
@@ -1034,12 +1059,20 @@ export default function Home() {
   };
 
   const WeightChart = ({ data }: { data: any[] }) => {
+    const tickInterval = getTickInterval(data.length);
+
     return (
       <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Weight History
         </h3>
-        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data} margin={{ bottom: 50 }}>
               <defs>
@@ -1054,8 +1087,8 @@ export default function Home() {
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval={0}
-                tick={{ dy: 10 }}
+                interval={tickInterval}
+                tick={{ dy: 10, fontSize: 12 }}
               />
               <YAxis domain={['dataMin - 1', 'dataMax + 1']} />
               <Tooltip
@@ -1063,9 +1096,15 @@ export default function Home() {
                   if (active && payload && payload.length) {
                     return (
                       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">
+                          {label}
+                        </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Weight: {typeof payload[0].value === 'number' ? payload[0].value.toFixed(1) : payload[0].value} kg
+                          Weight:{' '}
+                          {typeof payload[0].value === 'number'
+                            ? payload[0].value.toFixed(1)
+                            : payload[0].value}{' '}
+                          kg
                         </p>
                       </div>
                     );
@@ -1095,7 +1134,9 @@ export default function Home() {
     if (validData.length === 0) {
       return (
         <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-          <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+          <h3
+            className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+          >
             Weight Analytics
           </h3>
           <p className="text-slate-600 dark:text-slate-400">
@@ -1105,7 +1146,8 @@ export default function Home() {
       );
     }
 
-    const average = validData.reduce((acc, curr) => acc + curr.weight, 0) / validData.length;
+    const average =
+      validData.reduce((acc, curr) => acc + curr.weight, 0) / validData.length;
     const min = Math.min(...validData.map((d) => d.weight));
     const max = Math.max(...validData.map((d) => d.weight));
     const firstReading = validData[validData.length - 1].weight;
@@ -1114,41 +1156,70 @@ export default function Home() {
 
     return (
       <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Weight Analytics
         </h3>
         <div className="space-y-4">
           <div>
             <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {average.toFixed(1)} <span className="text-sm font-normal text-slate-500">kg</span>
+              {average.toFixed(1)}{' '}
+              <span className="text-sm font-normal text-slate-500">kg</span>
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Average Weight</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              Average Weight
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {min.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span>
+                {min.toFixed(1)}{' '}
+                <span className="text-xs font-normal text-slate-500">kg</span>
               </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">Lowest</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Lowest
+              </div>
             </div>
             <div>
               <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {max.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span>
+                {max.toFixed(1)}{' '}
+                <span className="text-xs font-normal text-slate-500">kg</span>
               </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">Highest</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Highest
+              </div>
             </div>
           </div>
 
           <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-600 dark:text-slate-400">Period Trend</span>
-              <div className={`flex items-center gap-1 text-sm ${
-                trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-500'
-              }`}>
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                Period Trend
+              </span>
+              <div
+                className={`flex items-center gap-1 text-sm ${
+                  trend > 0
+                    ? 'text-red-500'
+                    : trend < 0
+                    ? 'text-green-500'
+                    : 'text-slate-500'
+                }`}
+              >
                 {trend !== 0 && (
-                  <svg className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  <svg
+                    className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                    />
                   </svg>
                 )}
                 {Math.abs(trend).toFixed(1)} kg
@@ -1546,41 +1617,50 @@ export default function Home() {
     if (validEntries.length === 0) return null;
 
     const totalSleep = validEntries.reduce(
-      (acc, entry) => acc + entry.totalSleepHours + entry.totalSleepMinutes / 60,
+      (acc, entry) =>
+        acc + entry.totalSleepHours + entry.totalSleepMinutes / 60,
       0
     );
     const avgSleep = totalSleep / validEntries.length;
-    
-    // Calculate average sleep and wake times - filter out entries with "00:00" times
-    const validSleepTimeEntries = validEntries.filter(entry => entry.sleepTime !== "00:00");
-    const validWakeTimeEntries = validEntries.filter(entry => entry.wakeTime !== "00:00");
 
-    const avgSleepTimeMinutes = validSleepTimeEntries.length > 0 
-      ? validSleepTimeEntries.reduce((acc, entry) => {
-          const [hours, minutes] = entry.sleepTime.split(':').map(Number);
-          // Adjust for times after midnight (e.g., 1:00 should be treated as 25:00)
-          const adjustedHours = hours < 12 ? hours + 24 : hours;
-          return acc + adjustedHours * 60 + minutes;
-        }, 0) / validSleepTimeEntries.length
-      : 0;
+    // Calculate average sleep and wake times - filter out entries with "00:00" times
+    const validSleepTimeEntries = validEntries.filter(
+      (entry) => entry.sleepTime !== '00:00'
+    );
+    const validWakeTimeEntries = validEntries.filter(
+      (entry) => entry.wakeTime !== '00:00'
+    );
+
+    const avgSleepTimeMinutes =
+      validSleepTimeEntries.length > 0
+        ? validSleepTimeEntries.reduce((acc, entry) => {
+            const [hours, minutes] = entry.sleepTime.split(':').map(Number);
+            // Adjust for times after midnight (e.g., 1:00 should be treated as 25:00)
+            const adjustedHours = hours < 12 ? hours + 24 : hours;
+            return acc + adjustedHours * 60 + minutes;
+          }, 0) / validSleepTimeEntries.length
+        : 0;
 
     // Convert back to 24-hour format
     let avgSleepHours = Math.floor(avgSleepTimeMinutes / 60) % 24;
     const avgSleepMins = Math.round(avgSleepTimeMinutes % 60);
 
-    const avgWakeTimeMinutes = validWakeTimeEntries.length > 0
-      ? validWakeTimeEntries.reduce((acc, entry) => {
-          const [hours, minutes] = entry.wakeTime.split(':').map(Number);
-          return acc + hours * 60 + minutes;
-        }, 0) / validWakeTimeEntries.length
-      : 0;
+    const avgWakeTimeMinutes =
+      validWakeTimeEntries.length > 0
+        ? validWakeTimeEntries.reduce((acc, entry) => {
+            const [hours, minutes] = entry.wakeTime.split(':').map(Number);
+            return acc + hours * 60 + minutes;
+          }, 0) / validWakeTimeEntries.length
+        : 0;
 
     const avgWakeHours = Math.floor(avgWakeTimeMinutes / 60);
     const avgWakeMins = Math.round(avgWakeTimeMinutes % 60);
-    
+
     // Convert average sleep duration to hours and minutes
     const avgSleepDurationHours = Math.floor(avgSleep);
-    const avgSleepDurationMins = Math.round((avgSleep - avgSleepDurationHours) * 60);
+    const avgSleepDurationMins = Math.round(
+      (avgSleep - avgSleepDurationHours) * 60
+    );
 
     const avgDeepSleep =
       validEntries.reduce((acc, entry) => acc + entry.deepSleepPercentage, 0) /
@@ -1599,11 +1679,11 @@ export default function Home() {
       avgSleepDurationMins,
       avgSleepTime: {
         hours: avgSleepHours,
-        minutes: avgSleepMins
+        minutes: avgSleepMins,
       },
       avgWakeTime: {
         hours: avgWakeHours,
-        minutes: avgWakeMins
+        minutes: avgWakeMins,
       },
       avgDeepSleep,
       avgRemSleep,
@@ -1621,7 +1701,7 @@ export default function Home() {
       purple: 'border-purple-500',
       yellow: 'border-yellow-500',
       red: 'border-red-500',
-      teal: 'border-teal-500'
+      teal: 'border-teal-500',
     }[color];
 
     return (
@@ -1640,6 +1720,8 @@ export default function Home() {
   };
 
   const StepsChart = ({ data }: { data: any[] }) => {
+    const tickInterval = getTickInterval(data.length);
+
     return (
       <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
         <h3
@@ -1666,8 +1748,8 @@ export default function Home() {
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval={0}
-                tick={{ dy: 10 }}
+                interval={tickInterval}
+                tick={{ dy: 10, fontSize: 12 }}
               />
               <YAxis />
               <Tooltip
@@ -1843,7 +1925,11 @@ export default function Home() {
               {['All', 'Sleep', 'RHR', 'Steps', 'Weight'].map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveSection(tab.toLowerCase().replace(' ', '') as DisplaySection)}
+                  onClick={() =>
+                    setActiveSection(
+                      tab.toLowerCase().replace(' ', '') as DisplaySection
+                    )
+                  }
                   className={`py-4 px-2 text-sm font-medium transition-colors ${
                     activeSection === tab.toLowerCase().replace(' ', '')
                       ? 'text-purple-600 dark:text-white border-b-2 border-purple-600 dark:border-white'
@@ -1918,379 +2004,427 @@ export default function Home() {
 
       {/* Update the main content top padding to account for the fixed header */}
       <main className="max-w-7xl mx-auto pt-32">
-        <h1 className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}>
-          Sleep Tracker
-        </h1>
-
-        {/* Only show entry form and analysis card when on Sleep or All tabs */}
+        {/* Sleep Section */}
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
+            <h2
+              className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
+            >
+              Sleep Analysis
+            </h2>
             {renderManualEntryForm()}
-            {entries.length > 0 && (() => {
-              const todayEntry = entries.find(
-                (e) => e.date === new Date().toISOString().split('T')[0]
-              );
-              const hasMeaningfulSleepData = todayEntry &&
-                (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+            {entries.length > 0 &&
+              (() => {
+                const todayEntry = entries.find(
+                  (e) => e.date === new Date().toISOString().split('T')[0]
+                );
+                const hasMeaningfulSleepData =
+                  todayEntry &&
+                  (todayEntry.totalSleepHours > 0 ||
+                    todayEntry.totalSleepMinutes > 0);
 
-              return hasMeaningfulSleepData ? (
-                <div className="mb-8">
-                  <SleepAnalysisCard entry={todayEntry} />
+                return hasMeaningfulSleepData ? (
+                  <div className="mb-8">
+                    <SleepAnalysisCard entry={todayEntry} />
+                  </div>
+                ) : null;
+              })()}
+
+            {/* Add Sleep Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+              <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                <h3
+                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+                >
+                  Sleep Duration
+                </h3>
+                <div
+                  className={`transition-opacity duration-200 ${
+                    isLoadingCharts ? 'opacity-50' : 'opacity-100'
+                  }`}
+                >
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart
+                      data={prepareChartData()}
+                      margin={{ bottom: 50 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="sleepGradient"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#a855f7"
+                            stopOpacity={0.8}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#a855f7"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="date"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        interval={0}
+                        tick={{ dy: 10 }}
+                      />
+                      <YAxis
+                        domain={[0, 12]}
+                        ticks={[0, 2, 4, 6, 8, 10, 12]}
+                        label={{
+                          value: 'Hours',
+                          angle: -90,
+                          position: 'insideLeft',
+                        }}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                <p className="font-medium text-slate-900 dark:text-slate-100">
+                                  {label}
+                                </p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  Sleep Duration:{' '}
+                                  {typeof payload[0].value === 'number'
+                                    ? payload[0].value.toFixed(1)
+                                    : payload[0].value}
+                                  h
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="totalSleep"
+                        stroke="#a855f7"
+                        fill="url(#sleepGradient)"
+                        strokeWidth={3}
+                      />
+                      <ReferenceLine
+                        y={7}
+                        stroke="#22c55e"
+                        strokeDasharray="3 3"
+                      />
+                      <ReferenceLine
+                        y={9}
+                        stroke="#22c55e"
+                        strokeDasharray="3 3"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              ) : null;
-            })()}
+                {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+              </div>
+
+              <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                <h3
+                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+                >
+                  Sleep Stats
+                </h3>
+                {(() => {
+                  const stats = calculateStats(entries);
+                  if (!stats)
+                    return (
+                      <p className="text-slate-600 dark:text-slate-400">
+                        No data available
+                      </p>
+                    );
+
+                  return (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                          {stats.avgSleepDurationHours}h{' '}
+                          {stats.avgSleepDurationMins}m
+                        </div>
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                          Average Sleep Duration
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            {stats.avgSleepTime.hours
+                              .toString()
+                              .padStart(2, '0')}
+                            :
+                            {stats.avgSleepTime.minutes
+                              .toString()
+                              .padStart(2, '0')}
+                          </div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400">
+                            Avg. Bedtime
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            {stats.avgWakeTime.hours
+                              .toString()
+                              .padStart(2, '0')}
+                            :
+                            {stats.avgWakeTime.minutes
+                              .toString()
+                              .padStart(2, '0')}
+                          </div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400">
+                            Avg. Wake Time
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                              {stats.avgDeepSleep.toFixed(1)}%
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              Avg. Deep Sleep
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                              {stats.avgRemSleep.toFixed(1)}%
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              Avg. REM Sleep
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Sleep Pattern Chart */}
+            <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+              <h3
+                className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+              >
+                Sleep Pattern
+              </h3>
+              <div
+                className={`transition-opacity duration-200 ${
+                  isLoadingCharts ? 'opacity-50' : 'opacity-100'
+                }`}
+              >
+                <SleepPatternChart data={prepareSleepPatternData()} />
+              </div>
+              {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+            </div>
+
+            {/* Sleep Composition Chart */}
+            <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative mb-8">
+              <h3
+                className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+              >
+                Sleep Composition
+              </h3>
+              <div
+                className={`transition-opacity duration-200 ${
+                  isLoadingCharts ? 'opacity-50' : 'opacity-100'
+                }`}
+              >
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={prepareChartData().map((entry) => {
+                      const totalSleepHours = entry.totalSleep;
+                      return {
+                        ...entry,
+                        deepSleepHours:
+                          (totalSleepHours * entry.deepSleep) / 100,
+                        remSleepHours: (totalSleepHours * entry.remSleep) / 100,
+                        lightSleepHours:
+                          (totalSleepHours *
+                            (100 - entry.deepSleep - entry.remSleep)) /
+                          100,
+                      };
+                    })}
+                    margin={{ bottom: 50 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                      interval={0}
+                      tick={{ dy: 10 }}
+                    />
+                    <YAxis
+                      label={{
+                        value: 'Hours',
+                        angle: -90,
+                        position: 'insideLeft',
+                      }}
+                      domain={[0, 'auto']}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const formatDuration = (hours: number) => {
+                            const h = Math.floor(hours);
+                            const m = Math.round((hours - h) * 60);
+                            return `${h}h ${m}m`;
+                          };
+
+                          return (
+                            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                              <p className="font-medium text-slate-900 dark:text-slate-100">
+                                {label}
+                              </p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Deep Sleep:{' '}
+                                {formatDuration(
+                                  typeof payload[0].value === 'number'
+                                    ? payload[0].value
+                                    : 0
+                                )}
+                              </p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                REM Sleep:{' '}
+                                {formatDuration(
+                                  typeof payload[1].value === 'number'
+                                    ? payload[1].value
+                                    : 0
+                                )}
+                              </p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Light Sleep:{' '}
+                                {formatDuration(
+                                  typeof payload[2].value === 'number'
+                                    ? payload[2].value
+                                    : 0
+                                )}
+                              </p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Total Sleep:{' '}
+                                {formatDuration(
+                                  (typeof payload[0].value === 'number'
+                                    ? payload[0].value
+                                    : 0) +
+                                    (typeof payload[1].value === 'number'
+                                      ? payload[1].value
+                                      : 0) +
+                                    (typeof payload[2].value === 'number'
+                                      ? payload[2].value
+                                      : 0)
+                                )}
+                              </p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Awake: {payload[3].value} min
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar
+                      dataKey="deepSleepHours"
+                      stackId="a"
+                      fill="#3b82f6"
+                      name="Deep Sleep"
+                    />
+                    <Bar
+                      dataKey="remSleepHours"
+                      stackId="a"
+                      fill="#14b8a6"
+                      name="REM Sleep"
+                    />
+                    <Bar
+                      dataKey="lightSleepHours"
+                      stackId="a"
+                      fill="#60a5fa"
+                      name="Light Sleep"
+                    />
+                    <Bar dataKey="awakeTime" fill="#ef4444" name="Awake Time" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
+            </div>
           </>
         )}
 
-        <div className="space-y-4">
-          <div className="flex flex-col gap-4">
-            {/* Conditionally render chart sections based on activeSection */}
-            {loading ? (
-              <p className="text-slate-600 dark:text-slate-400">Loading entries...</p>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Sleep charts */}
-                {(activeSection === 'all' || activeSection === 'sleep') && (
-                  <>
-                    <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-                      {/* Sleep Duration Chart */}
-                      <h3
-                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
-                      >
-                        Sleep Duration Over Time
-                      </h3>
-                      <div
-                        className={`transition-opacity duration-200 ${
-                          isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                        }`}
-                      >
-                        <ResponsiveContainer width="100%" height={300}>
-                          <AreaChart
-                            data={prepareChartData()}
-                            margin={{ bottom: 50, right: 20 }}
-                          >
-                            <defs>
-                              <linearGradient
-                                id="sleepGradient"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor="#8884d8"
-                                  stopOpacity={0.8}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="#8884d8"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              angle={-45}
-                              textAnchor="end"
-                              height={60}
-                              interval={0}
-                              tick={{ dy: 10 }}
-                              minTickGap={-200}
-                            />
-                            <YAxis domain={[0, 'auto']} allowDataOverflow={true} />
-                            <Tooltip />
-                            <Legend />
-                            <ReferenceLine
-                              y={
-                                prepareChartData()
-                                  .filter((entry) => entry.totalSleep > 0)
-                                  .reduce((acc, curr) => acc + curr.totalSleep, 0) /
-                                prepareChartData().filter(
-                                  (entry) => entry.totalSleep > 0
-                                ).length
-                              }
-                              stroke="#8884d8"
-                              strokeOpacity={0.5}
-                              label={{
-                                value: 'Avg Sleep',
-                                position: 'right',
-                                fill: '#8884d8',
-                                opacity: 0.5,
-                              }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="totalSleep"
-                              stroke="#8884d8"
-                              fill="url(#sleepGradient)"
-                              name="Total Sleep (hours)"
-                              strokeWidth={2}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-                    </div>
-                    <div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                      {/* Sleep Statistics Panel */}
-                      <h3
-                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                      >
-                        Period Statistics
-                      </h3>
-                      {(() => {
-                        const filteredEntries = entries.filter((entry) => {
-                          const entryDate = new Date(entry.date);
-                          return (
-                            entryDate >= dateRange.from && entryDate <= dateRange.to
-                          );
-                        });
-                        const stats = calculateStats(filteredEntries);
-
-                        if (!stats)
-                          return (
-                            <p className="text-slate-600 dark:text-slate-400">
-                              No data available
-                            </p>
-                          );
-
-                        return (
-                          <div className="space-y-4">
-                            <div>
-                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                {stats.avgSleepDurationHours}h {stats.avgSleepDurationMins}m
-                              </div>
-                              <div className="text-sm text-slate-600 dark:text-slate-400">
-                                Average Sleep Duration
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                  {stats.avgSleepTime.hours.toString().padStart(2, '0')}:
-                                  {stats.avgSleepTime.minutes.toString().padStart(2, '0')}
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  Avg Bedtime
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                  {stats.avgWakeTime.hours.toString().padStart(2, '0')}:
-                                  {stats.avgWakeTime.minutes.toString().padStart(2, '0')}
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  Avg Wake Time
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                  {stats.avgDeepSleep.toFixed(1)}%
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  Avg Deep Sleep
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                  {stats.avgRemSleep.toFixed(1)}%
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  Avg REM Sleep
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                  {stats.avgAwakeTime.toFixed(0)}m
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  Avg Awake Time
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                  {stats.totalEntries}
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">
-                                  Total Entries
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-                      {/* Sleep Quality Metrics Chart */}
-                      <h3
-                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
-                      >
-                        Sleep Quality Metrics
-                      </h3>
-                      <div
-                        className={`transition-opacity duration-200 ${
-                          isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                        }`}
-                      >
-                        <ResponsiveContainer width="100%" height={300}>
-                          <AreaChart
-                            data={prepareChartData()}
-                            margin={{ bottom: 50, right: 20 }}
-                          >
-                            <defs>
-                              <linearGradient
-                                id="deepSleepGradient"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor="#1d4ed8"
-                                  stopOpacity={0.8}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="#1d4ed8"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                              <linearGradient
-                                id="remSleepGradient"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor="#2dd4bf"
-                                  stopOpacity={0.8}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="#2dd4bf"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                              <linearGradient
-                                id="awakeGradient"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor="#ffc658"
-                                  stopOpacity={0.8}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="#ffc658"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              angle={-45}
-                              textAnchor="end"
-                              height={60}
-                              interval={0}
-                              tick={{ dy: 10 }}
-                              minTickGap={-200}
-                            />
-                            <YAxis domain={[0, 100]} allowDataOverflow={true} />
-                            <Tooltip />
-                            <Legend />
-                            <Area
-                              type="monotone"
-                              dataKey="deepSleep"
-                              stroke="#1d4ed8"
-                              fill="url(#deepSleepGradient)"
-                              name="Deep Sleep %"
-                              strokeWidth={2}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="remSleep"
-                              stroke="#2dd4bf"
-                              fill="url(#remSleepGradient)"
-                              name="REM Sleep %"
-                              strokeWidth={2}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="awakeTime"
-                              stroke="#ffc658"
-                              fill="url(#awakeGradient)"
-                              name="Awake Time (min)"
-                              strokeWidth={2}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-                    </div>
-                    <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-                      {/* Sleep Patterns Chart */}
-                      <h3
-                        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 bg-white/50 dark:bg-slate-900/50 ${outfit.className}`}
-                      >
-                        Sleep Patterns
-                      </h3>
-                      <div
-                        className={`transition-opacity duration-200 ${
-                          isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                        }`}
-                      >
-                        <SleepPatternChart data={prepareSleepPatternData()} />
-                      </div>
-                      {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-                    </div>
-                  </>
-                )}
-
-                {/* Steps charts */}
-                {(activeSection === 'all' || activeSection === 'steps') && (
-                  <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    <StepsAnalytics data={prepareChartData()} />
-                    <div className="lg:col-span-3 relative">
-                      <StepsChart data={prepareChartData()} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Heart Rate charts */}
-                {(activeSection === 'all' || activeSection === 'rhr') && (
-                  <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    <div className="lg:col-span-3 relative">
-                      <RHRChart
-                        data={prepareChartData().filter(entry => entry.restingHeartRate != null)}
-                      />
-                    </div>
-                    <RHRAnalytics
-                      data={prepareChartData().filter(entry => entry.restingHeartRate != null)}
-                    />
-                  </div>
-                )}
-
-                {/* Weight charts */}
-                {(activeSection === 'all' || activeSection === 'weight') && (
-                  <>
-                    <WeightAnalytics data={prepareChartData()} />
-                    <WeightChart data={prepareChartData()} />
-                  </>
-                )}
+        {/* Heart Rate Section */}
+        {(activeSection === 'all' || activeSection === 'rhr') && (
+          <>
+            <h2
+              className={`text-3xl font-bold mb-8 ${
+                activeSection === 'all' ? 'mt-12' : ''
+              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
+                outfit.className
+              }`}
+            >
+              Heart Rate Analysis
+            </h2>
+            <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <div className="lg:col-span-3 relative">
+                <RHRChart data={prepareChartData()} />
               </div>
-            )}
-          </div>
-        </div>
+              <RHRAnalytics data={prepareChartData()} />
+            </div>
+          </>
+        )}
+
+        {/* Steps Section */}
+        {(activeSection === 'all' || activeSection === 'steps') && (
+          <>
+            <h2
+              className={`text-3xl font-bold mb-8 ${
+                activeSection === 'all' ? 'mt-12' : ''
+              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
+                outfit.className
+              }`}
+            >
+              Steps Analysis
+            </h2>
+            <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <StepsAnalytics data={prepareChartData()} />
+              <div className="lg:col-span-3 relative">
+                <StepsChart data={prepareChartData()} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Weight Section */}
+        {(activeSection === 'all' || activeSection === 'weight') && (
+          <>
+            <h2
+              className={`text-3xl font-bold mb-8 ${
+                activeSection === 'all' ? 'mt-12' : ''
+              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
+                outfit.className
+              }`}
+            >
+              Weight Analysis
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <WeightAnalytics data={prepareChartData()} />
+              <WeightChart data={prepareChartData()} />
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
