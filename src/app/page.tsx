@@ -28,9 +28,33 @@ import {
   ComposedChart,
 } from 'recharts';
 import { Inter, Outfit } from 'next/font/google';
-import { Menu, Moon, Heart, Footprints, Weight, X, Pencil, CheckSquare, RefreshCw } from 'lucide-react';
+import {
+  Menu,
+  Moon,
+  Heart,
+  Footprints,
+  Weight,
+  X,
+  Pencil,
+  CheckSquare,
+  RefreshCw,
+  Dumbbell,
+  Plus,
+  Calendar,
+  BarChart2,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from "@/components/ui/checkbox"
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { addDays, format, isSameDay, startOfMonth } from 'date-fns';
+import {
+  Tooltip as TooltipUI,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -61,7 +85,14 @@ interface SleepAnalysis {
 }
 
 // Add this type near the top with other type definitions
-type DisplaySection = 'all' | 'sleep' | 'rhr' | 'steps' | 'weight' | 'checklist';
+type DisplaySection =
+  | 'all'
+  | 'sleep'
+  | 'rhr'
+  | 'steps'
+  | 'weight'
+  | 'checklist'
+  | 'gym';
 
 // Add this helper function near the top of the file
 const getTickInterval = (dataLength: number) => {
@@ -69,6 +100,285 @@ const getTickInterval = (dataLength: number) => {
   if (dataLength <= 14) return 1; // Show every other tick for up to 14 points
   if (dataLength <= 30) return 2; // Show every third tick for up to 30 points
   return Math.floor(dataLength / 10); // Show roughly 10 ticks for larger datasets
+};
+
+// Update the Workout type to match running data
+type Workout = {
+  id: string;
+  date: string;
+  type: 'strength' | 'run';
+  title?: string;
+  distance?: number;
+  duration?: number;
+  pace?: number;
+  notes?: string;
+};
+
+// Update the WorkoutCalendar component to fetch real data
+const WorkoutCalendar = () => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const startDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    );
+    const endDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0
+    );
+
+    fetch(
+      `/api/notion/running?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+    )
+      .then((res) => res.json())
+      .then((runs) => {
+        const formattedRuns = runs.map((run: any) => ({
+          id: run.id,
+          date: new Date(run.date + 'T00:00:00').toISOString().split('T')[0],
+          type: 'run' as const,
+          title: run.name,
+          distance: run.distance,
+          duration: run.duration,
+          pace: run.pace,
+          notes: run.notes,
+        }));
+        setWorkouts(formattedRuns);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error fetching runs:', error);
+        setIsLoading(false);
+      });
+  }, [currentDate]);
+
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  // Modified to handle Monday as first day
+  const getFirstDayOfMonth = (date: Date) => {
+    let day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    // Convert Sunday (0) to 6, and shift other days back by 1
+    return day === 0 ? 6 : day - 1;
+  };
+
+  const handlePreviousMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1)
+    );
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1)
+    );
+  };
+
+  const monthYear = currentDate.toLocaleString('default', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDayOfMonth = getFirstDayOfMonth(currentDate);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
+      {/* Calendar Section - Left Side */}
+      <div className="lg:col-span-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+            {monthYear}
+          </h3>
+          {/* Calendar Navigation Buttons */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePreviousMonth}
+              className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleNextMonth}
+              className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {/* Day Headers - Now starting with Monday */}
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+            <div
+              key={day}
+              className="text-center text-sm font-medium text-slate-600 dark:text-slate-400 p-2"
+            >
+              {day}
+            </div>
+          ))}
+
+          {/* Empty cells for days before the first day of the month */}
+          {Array.from({ length: firstDayOfMonth }, (_, i) => (
+            <div key={`empty-${i}`} className="aspect-square p-2" />
+          ))}
+
+          {/* Calendar Days */}
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+            const currentMonthDate = new Date(
+              currentDate.getFullYear(),
+              currentDate.getMonth(),
+              day
+            );
+            const dateString = currentMonthDate.toISOString().split('T')[0];
+            const workoutsForDay = workouts.filter(
+              (event) => event.date === dateString
+            );
+            const isToday =
+              currentMonthDate.toDateString() === new Date().toDateString();
+
+            return (
+              <TooltipProvider key={day}>
+                <TooltipUI delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative ${
+                        isToday
+                          ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+                          : ''
+                      } cursor-default`}
+                    >
+                      <span
+                        className={`text-sm ${
+                          isToday
+                            ? 'font-medium text-purple-600 dark:text-purple-400'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {day}
+                      </span>
+                      {workoutsForDay.length > 0 && (
+                        <div className="absolute bottom-1 right-1 flex gap-1">
+                          {workoutsForDay.map((workout, index) => (
+                            <div
+                              key={index}
+                              className={`w-2 h-2 rounded-full ${
+                                workout.type === 'run'
+                                  ? 'bg-orange-500'
+                                  : 'bg-purple-500'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  {workoutsForDay.length > 0 && (
+                    <TooltipContent className="space-y-2">
+                      {workoutsForDay.map((workout, index) => (
+                        <div key={index} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                workout.type === 'run'
+                                  ? 'bg-orange-500'
+                                  : 'bg-purple-500'
+                              }`}
+                            />
+                            <span className="font-medium">{workout.title}</span>
+                          </div>
+                          {workout.type === 'run' && (
+                            <div className="text-sm text-slate-500 dark:text-slate-400 pl-4 space-y-1">
+                              {workout.distance && (
+                                <div>Distance: {workout.distance}km</div>
+                              )}
+                              {workout.duration && (
+                                <div>Duration: {workout.duration}min</div>
+                              )}
+                              {workout.pace && (
+                                <div>Pace: {workout.pace}min/km</div>
+                              )}
+                              {workout.notes && (
+                                <div>Notes: {workout.notes}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </TooltipContent>
+                  )}
+                </TooltipUI>
+              </TooltipProvider>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Workout Details - Right Side */}
+      <div className="lg:col-span-2 space-y-4">
+        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">
+            Today's Workout
+          </h3>
+          {workouts.some(
+            (event) =>
+              new Date(event.date).toDateString() === new Date().toDateString()
+          ) ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  Upper Body + Core
+                </span>
+              </div>
+              <Button className="w-full bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700">
+                Start Workout
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              No workout scheduled for today
+            </p>
+          )}
+        </div>
+
+        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">
+            Quick Actions
+          </h3>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Workout
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Calendar className="mr-2 h-4 w-4" /> View Schedule
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <BarChart2 className="mr-2 h-4 w-4" /> Progress Stats
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default function Home() {
@@ -105,7 +415,9 @@ export default function Home() {
   const [showAwakeTime, setShowAwakeTime] = useState(true);
 
   // Add this inside your Home component, with other state declarations
-  const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
+  const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>(
+    {}
+  );
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -214,8 +526,7 @@ export default function Home() {
                     />
                   </svg>
                   <span className="text-slate-600 dark:text-slate-400">
-                    Today&apos;s sleep data has been recorded:
-                    {' '}
+                    Today&apos;s sleep data has been recorded:{' '}
                     {todayEntry.totalSleepHours}h {todayEntry.totalSleepMinutes}
                     m
                   </span>
@@ -2043,8 +2354,8 @@ export default function Home() {
                           Total Sleep:{' '}
                           {formatDuration(
                             (Number(payload[0].value) || 0) +
-                            (Number(payload[1].value) || 0) +
-                            (Number(payload[2].value) || 0)
+                              (Number(payload[1].value) || 0) +
+                              (Number(payload[2].value) || 0)
                           )}
                         </p>
                         {showAwakeTime && payload[3] && (
@@ -2114,31 +2425,48 @@ export default function Home() {
                 { name: 'RHR', icon: <Heart className="w-4 h-4" /> },
                 { name: 'Steps', icon: <Footprints className="w-4 h-4" /> },
                 { name: 'Weight', icon: <Weight className="w-4 h-4" /> },
-                { 
-                  name: 'Checklist', 
+                {
+                  name: 'Checklist',
                   icon: <CheckSquare className="w-4 h-4" />,
                   showNotification: (() => {
                     const today = new Date().toISOString().split('T')[0];
-                    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-                    
-                    const todayEntry = entries.find(entry => entry.date === today);
-                    const yesterdayEntry = entries.find(entry => entry.date === yesterday);
-                    
-                    const hasTodaySleepData = todayEntry && (
-                      todayEntry.totalSleepHours > 0 || 
-                      todayEntry.totalSleepMinutes > 0
+                    const yesterday = new Date(Date.now() - 86400000)
+                      .toISOString()
+                      .split('T')[0];
+
+                    const todayEntry = entries.find(
+                      (entry) => entry.date === today
                     );
-                    const hasYesterdayRHR = yesterdayEntry?.restingHeartRate != null;
+                    const yesterdayEntry = entries.find(
+                      (entry) => entry.date === yesterday
+                    );
+
+                    const hasTodaySleepData =
+                      todayEntry &&
+                      (todayEntry.totalSleepHours > 0 ||
+                        todayEntry.totalSleepMinutes > 0);
+                    const hasYesterdayRHR =
+                      yesterdayEntry?.restingHeartRate != null;
                     const hasYesterdaySteps = yesterdayEntry?.steps != null;
                     const hasTodayWeight = todayEntry?.weight != null;
-                    
-                    return !hasTodaySleepData || !hasYesterdayRHR || !hasYesterdaySteps || !hasTodayWeight;
-                  })()
+
+                    return (
+                      !hasTodaySleepData ||
+                      !hasYesterdayRHR ||
+                      !hasYesterdaySteps ||
+                      !hasTodayWeight
+                    );
+                  })(),
                 },
+                { name: 'Gym', icon: <Dumbbell className="w-4 h-4" /> },
               ].map((tab) => (
                 <button
                   key={tab.name}
-                  onClick={() => setActiveSection(tab.name.toLowerCase().replace(' ', '') as DisplaySection)}
+                  onClick={() =>
+                    setActiveSection(
+                      tab.name.toLowerCase().replace(' ', '') as DisplaySection
+                    )
+                  }
                   className={`py-4 px-2 text-sm font-medium transition-colors flex items-center gap-2 relative ${
                     activeSection === tab.name.toLowerCase().replace(' ', '')
                       ? 'text-purple-600 dark:text-white border-b-2 border-purple-600 dark:border-white'
@@ -2235,7 +2563,8 @@ export default function Home() {
                 );
                 const hasMeaningfulSleepData =
                   todayEntry &&
-                  (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+                  (todayEntry.totalSleepHours > 0 ||
+                    todayEntry.totalSleepMinutes > 0);
 
                 return hasMeaningfulSleepData ? (
                   <div className="mb-8">
@@ -2486,7 +2815,7 @@ export default function Home() {
                         lightSleepHours:
                           (totalSleepHours *
                             (100 - entry.deepSleep - entry.remSleep)) /
-                            100,
+                          100,
                       };
                     })}
                     margin={{ bottom: 50 }}
@@ -2551,8 +2880,8 @@ export default function Home() {
                                 Total Sleep:{' '}
                                 {formatDuration(
                                   (Number(payload[0].value) || 0) +
-                                  (Number(payload[1].value) || 0) +
-                                  (Number(payload[2].value) || 0)
+                                    (Number(payload[1].value) || 0) +
+                                    (Number(payload[2].value) || 0)
                                 )}
                               </p>
                               {showAwakeTime && payload[3] && (
@@ -2704,24 +3033,36 @@ export default function Home() {
                 .toISOString()
                 .split('T')[0];
 
-              const todayEntry = entries.find(entry => entry.date === today);
-              const yesterdayEntry = entries.find(entry => entry.date === yesterday);
-
-              const hasTodaySleepData = todayEntry && (
-                todayEntry.totalSleepHours > 0 || 
-                todayEntry.totalSleepMinutes > 0
+              const todayEntry = entries.find((entry) => entry.date === today);
+              const yesterdayEntry = entries.find(
+                (entry) => entry.date === yesterday
               );
+
+              const hasTodaySleepData =
+                todayEntry &&
+                (todayEntry.totalSleepHours > 0 ||
+                  todayEntry.totalSleepMinutes > 0);
+
               const hasYesterdayRHR = yesterdayEntry?.restingHeartRate != null;
               const hasYesterdaySteps = yesterdayEntry?.steps != null;
               const hasTodayWeight = todayEntry?.weight != null;
 
-              const isComplete = hasTodaySleepData && hasYesterdayRHR && hasYesterdaySteps && hasTodayWeight;
+              const isComplete =
+                hasTodaySleepData &&
+                hasYesterdayRHR &&
+                hasYesterdaySteps &&
+                hasTodayWeight;
 
-              return isComplete && (
-                <div className="mb-6 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-4 py-2 rounded-lg border border-green-200 dark:border-green-900 flex items-center gap-2">
-                  <CheckSquare className="h-4 w-4" />
-                  <span className="text-sm font-medium">Great job! You've completed all your health tracking tasks for today! 🎉</span>
-                </div>
+              return (
+                isComplete && (
+                  <div className="mb-6 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-4 py-2 rounded-lg border border-green-200 dark:border-green-900 flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      Great job! You've completed all your health tracking tasks
+                      for today! 🎉
+                    </span>
+                  </div>
+                )
               );
             })()}
             {isLoadingCharts && (
@@ -2740,15 +3081,20 @@ export default function Home() {
                   .toISOString()
                   .split('T')[0];
 
-                const todayEntry = entries.find(entry => entry.date === today);
-                const yesterdayEntry = entries.find(entry => entry.date === yesterday);
-
-                const hasTodaySleepData = todayEntry && (
-                  todayEntry.totalSleepHours > 0 || 
-                  todayEntry.totalSleepMinutes > 0
+                const todayEntry = entries.find(
+                  (entry) => entry.date === today
+                );
+                const yesterdayEntry = entries.find(
+                  (entry) => entry.date === yesterday
                 );
 
-                const hasYesterdayRHR = yesterdayEntry?.restingHeartRate != null;
+                const hasTodaySleepData =
+                  todayEntry &&
+                  (todayEntry.totalSleepHours > 0 ||
+                    todayEntry.totalSleepMinutes > 0);
+
+                const hasYesterdayRHR =
+                  yesterdayEntry?.restingHeartRate != null;
                 const hasYesterdaySteps = yesterdayEntry?.steps != null;
                 const hasTodayWeight = todayEntry?.weight != null;
 
@@ -2757,26 +3103,26 @@ export default function Home() {
                     id: 'sleep',
                     label: "Record today's sleep data",
                     checked: hasTodaySleepData,
-                    autoCheck: true
+                    autoCheck: true,
                   },
                   {
                     id: 'rhr',
                     label: "Record yesterday's resting heart rate",
                     checked: hasYesterdayRHR,
-                    autoCheck: true
+                    autoCheck: true,
                   },
                   {
                     id: 'steps',
                     label: "Record yesterday's steps",
                     checked: hasYesterdaySteps,
-                    autoCheck: true
+                    autoCheck: true,
                   },
                   {
                     id: 'weight',
                     label: "Record today's weight",
                     checked: hasTodayWeight,
-                    autoCheck: true
-                  }
+                    autoCheck: true,
+                  },
                 ];
 
                 return checklistItems.map((item) => (
@@ -2806,6 +3152,17 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {activeSection === 'gym' && (
+        <>
+          <h2
+            className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
+          >
+            Gym Planner
+          </h2>
+          <WorkoutCalendar />
+        </>
       )}
     </div>
   );
