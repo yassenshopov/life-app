@@ -114,8 +114,11 @@ type Workout = {
   notes?: string;
 };
 
-// Update the WorkoutCalendar component to fetch real data
-const WorkoutCalendar = () => {
+interface WorkoutCalendarProps {
+  onLoadingChange: (loading: boolean) => void;
+}
+
+export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,6 +188,34 @@ const WorkoutCalendar = () => {
   });
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDayOfMonth = getFirstDayOfMonth(currentDate);
+
+  const ChartLoadingOverlay = ({
+    color = 'purple',
+  }: {
+    color?: 'purple' | 'yellow' | 'red' | 'teal' | 'orange';
+  }) => {
+    const borderColorClass = {
+      purple: 'border-purple-500',
+      yellow: 'border-yellow-500',
+      red: 'border-red-500',
+      teal: 'border-teal-500',
+      orange: 'border-orange-500',
+    }[color];
+
+    return (
+      <div className="absolute inset-0 top-[52px] flex items-center justify-center">
+        <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
+        <div className="flex flex-col items-center gap-2 z-10">
+          <div
+            className={`w-8 h-8 border-4 ${borderColorClass} border-t-transparent rounded-full animate-spin`}
+          />
+          <span className="text-sm text-slate-600 dark:text-slate-400">
+            Loading data...
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
@@ -418,6 +449,8 @@ export default function Home() {
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>(
     {}
   );
+
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -2022,13 +2055,14 @@ export default function Home() {
   const ChartLoadingOverlay = ({
     color = 'purple',
   }: {
-    color?: 'purple' | 'yellow' | 'red' | 'teal';
+    color?: 'purple' | 'yellow' | 'red' | 'teal' | 'orange';
   }) => {
     const borderColorClass = {
       purple: 'border-purple-500',
       yellow: 'border-yellow-500',
       red: 'border-red-500',
       teal: 'border-teal-500',
+      orange: 'border-orange-500',
     }[color];
 
     return (
@@ -2356,7 +2390,7 @@ export default function Home() {
                             (Number(payload[0].value) || 0) +
                               (Number(payload[1].value) || 0) +
                               (Number(payload[2].value) || 0)
-                          )}
+                            )}
                         </p>
                         {showAwakeTime && payload[3] && (
                           <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -3161,7 +3195,20 @@ export default function Home() {
           >
             Gym Planner
           </h2>
-          <WorkoutCalendar />
+          <div className="relative">
+            <div className={`transition-opacity duration-200 ${isLoadingCharts || isCalendarLoading ? 'opacity-50' : 'opacity-100'}`}>
+              <WorkoutCalendar onLoadingChange={(loading) => setIsCalendarLoading(loading)} />
+            </div>
+            {(isLoadingCharts || isCalendarLoading) && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
+                <div className="flex flex-col items-center gap-2 z-10">
+                  <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Loading data...</span>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
