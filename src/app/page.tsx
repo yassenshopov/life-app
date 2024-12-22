@@ -44,6 +44,11 @@ import {
   BarChart2,
   ChevronLeft,
   ChevronRight,
+  Dumbbell as DumbbellIcon,
+  HeartPulse,
+  Users,
+  ArrowUpDown,
+  Activity,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -167,6 +172,252 @@ interface WorkoutEvent {
   notes?: string;
 }
 
+// Add these types near your other interfaces
+interface Exercise {
+  name: string;
+  sets: Array<{
+    reps: number;
+    weight: number;
+  }>;
+}
+
+// Add this constant with your exercise library
+const EXERCISE_LIBRARY = {
+  legs: [
+    'Barbell Squat',
+    'Romanian Deadlift',
+    'Leg Press',
+    'Leg Extension',
+    'Leg Curl',
+    'Calf Raises',
+  ],
+  back_and_chest: [
+    'Bench Press',
+    'Incline Bench Press',
+    'Barbell Row',
+    'Lat Pulldown',
+    'Cable Flyes',
+    'Pull-ups',
+  ],
+  shoulders_and_arms: [
+    'Overhead Press',
+    'Lateral Raises',
+    'Bicep Curls',
+    'Tricep Extensions',
+    'Face Pulls',
+    'Hammer Curls',
+  ],
+  cardio: [
+    'Treadmill',
+    'Rowing Machine',
+    'Exercise Bike',
+    'Elliptical',
+    'Jump Rope',
+  ],
+  full_body: ['Deadlift', 'Push-ups', 'Pull-ups', 'Dips', 'Lunges', 'Planks'],
+} as const;
+
+// Add these types near your other interfaces
+interface ExerciseStats {
+  name: string;
+  totalSets: number;
+  maxWeight: number;
+  avgWeight: number;
+  totalReps: number;
+  lastPerformed: string;
+  category: keyof typeof EXERCISE_LIBRARY;
+}
+
+// Add this helper function
+const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
+  const exerciseStats = new Map<string, ExerciseStats>();
+
+  // Initialize stats for all exercises in the library
+  Object.entries(EXERCISE_LIBRARY).forEach(([category, exercises]) => {
+    exercises.forEach((exercise) => {
+      exerciseStats.set(exercise.toLowerCase(), {
+        name: exercise,
+        totalSets: 0,
+        maxWeight: 0,
+        avgWeight: 0,
+        totalReps: 0,
+        lastPerformed: '',
+        category: category as keyof typeof EXERCISE_LIBRARY,
+      });
+    });
+  });
+
+  // Process gym sessions
+  gymSessions.forEach((session) => {
+    const sessionDate = new Date(session.date).toISOString().split('T')[0];
+    const exerciseLog = session.exercise_log || {};
+
+    Object.entries(exerciseLog).forEach(
+      ([exerciseName, data]: [string, any]) => {
+        const cleanName = exerciseName.toLowerCase().replace(/_/g, ' ');
+        const stats = exerciseStats.get(cleanName);
+
+        if (stats) {
+          let sessionTotalWeight = 0;
+          let sessionTotalSets = 0;
+
+          data.sets.forEach((set: { weight: number; reps: number }) => {
+            stats.totalSets++;
+            stats.totalReps += set.reps;
+            stats.maxWeight = Math.max(stats.maxWeight, set.weight);
+            sessionTotalWeight += set.weight;
+            sessionTotalSets++;
+          });
+
+          // Update average weight
+          stats.avgWeight = Number(
+            (
+              (stats.avgWeight * (stats.totalSets - sessionTotalSets) +
+                sessionTotalWeight) /
+              stats.totalSets
+            ).toFixed(1)
+          );
+
+          // Update last performed date if more recent
+          if (!stats.lastPerformed || sessionDate > stats.lastPerformed) {
+            stats.lastPerformed = sessionDate;
+          }
+        }
+      }
+    );
+  });
+
+  // Return all exercises, sorting performed ones first, then alphabetically
+  return Array.from(exerciseStats.values()).sort((a, b) => {
+    // First sort by whether the exercise has been performed
+    if (a.totalSets > 0 && b.totalSets === 0) return -1;
+    if (a.totalSets === 0 && b.totalSets > 0) return 1;
+    // Then sort by last performed date (if both have been performed)
+    if (a.totalSets > 0 && b.totalSets > 0) {
+      return (
+        new Date(b.lastPerformed).getTime() -
+        new Date(a.lastPerformed).getTime()
+      );
+    }
+    // Finally sort alphabetically
+    return a.name.localeCompare(b.name);
+  });
+};
+
+// Add this new component
+const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
+  const exerciseStats = calculateExerciseStats(gymSessions);
+  const [selectedCategory, setSelectedCategory] = useState<
+    keyof typeof EXERCISE_LIBRARY | 'all'
+  >('all');
+
+  const filteredStats = exerciseStats.filter(
+    (stat) => selectedCategory === 'all' || stat.category === selectedCategory
+  );
+
+  return (
+    <div className="space-y-6 mb-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Select
+          value={selectedCategory}
+          onValueChange={(value) =>
+            setSelectedCategory(value as keyof typeof EXERCISE_LIBRARY | 'all')
+          }
+        >
+          <SelectTrigger className="w-[180px] bg-white dark:bg-slate-800">
+            <SelectValue placeholder="All Exercises" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Exercises</SelectItem>
+            <SelectItem value="legs" className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4" />
+              <span>Legs</span>
+            </SelectItem>
+            <SelectItem value="back_and_chest" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Back & Chest</span>
+            </SelectItem>
+            <SelectItem value="shoulders_and_arms" className="flex items-center gap-2">
+              <DumbbellIcon className="h-4 w-4" />
+              <span>Shoulders & Arms</span>
+            </SelectItem>
+            <SelectItem value="cardio" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span>Cardio</span>
+            </SelectItem>
+            <SelectItem value="full_body" className="flex items-center gap-2">
+              <HeartPulse className="h-4 w-4" />
+              <span>Full Body</span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {filteredStats.map((stat) => (
+          <div
+            key={stat.name}
+            className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h4 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                {stat.name}
+              </h4>
+              <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                {stat.category.replace(/_/g, ' ')}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-y-4">
+              <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Max Weight
+                </div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                  {stat.maxWeight}{' '}
+                  <span className="text-xs text-slate-500">kg</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Avg Weight
+                </div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                  {stat.avgWeight}{' '}
+                  <span className="text-xs text-slate-500">kg</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Total Sets
+                </div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                  {stat.totalSets}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Total Reps
+                </div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                  {stat.totalReps}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Last performed:{' '}
+                {new Date(stat.lastPerformed).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const WorkoutCalendar = ({
   onLoadingChange,
   showGymForm,
@@ -179,9 +430,13 @@ export const WorkoutCalendar = ({
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [sessionType, setSessionType] = useState<GymSessionType>('legs');
-  const [exercises, setExercises] = useState('');
+  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmittingGym, setIsSubmittingGym] = useState(false);
+
+  // Add this with your other state declarations
+  const [gymDate, setGymDate] = useState<string | null>(null);
 
   useEffect(() => {
     const startDate = new Date(
@@ -290,24 +545,43 @@ export const WorkoutCalendar = ({
   };
 
   const handleGymSubmit = async () => {
-    if (!sessionType || !exercises) return;
+    if (!sessionType || selectedExercises.length === 0) return;
     setIsSubmittingGym(true);
+
+    // Get the selected date or default to today
+    const selectedDate = gymDate || new Date().toISOString().split('T')[0];
+
+    // Transform exercises into the required format
+    const exerciseLog = selectedExercises.reduce((acc, exercise, index) => {
+      const exerciseName = exercise.name.toLowerCase().replace(/\s+/g, '_');
+      acc[exerciseName] = {
+        order: index + 1,
+        sets: exercise.sets.map((set, setIndex) => ({
+          reps: set.reps,
+          weight: set.weight,
+          order: setIndex + 1,
+        })),
+      };
+      return acc;
+    }, {} as Record<string, { order: number; sets: Array<{ reps: number; weight: number; order: number }> }>);
+
     try {
       const response = await fetch('/api/supabase/exercises', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: sessionType,
-          date: new Date().toISOString().split('T')[0],
-          exercises,
+          date: selectedDate, // Use the selected date
+          exercise_log: exerciseLog,
           notes: notes || null,
         }),
       });
       if (!response.ok) throw new Error('Failed to save gym session');
       setShowGymForm(false);
       setSessionType('' as GymSessionType);
-      setExercises('');
+      setSelectedExercises([]);
       setNotes('');
+      setGymDate(null); // Reset the date after submission
     } catch (error) {
       console.error('Failed to save gym session:', error);
     } finally {
@@ -486,11 +760,12 @@ export const WorkoutCalendar = ({
                           )}
                           {activity.type === 'gym' && (
                             <div className="text-sm text-slate-500 dark:text-slate-400 pl-4 space-y-1">
-                              {'exercises' in activity.details && activity.details.exercises && (
-                                <div>
-                                  Exercises: {activity.details.exercises}
-                                </div>
-                              )}
+                              {'exercises' in activity.details &&
+                                activity.details.exercises && (
+                                  <div>
+                                    Exercises: {activity.details.exercises}
+                                  </div>
+                                )}
                               {activity.details.notes && (
                                 <div>Notes: {activity.details.notes}</div>
                               )}
@@ -545,7 +820,7 @@ export const WorkoutCalendar = ({
               className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={() => setShowGymForm(true)}
             >
-              <Dumbbell className="mr-2 h-4 w-4" /> Add Gym Session
+              <DumbbellIcon className="mr-2 h-4 w-4" /> Add Gym Session
             </Button>
             <Button
               variant="outline"
@@ -585,6 +860,22 @@ export const WorkoutCalendar = ({
               }}
               className="space-y-4"
             >
+              {/* Add this date input */}
+              <div>
+                <label
+                  htmlFor="date"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                >
+                  Date
+                </label>
+                <input
+                  type="date"
+                  id="date"
+                  value={gymDate || new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setGymDate(e.target.value)}
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                />
+              </div>
               <div>
                 <label
                   htmlFor="sessionType"
@@ -594,34 +885,168 @@ export const WorkoutCalendar = ({
                 </label>
                 <Select
                   value={sessionType}
-                  onValueChange={(value) => setSessionType(value as GymSessionType)}
+                  onValueChange={(value) =>
+                    setSessionType(value as GymSessionType)
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select session type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="legs">Legs</SelectItem>
-                    <SelectItem value="back_and_chest">Back & Chest</SelectItem>
-                    <SelectItem value="shoulders_and_arms">Shoulders & Arms</SelectItem>
-                    <SelectItem value="cardio">Cardio</SelectItem>
-                    <SelectItem value="full_body">Full Body</SelectItem>
+                    <SelectItem value="legs" className="flex items-center gap-2">
+                      <ArrowUpDown className="h-4 w-4" />
+                      <span>Legs</span>
+                    </SelectItem>
+                    <SelectItem value="back_and_chest" className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      <span>Back & Chest</span>
+                    </SelectItem>
+                    <SelectItem value="shoulders_and_arms" className="flex items-center gap-2">
+                      <DumbbellIcon className="h-4 w-4" />
+                      <span>Shoulders & Arms</span>
+                    </SelectItem>
+                    <SelectItem value="cardio" className="flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      <span>Cardio</span>
+                    </SelectItem>
+                    <SelectItem value="full_body" className="flex items-center gap-2">
+                      <HeartPulse className="h-4 w-4" />
+                      <span>Full Body</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <label
                   htmlFor="exercises"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
                 >
                   Exercises
                 </label>
-                <Textarea
-                  id="exercises"
-                  value={exercises}
-                  onChange={(e) => setExercises(e.target.value)}
-                  placeholder="Enter exercises"
-                  className="w-full"
-                />
+
+                {/* Exercise Search & Add */}
+                <div className="flex gap-2 mb-4">
+                  <Select
+                    value={exerciseSearch}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setSelectedExercises([
+                          ...selectedExercises,
+                          { name: value, sets: [{ reps: 0, weight: 0 }] },
+                        ]);
+                        setExerciseSearch('');
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select an exercise" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXERCISE_LIBRARY[sessionType]?.map((exercise) => (
+                        <SelectItem key={exercise} value={exercise}>
+                          {exercise}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Selected Exercises List */}
+                <div className="space-y-4">
+                  {selectedExercises.map((exercise, exerciseIndex) => (
+                    <div
+                      key={exerciseIndex}
+                      className="border border-slate-200 dark:border-slate-700 rounded-lg p-4"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{exercise.name}</h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newExercises = [...selectedExercises];
+                            newExercises.splice(exerciseIndex, 1);
+                            setSelectedExercises(newExercises);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Sets */}
+                      <div className="space-y-2">
+                        {exercise.sets.map((set, setIndex) => (
+                          <div
+                            key={setIndex}
+                            className="flex items-center gap-2"
+                          >
+                            <span className="text-sm text-slate-500 w-10">
+                              Set {setIndex + 1}
+                            </span>
+                            <input
+                              type="number"
+                              placeholder="Reps"
+                              className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                              value={set.reps || ''}
+                              onChange={(e) => {
+                                const newExercises = [...selectedExercises];
+                                newExercises[exerciseIndex].sets[
+                                  setIndex
+                                ].reps = Number(e.target.value);
+                                setSelectedExercises(newExercises);
+                              }}
+                            />
+                            <span className="text-sm text-slate-500">×</span>
+                            <input
+                              type="number"
+                              placeholder="Weight"
+                              className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                              value={set.weight || ''}
+                              onChange={(e) => {
+                                const newExercises = [...selectedExercises];
+                                newExercises[exerciseIndex].sets[
+                                  setIndex
+                                ].weight = Number(e.target.value);
+                                setSelectedExercises(newExercises);
+                              }}
+                            />
+                            <span className="text-sm text-slate-500">kg</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newExercises = [...selectedExercises];
+                                newExercises[exerciseIndex].sets.splice(
+                                  setIndex,
+                                  1
+                                );
+                                setSelectedExercises(newExercises);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2"
+                          onClick={() => {
+                            const newExercises = [...selectedExercises];
+                            newExercises[exerciseIndex].sets.push({
+                              reps: 0,
+                              weight: 0,
+                            });
+                            setSelectedExercises(newExercises);
+                          }}
+                        >
+                          Add Set
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div>
                 <label
@@ -639,15 +1064,16 @@ export const WorkoutCalendar = ({
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowGymForm(false)}
-                >
+                <Button variant="outline" onClick={() => setShowGymForm(false)}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleGymSubmit}
-                  disabled={!sessionType || !exercises || isSubmittingGym}
+                  disabled={
+                    !sessionType ||
+                    selectedExercises.length === 0 ||
+                    isSubmittingGym
+                  }
                 >
                   {isSubmittingGym ? 'Saving...' : 'Save Session'}
                 </Button>
@@ -710,9 +1136,13 @@ export default function HealthDashboard() {
 
   // Add near your other state declarations
   const [sessionType, setSessionType] = useState<GymSessionType>('legs');
-  const [exercises, setExercises] = useState('');
+  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmittingGym, setIsSubmittingGym] = useState(false);
+
+  // Add this near your other state declarations
+  const [gymDate, setGymDate] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -3050,26 +3480,43 @@ export default function HealthDashboard() {
   };
 
   const handleGymSubmit = async () => {
-    if (!sessionType || !exercises) return;
-
+    if (!sessionType || selectedExercises.length === 0) return;
     setIsSubmittingGym(true);
+
+    // Get the selected date or default to today
+    const selectedDate = gymDate || new Date().toISOString().split('T')[0];
+
+    // Transform exercises into the required format
+    const exerciseLog = selectedExercises.reduce((acc, exercise, index) => {
+      const exerciseName = exercise.name.toLowerCase().replace(/\s+/g, '_');
+      acc[exerciseName] = {
+        order: index + 1,
+        sets: exercise.sets.map((set, setIndex) => ({
+          reps: set.reps,
+          weight: set.weight,
+          order: setIndex + 1,
+        })),
+      };
+      return acc as Record<string, { order: number; sets: Array<{ reps: number; weight: number; order: number }> }>;
+    }, {} as Record<string, { order: number; sets: Array<{ reps: number; weight: number; order: number }> }>);
+
     try {
       const response = await fetch('/api/supabase/exercises', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: sessionType,
-          date: new Date().toISOString().split('T')[0],
-          exercises,
+          date: selectedDate, // Use the selected date
+          exercise_log: exerciseLog,
           notes: notes || null,
         }),
       });
-
       if (!response.ok) throw new Error('Failed to save gym session');
       setShowGymForm(false);
       setSessionType('' as GymSessionType);
-      setExercises('');
+      setSelectedExercises([]);
       setNotes('');
+      setGymDate(null); // Reset the date after submission
     } catch (error) {
       console.error('Failed to save gym session:', error);
     } finally {
@@ -3126,7 +3573,7 @@ export default function HealthDashboard() {
                     );
                   })(),
                 },
-                { name: 'Gym', icon: <Dumbbell className="w-4 h-4" /> },
+                { name: 'Gym', icon: <DumbbellIcon className="w-4 h-4" /> },
               ].map((tab) => (
                 <button
                   key={tab.name}
@@ -3478,7 +3925,7 @@ export default function HealthDashboard() {
                         lightSleepHours:
                           (totalSleepHours *
                             (100 - entry.deepSleep - entry.remSleep)) /
-                            100,
+                          100,
                       };
                     })}
                     margin={{ bottom: 50 }}
@@ -3666,9 +4113,7 @@ export default function HealthDashboard() {
             >
               Exercise Analysis
             </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <ExerciseProgressChart data={exerciseData} />
-            </div>
+            <ExerciseAnalysis gymSessions={gymSessions} />
           </>
         )}
       </main>

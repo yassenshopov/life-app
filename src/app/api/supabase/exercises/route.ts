@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { type, date, exercises, notes } = body;
+    const { type, date, exercise_log, notes, user_id } = body;
 
     const { data, error } = await supabase
       .from('training_sessions')
@@ -43,8 +43,8 @@ export async function POST(request: Request) {
         {
           type,
           date,
-          exercises,
-          notes
+          exercise_log,
+          notes,
         }
       ])
       .select()
