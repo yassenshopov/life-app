@@ -1213,24 +1213,47 @@ export default function Home() {
   const RHRChart = ({ data }: { data: any[] }) => {
     const tickInterval = getTickInterval(data.length);
 
-    // Don't filter out nulls, just map the data
-    const chartData = data.map((item) => ({
-      date: item.date,
-      rhr: item.restingHeartRate,
+
+    const chartData = data.map((entry) => ({
+      date: entry.date,
+      rhr: entry.restingHeartRate,
     }));
+    // Calculate average RHR for the period
+    const validRHR = data.filter(entry => entry.restingHeartRate !== null).map(entry => entry.restingHeartRate);
+    const averageRHR = validRHR.length > 0 
+      ? Math.round(validRHR.reduce((acc, curr) => acc + curr, 0) / validRHR.length)
+      : 0;
+
+    // Custom tick formatter for Y-axis
+    const CustomYAxisTick = (props: any) => {
+      const { x, y, payload } = props;
+      const isAverage = Math.abs(payload.value - averageRHR) < 0.5; // Check if this tick is close to average
+
+      return (
+        <text
+          x={x}
+          y={y}
+          dy={4}
+          textAnchor="end"
+          fill={isAverage ? "#ef4444" : "currentColor"}
+          className={isAverage ? "font-medium" : ""}
+        >
+          {payload.value}
+        </text>
+      );
+    };
+
+    // Calculate domain and ticks
+    const minRHR = Math.min(...validRHR);
+    const maxRHR = Math.max(...validRHR);
+    const yAxisTicks = generateYAxisTicks(minRHR, maxRHR, averageRHR);
 
     return (
       <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3
-          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-        >
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
           Resting Heart Rate
         </h3>
-        <div
-          className={`transition-opacity duration-200 ${
-            isLoadingCharts ? 'opacity-50' : 'opacity-100'
-          }`}
-        >
+        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={chartData} margin={{ bottom: 50 }}>
               <defs>
@@ -1248,7 +1271,11 @@ export default function Home() {
                 interval={tickInterval}
                 tick={{ dy: 10, fontSize: 12 }}
               />
-              <YAxis />
+              <YAxis 
+                domain={[minRHR - 2, maxRHR + 2]}
+                tick={<CustomYAxisTick />}
+                ticks={yAxisTicks}
+              />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
@@ -1275,12 +1302,43 @@ export default function Home() {
                 name="Resting Heart Rate"
                 connectNulls={false}
               />
+              <ReferenceLine 
+                y={averageRHR} 
+                stroke="#ef4444" 
+                strokeDasharray="3 3"
+                label={{ 
+                  value: `Avg: ${averageRHR} bpm`,
+                  position: 'right',
+                  fill: '#ef4444',
+                  fontSize: 12
+                }}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
         {isLoadingCharts && <ChartLoadingOverlay color="red" />}
       </div>
     );
+  };
+
+  // Helper function to generate Y-axis ticks including the average
+  const generateYAxisTicks = (min: number, max: number, average: number) => {
+    const ticks = new Set<number>();
+    
+    // Add min and max
+    ticks.add(Math.floor(min));
+    ticks.add(Math.ceil(max));
+    
+    // Add average
+    ticks.add(average);
+    
+    // Add intermediate values
+    for (let i = Math.floor(min); i <= Math.ceil(max); i++) {
+      ticks.add(i);
+    }
+    
+    // Convert to array and sort
+    return Array.from(ticks).sort((a, b) => a - b);
   };
 
   const RHRAnalytics = ({ data }: { data: any[] }) => {
@@ -1413,18 +1471,42 @@ export default function Home() {
   const WeightChart = ({ data }: { data: any[] }) => {
     const tickInterval = getTickInterval(data.length);
 
+    // Calculate average weight for the period
+    const validWeights = data.filter(entry => entry.weight !== null).map(entry => entry.weight);
+    const averageWeight = validWeights.length > 0 
+      ? Number((validWeights.reduce((acc, curr) => acc + curr, 0) / validWeights.length).toFixed(1))
+      : 0;
+
+    // Custom tick formatter for Y-axis
+    const CustomYAxisTick = (props: any) => {
+      const { x, y, payload } = props;
+      const isAverage = Math.abs(payload.value - averageWeight) < 0.1; // Check if this tick is close to average
+
+      return (
+        <text
+          x={x}
+          y={y}
+          dy={4}
+          textAnchor="end"
+          fill={isAverage ? "#14b8a6" : "currentColor"}
+          className={isAverage ? "font-medium" : ""}
+        >
+          {payload.value}
+        </text>
+      );
+    };
+
+    // Calculate domain and ticks
+    const minWeight = Math.min(...validWeights);
+    const maxWeight = Math.max(...validWeights);
+    const yAxisTicks = generateYAxisTicks(minWeight, maxWeight, averageWeight);
+
     return (
       <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3
-          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-        >
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
           Weight History
         </h3>
-        <div
-          className={`transition-opacity duration-200 ${
-            isLoadingCharts ? 'opacity-50' : 'opacity-100'
-          }`}
-        >
+        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data} margin={{ bottom: 50 }}>
               <defs>
@@ -1442,7 +1524,11 @@ export default function Home() {
                 interval={tickInterval}
                 tick={{ dy: 10, fontSize: 12 }}
               />
-              <YAxis domain={['dataMin - 1', 'dataMax + 1']} />
+              <YAxis 
+                domain={[minWeight - 0.5, maxWeight + 0.5]}
+                tick={<CustomYAxisTick />}
+                ticks={yAxisTicks}
+              />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
@@ -1452,11 +1538,10 @@ export default function Home() {
                           {label}
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Weight:{' '}
-                          {typeof payload[0].value === 'number'
-                            ? payload[0].value.toFixed(1)
-                            : payload[0].value}{' '}
-                          kg
+                          Weight: {typeof payload[0].value === 'number' ? payload[0].value.toFixed(1) : payload[0].value} kg
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Average: {averageWeight} kg
                         </p>
                       </div>
                     );
@@ -1471,6 +1556,17 @@ export default function Home() {
                 fill="url(#weightGradient)"
                 name="Weight (kg)"
                 strokeWidth={3}
+              />
+              <ReferenceLine 
+                y={averageWeight} 
+                stroke="#14b8a6" 
+                strokeDasharray="3 3"
+                label={{ 
+                  value: `Avg: ${averageWeight} kg`,
+                  position: 'right',
+                  fill: '#14b8a6',
+                  fontSize: 12
+                }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -2088,18 +2184,20 @@ export default function Home() {
   const StepsChart = ({ data }: { data: any[] }) => {
     const tickInterval = getTickInterval(data.length);
 
+    // Calculate average steps for the period
+    const validSteps = data.filter(entry => entry.steps !== null).map(entry => entry.steps);
+    const averageSteps = validSteps.length > 0 
+      ? Math.round(
+          validSteps.reduce((acc, curr) => acc + curr, 0) / validSteps.length
+        )
+      : 0;
+
     return (
       <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3
-          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-        >
+        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
           Daily Steps
         </h3>
-        <div
-          className={`transition-opacity duration-200 ${
-            isLoadingCharts ? 'opacity-50' : 'opacity-100'
-          }`}
-        >
+        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data} margin={{ bottom: 50 }}>
               <defs>
@@ -2129,6 +2227,9 @@ export default function Home() {
                         <p className="text-sm text-slate-600 dark:text-slate-400">
                           Steps: {payload[0].value?.toLocaleString()}
                         </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Average: {averageSteps.toLocaleString()}
+                        </p>
                       </div>
                     );
                   }
@@ -2142,6 +2243,18 @@ export default function Home() {
                 fill="url(#stepsGradient)"
                 name="Steps"
                 strokeWidth={3}
+              />
+              {/* Add ReferenceLine for average */}
+              <ReferenceLine 
+                y={averageSteps} 
+                stroke="#eab308" 
+                strokeDasharray="3 3"
+                label={{ 
+                  value: `Avg: ${averageSteps.toLocaleString()}`,
+                  position: 'right',
+                  fill: '#eab308',
+                  fontSize: 12
+                }}
               />
             </AreaChart>
           </ResponsiveContainer>
