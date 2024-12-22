@@ -148,7 +148,7 @@ export async function POST(request: Request) {
 
     const properties = {
       GoneToSleepH: {
-        number: GoneToSleepH + 12,
+        number: GoneToSleepH,
       },
       GoneToSleepM: {
         number: GoneToSleepM,

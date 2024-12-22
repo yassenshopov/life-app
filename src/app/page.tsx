@@ -1852,9 +1852,14 @@ export default function Home() {
     return (
       <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
-            Today's Sleep Analysis
-          </h3>
+          <div className="flex flex-col">
+          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 opacity-50 mb-2">
+            Today's Sleep Analysis ({format(new Date(entry.date), 'MMM do yyyy')})
+          </h2>
+          <p className="text-2xl font-medium text-slate-900 dark:text-slate-100">
+              {entry.sleepTime} - {entry.wakeTime}
+            </p>
+          </div>
           <div
             className={`px-3 py-1 rounded-full text-sm font-medium ${
               analysis.quality === 'Excellent'
@@ -2367,36 +2372,31 @@ export default function Home() {
                       return `${h}h ${m}m`;
                     };
 
+                    const entry = payload[0].payload; // Get the full data point
                     return (
                       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                         <p className="font-medium text-slate-900 dark:text-slate-100">
                           {label}
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Deep Sleep:{' '}
-                          {formatDuration(Number(payload[0].value) || 0)}
+                          Sleep Duration:{' '}
+                          {typeof payload[0].value === 'number'
+                            ? payload[0].value.toFixed(1)
+                            : payload[0].value}
+                          h
                         </p>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          REM Sleep:{' '}
-                          {formatDuration(Number(payload[1].value) || 0)}
-                        </p>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Light Sleep:{' '}
-                          {formatDuration(Number(payload[2].value) || 0)}
-                        </p>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Total Sleep:{' '}
-                          {formatDuration(
-                            (Number(payload[0].value) || 0) +
-                              (Number(payload[1].value) || 0) +
-                              (Number(payload[2].value) || 0)
-                            )}
-                        </p>
-                        {showAwakeTime && payload[3] && (
+                        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                           <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Awake: {payload[3].value} min
+                            Light Sleep:{' '}
+                            {100 - entry.deepSleep - entry.remSleep}%
                           </p>
-                        )}
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Deep Sleep: {entry.deepSleep}%
+                          </p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
+                            REM Sleep: {entry.remSleep}%
+                          </p>
+                        </div>
                       </div>
                     );
                   }
@@ -2691,15 +2691,10 @@ export default function Home() {
                         fill="url(#sleepGradient)"
                         strokeWidth={3}
                       />
-                      <ReferenceLine
-                        y={7}
-                        stroke="#22c55e"
-                        strokeDasharray="3 3"
-                      />
-                      <ReferenceLine
-                        y={9}
-                        stroke="#22c55e"
-                        strokeDasharray="3 3"
+                      <ReferenceLine // This the recommended band of 7-9 hours
+                        y={8}
+                        stroke="#22c55e40"
+                        strokeWidth={30}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -2893,36 +2888,31 @@ export default function Home() {
                             return `${h}h ${m}m`;
                           };
 
+                          const entry = payload[0].payload; // Get the full data point
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                               <p className="font-medium text-slate-900 dark:text-slate-100">
                                 {label}
                               </p>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Deep Sleep:{' '}
-                                {formatDuration(Number(payload[0].value) || 0)}
+                                Sleep Duration:{' '}
+                                {typeof payload[0].value === 'number'
+                                  ? payload[0].value.toFixed(1)
+                                  : payload[0].value}
+                                h
                               </p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                REM Sleep:{' '}
-                                {formatDuration(Number(payload[1].value) || 0)}
-                              </p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Light Sleep:{' '}
-                                {formatDuration(Number(payload[2].value) || 0)}
-                              </p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Total Sleep:{' '}
-                                {formatDuration(
-                                  (Number(payload[0].value) || 0) +
-                                    (Number(payload[1].value) || 0) +
-                                    (Number(payload[2].value) || 0)
-                                )}
-                              </p>
-                              {showAwakeTime && payload[3] && (
+                              <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                                  Awake: {payload[3].value} min
+                                  Light Sleep:{' '}
+                                  {100 - entry.deepSleep - entry.remSleep}%
                                 </p>
-                              )}
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  Deep Sleep: {entry.deepSleep}%
+                                </p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  REM Sleep: {entry.remSleep}%
+                                </p>
+                              </div>
                             </div>
                           );
                         }
@@ -3196,15 +3186,25 @@ export default function Home() {
             Gym Planner
           </h2>
           <div className="relative">
-            <div className={`transition-opacity duration-200 ${isLoadingCharts || isCalendarLoading ? 'opacity-50' : 'opacity-100'}`}>
-              <WorkoutCalendar onLoadingChange={(loading) => setIsCalendarLoading(loading)} />
+            <div
+              className={`transition-opacity duration-200 ${
+                isLoadingCharts || isCalendarLoading
+                  ? 'opacity-50'
+                  : 'opacity-100'
+              }`}
+            >
+              <WorkoutCalendar
+                onLoadingChange={(loading) => setIsCalendarLoading(loading)}
+              />
             </div>
             {(isLoadingCharts || isCalendarLoading) && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
                 <div className="flex flex-col items-center gap-2 z-10">
                   <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Loading data...</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    Loading data...
+                  </span>
                 </div>
               </div>
             )}
