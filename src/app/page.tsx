@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -55,6 +55,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -94,6 +95,14 @@ type DisplaySection =
   | 'checklist'
   | 'gym';
 
+// Add this type near the top with other type definitions
+type GymSessionType =
+  | 'legs'
+  | 'back_and_chest'
+  | 'shoulders_and_arms'
+  | 'cardio'
+  | 'full_body';
+
 // Add this helper function near the top of the file
 const getTickInterval = (dataLength: number) => {
   if (dataLength <= 7) return 0; // Show all ticks for 7 or fewer points
@@ -116,12 +125,63 @@ type Workout = {
 
 interface WorkoutCalendarProps {
   onLoadingChange: (loading: boolean) => void;
+  showGymForm: boolean;
+  setShowGymForm: (show: boolean) => void;
 }
 
-export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
+// Add this helper function before your component
+const formatGymType = (type: string): string => {
+  switch (type.toLowerCase()) {
+    case 'upper':
+      return 'Upper Body';
+    case 'lower':
+      return 'Lower Body';
+    case 'full':
+      return 'Full Body';
+    case 'cardio':
+      return 'Cardio';
+    case 'other':
+      return 'Other';
+    default:
+      return type;
+  }
+};
+
+// Add these TypeScript interfaces if you haven't already
+interface GymSession {
+  id: string;
+  type: string;
+  date: string;
+  exercises: string;
+  notes?: string | null;
+}
+
+interface WorkoutEvent {
+  id: string;
+  type: string;
+  title: string;
+  date: string;
+  distance?: number;
+  duration?: number;
+  pace?: string;
+  notes?: string;
+}
+
+export const WorkoutCalendar = ({
+  onLoadingChange,
+  showGymForm,
+  setShowGymForm,
+}: WorkoutCalendarProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [gymSessions, setGymSessions] = useState<any[]>([]);
+
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [sessionType, setSessionType] = useState<GymSessionType>('legs');
+  const [exercises, setExercises] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmittingGym, setIsSubmittingGym] = useState(false);
 
   useEffect(() => {
     const startDate = new Date(
@@ -156,6 +216,18 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
       .catch((error) => {
         console.error('Error fetching runs:', error);
         setIsLoading(false);
+      });
+
+    fetch(
+      `/api/supabase/exercises?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+    )
+      .then((res) => res.json())
+      .then((gymData) => {
+        console.log('Gym sessions:', gymData); // Debug log
+        setGymSessions(gymData);
+      })
+      .catch((error) => {
+        console.error('Error fetching gym sessions:', error);
       });
   }, [currentDate]);
 
@@ -217,6 +289,32 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
     );
   };
 
+  const handleGymSubmit = async () => {
+    if (!sessionType || !exercises) return;
+    setIsSubmittingGym(true);
+    try {
+      const response = await fetch('/api/supabase/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: sessionType,
+          date: new Date().toISOString().split('T')[0],
+          exercises,
+          notes: notes || null,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save gym session');
+      setShowGymForm(false);
+      setSessionType('' as GymSessionType);
+      setExercises('');
+      setNotes('');
+    } catch (error) {
+      console.error('Failed to save gym session:', error);
+    } finally {
+      setIsSubmittingGym(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
       {/* Calendar Section - Left Side */}
@@ -274,8 +372,37 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
             const workoutsForDay = workouts.filter(
               (event) => event.date === dateString
             );
+            const gymSessionsForDay = gymSessions.filter((session) => {
+              // Add T00:00:00 to the date string before creating the Date object, just like we do for runs
+              const sessionDate = new Date(session.date + 'T00:00:00')
+                .toISOString()
+                .split('T')[0];
+              return sessionDate === dateString;
+            });
             const isToday =
               currentMonthDate.toDateString() === new Date().toDateString();
+
+            // Combine both types of activities
+            const activitiesForDay = [
+              ...workoutsForDay.map((workout) => ({
+                type: workout.type,
+                title: workout.title,
+                details: {
+                  distance: workout.distance,
+                  duration: workout.duration,
+                  pace: workout.pace,
+                  notes: workout.notes,
+                },
+              })),
+              ...gymSessionsForDay.map((session) => ({
+                type: 'gym',
+                title: formatGymType(session.type) || 'Gym Session',
+                details: {
+                  exercises: session.exercises,
+                  notes: session.notes,
+                },
+              })),
+            ];
 
             return (
               <TooltipProvider key={day}>
@@ -297,15 +424,17 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
                       >
                         {day}
                       </span>
-                      {workoutsForDay.length > 0 && (
+                      {activitiesForDay.length > 0 && (
                         <div className="absolute bottom-1 right-1 flex gap-1">
-                          {workoutsForDay.map((workout, index) => (
+                          {activitiesForDay.map((activity, index) => (
                             <div
                               key={index}
                               className={`w-2 h-2 rounded-full ${
-                                workout.type === 'run'
+                                activity.type === 'run'
                                   ? 'bg-orange-500'
-                                  : 'bg-purple-500'
+                                  : activity.type === 'gym'
+                                  ? 'bg-purple-500'
+                                  : 'bg-blue-500'
                               }`}
                             />
                           ))}
@@ -313,33 +442,57 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
                       )}
                     </div>
                   </TooltipTrigger>
-                  {workoutsForDay.length > 0 && (
+                  {activitiesForDay.length > 0 && (
                     <TooltipContent className="space-y-2">
-                      {workoutsForDay.map((workout, index) => (
+                      {activitiesForDay.map((activity, index) => (
                         <div key={index} className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                workout.type === 'run'
+                                activity.type === 'run'
                                   ? 'bg-orange-500'
-                                  : 'bg-purple-500'
+                                  : activity.type === 'gym'
+                                  ? 'bg-purple-500'
+                                  : 'bg-blue-500'
                               }`}
                             />
-                            <span className="font-medium">{workout.title}</span>
+                            <span className="font-medium">
+                              {activity.title}
+                            </span>
                           </div>
-                          {workout.type === 'run' && (
+                          {activity.type === 'run' && (
                             <div className="text-sm text-slate-500 dark:text-slate-400 pl-4 space-y-1">
-                              {workout.distance && (
-                                <div>Distance: {workout.distance}km</div>
+                              {'distance' in activity.details &&
+                                activity.details.distance && (
+                                  <div>
+                                    Distance: {activity.details.distance}km
+                                  </div>
+                                )}
+                              {'duration' in activity.details &&
+                                activity.details.duration && (
+                                  <div>
+                                    Duration: {activity.details.duration}min
+                                  </div>
+                                )}
+                              {'pace' in activity.details &&
+                                activity.details.pace && (
+                                  <div>Pace: {activity.details.pace}min/km</div>
+                                )}
+                              {'notes' in activity.details &&
+                                activity.details.notes && (
+                                  <div>Notes: {activity.details.notes}</div>
+                                )}
+                            </div>
+                          )}
+                          {activity.type === 'gym' && (
+                            <div className="text-sm text-slate-500 dark:text-slate-400 pl-4 space-y-1">
+                              {'exercises' in activity.details && activity.details.exercises && (
+                                <div>
+                                  Exercises: {activity.details.exercises}
+                                </div>
                               )}
-                              {workout.duration && (
-                                <div>Duration: {workout.duration}min</div>
-                              )}
-                              {workout.pace && (
-                                <div>Pace: {workout.pace}min/km</div>
-                              )}
-                              {workout.notes && (
-                                <div>Notes: {workout.notes}</div>
+                              {activity.details.notes && (
+                                <div>Notes: {activity.details.notes}</div>
                               )}
                             </div>
                           )}
@@ -390,8 +543,9 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
             <Button
               variant="outline"
               className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={() => setShowGymForm(true)}
             >
-              <Plus className="mr-2 h-4 w-4" /> Add Workout
+              <Dumbbell className="mr-2 h-4 w-4" /> Add Gym Session
             </Button>
             <Button
               variant="outline"
@@ -408,11 +562,105 @@ export const WorkoutCalendar = ({ onLoadingChange }: WorkoutCalendarProps) => {
           </div>
         </div>
       </div>
+
+      {showGymForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-800 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                Add Gym Session
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowGymForm(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                // Handle form submission
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label
+                  htmlFor="sessionType"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                >
+                  Session Type
+                </label>
+                <Select
+                  value={sessionType}
+                  onValueChange={(value) => setSessionType(value as GymSessionType)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select session type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="legs">Legs</SelectItem>
+                    <SelectItem value="back_and_chest">Back & Chest</SelectItem>
+                    <SelectItem value="shoulders_and_arms">Shoulders & Arms</SelectItem>
+                    <SelectItem value="cardio">Cardio</SelectItem>
+                    <SelectItem value="full_body">Full Body</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label
+                  htmlFor="exercises"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                >
+                  Exercises
+                </label>
+                <Textarea
+                  id="exercises"
+                  value={exercises}
+                  onChange={(e) => setExercises(e.target.value)}
+                  placeholder="Enter exercises"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="notes"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                >
+                  Notes (optional)
+                </label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter notes"
+                  className="w-full"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowGymForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleGymSubmit}
+                  disabled={!sessionType || !exercises || isSubmittingGym}
+                >
+                  {isSubmittingGym ? 'Saving...' : 'Save Session'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default function Home() {
+export default function HealthDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [entries, setEntries] = useState<SleepEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -431,7 +679,7 @@ export default function Home() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [awakeTime, setAwakeTime] = useState('');
   const [restingHeartRate, setRestingHeartRate] = useState('');
-  const [activeTab, setActiveTab] = useState<string | null>('30');
+  const [activeTab, setActiveTab] = useState<string | null>('30D'); // Changed from '30'
   const [steps, setSteps] = useState('');
   const [weight, setWeight] = useState('');
 
@@ -452,6 +700,20 @@ export default function Home() {
 
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
 
+  // Add to your existing state declarations
+  const [exerciseData, setExerciseData] = useState<any[]>([]);
+
+  // Add this to your state declarations
+  const [gymSessions, setGymSessions] = useState<any[]>([]);
+
+  const [showGymForm, setShowGymForm] = useState(false);
+
+  // Add near your other state declarations
+  const [sessionType, setSessionType] = useState<GymSessionType>('legs');
+  const [exercises, setExercises] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmittingGym, setIsSubmittingGym] = useState(false);
+
   useEffect(() => {
     const fetchEntries = async () => {
       setIsLoadingCharts(true);
@@ -471,6 +733,36 @@ export default function Home() {
     };
 
     fetchEntries();
+  }, [dateRange]);
+
+  // Add to your useEffect that fetches data
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoadingCharts(true);
+      try {
+        // Fetch exercise data
+        const exerciseResponse = await fetch(
+          `/api/supabase/exercises?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
+        );
+        const exerciseData = await exerciseResponse.json();
+        console.log('Exercise data:', exerciseResponse);
+        setExerciseData(exerciseData);
+
+        // Fetch gym sessions
+        const gymResponse = await fetch(
+          `/api/supabase/exercises?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
+        );
+        const gymData = await gymResponse.json();
+        console.log('Gym sessions:', gymData); // Debug log
+        setGymSessions(gymData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoadingCharts(false);
+      }
+    };
+
+    fetchData();
   }, [dateRange]);
 
   // Add initial loading screen
@@ -1213,16 +1505,20 @@ export default function Home() {
   const RHRChart = ({ data }: { data: any[] }) => {
     const tickInterval = getTickInterval(data.length);
 
-
     const chartData = data.map((entry) => ({
       date: entry.date,
       rhr: entry.restingHeartRate,
     }));
     // Calculate average RHR for the period
-    const validRHR = data.filter(entry => entry.restingHeartRate !== null).map(entry => entry.restingHeartRate);
-    const averageRHR = validRHR.length > 0 
-      ? Math.round(validRHR.reduce((acc, curr) => acc + curr, 0) / validRHR.length)
-      : 0;
+    const validRHR = data
+      .filter((entry) => entry.restingHeartRate !== null)
+      .map((entry) => entry.restingHeartRate);
+    const averageRHR =
+      validRHR.length > 0
+        ? Math.round(
+            validRHR.reduce((acc, curr) => acc + curr, 0) / validRHR.length
+          )
+        : 0;
 
     // Custom tick formatter for Y-axis
     const CustomYAxisTick = (props: any) => {
@@ -1235,8 +1531,8 @@ export default function Home() {
           y={y}
           dy={4}
           textAnchor="end"
-          fill={isAverage ? "#ef4444" : "currentColor"}
-          className={isAverage ? "font-medium" : ""}
+          fill={isAverage ? '#ef4444' : 'currentColor'}
+          className={isAverage ? 'font-medium' : ''}
         >
           {payload.value}
         </text>
@@ -1250,10 +1546,16 @@ export default function Home() {
 
     return (
       <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Resting Heart Rate
         </h3>
-        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={chartData} margin={{ bottom: 50 }}>
               <defs>
@@ -1271,7 +1573,7 @@ export default function Home() {
                 interval={tickInterval}
                 tick={{ dy: 10, fontSize: 12 }}
               />
-              <YAxis 
+              <YAxis
                 domain={[minRHR - 2, maxRHR + 2]}
                 tick={<CustomYAxisTick />}
                 ticks={yAxisTicks}
@@ -1302,15 +1604,15 @@ export default function Home() {
                 name="Resting Heart Rate"
                 connectNulls={false}
               />
-              <ReferenceLine 
-                y={averageRHR} 
-                stroke="#ef4444" 
+              <ReferenceLine
+                y={averageRHR}
+                stroke="#ef4444"
                 strokeDasharray="3 3"
-                label={{ 
+                label={{
                   value: `Avg: ${averageRHR} bpm`,
                   position: 'right',
                   fill: '#ef4444',
-                  fontSize: 12
+                  fontSize: 12,
                 }}
               />
             </AreaChart>
@@ -1324,19 +1626,19 @@ export default function Home() {
   // Helper function to generate Y-axis ticks including the average
   const generateYAxisTicks = (min: number, max: number, average: number) => {
     const ticks = new Set<number>();
-    
+
     // Add min and max
     ticks.add(Math.floor(min));
     ticks.add(Math.ceil(max));
-    
+
     // Add average
     ticks.add(average);
-    
+
     // Add intermediate values
     for (let i = Math.floor(min); i <= Math.ceil(max); i++) {
       ticks.add(i);
     }
-    
+
     // Convert to array and sort
     return Array.from(ticks).sort((a, b) => a - b);
   };
@@ -1472,10 +1774,18 @@ export default function Home() {
     const tickInterval = getTickInterval(data.length);
 
     // Calculate average weight for the period
-    const validWeights = data.filter(entry => entry.weight !== null).map(entry => entry.weight);
-    const averageWeight = validWeights.length > 0 
-      ? Number((validWeights.reduce((acc, curr) => acc + curr, 0) / validWeights.length).toFixed(1))
-      : 0;
+    const validWeights = data
+      .filter((entry) => entry.weight !== null)
+      .map((entry) => entry.weight);
+    const averageWeight =
+      validWeights.length > 0
+        ? Number(
+            (
+              validWeights.reduce((acc, curr) => acc + curr, 0) /
+              validWeights.length
+            ).toFixed(1)
+          )
+        : 0;
 
     // Custom tick formatter for Y-axis
     const CustomYAxisTick = (props: any) => {
@@ -1488,8 +1798,8 @@ export default function Home() {
           y={y}
           dy={4}
           textAnchor="end"
-          fill={isAverage ? "#14b8a6" : "currentColor"}
-          className={isAverage ? "font-medium" : ""}
+          fill={isAverage ? '#14b8a6' : 'currentColor'}
+          className={isAverage ? 'font-medium' : ''}
         >
           {payload.value}
         </text>
@@ -1503,10 +1813,16 @@ export default function Home() {
 
     return (
       <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Weight History
         </h3>
-        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data} margin={{ bottom: 50 }}>
               <defs>
@@ -1524,7 +1840,7 @@ export default function Home() {
                 interval={tickInterval}
                 tick={{ dy: 10, fontSize: 12 }}
               />
-              <YAxis 
+              <YAxis
                 domain={[minWeight - 0.5, maxWeight + 0.5]}
                 tick={<CustomYAxisTick />}
                 ticks={yAxisTicks}
@@ -1538,7 +1854,11 @@ export default function Home() {
                           {label}
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Weight: {typeof payload[0].value === 'number' ? payload[0].value.toFixed(1) : payload[0].value} kg
+                          Weight:{' '}
+                          {typeof payload[0].value === 'number'
+                            ? payload[0].value.toFixed(1)
+                            : payload[0].value}{' '}
+                          kg
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
                           Average: {averageWeight} kg
@@ -1557,15 +1877,15 @@ export default function Home() {
                 name="Weight (kg)"
                 strokeWidth={3}
               />
-              <ReferenceLine 
-                y={averageWeight} 
-                stroke="#14b8a6" 
+              <ReferenceLine
+                y={averageWeight}
+                stroke="#14b8a6"
                 strokeDasharray="3 3"
-                label={{ 
+                label={{
                   value: `Avg: ${averageWeight} kg`,
                   position: 'right',
                   fill: '#14b8a6',
-                  fontSize: 12
+                  fontSize: 12,
                 }}
               />
             </AreaChart>
@@ -1949,10 +2269,11 @@ export default function Home() {
       <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between mb-6">
           <div className="flex flex-col">
-          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 opacity-50 mb-2">
-            Today's Sleep Analysis ({format(new Date(entry.date), 'MMM do yyyy')})
-          </h2>
-          <p className="text-2xl font-medium text-slate-900 dark:text-slate-100">
+            <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 opacity-50 mb-2">
+              Today's Sleep Analysis (
+              {format(new Date(entry.date), 'MMM do yyyy')})
+            </h2>
+            <p className="text-2xl font-medium text-slate-900 dark:text-slate-100">
               {entry.sleepTime} - {entry.wakeTime}
             </p>
           </div>
@@ -2185,19 +2506,28 @@ export default function Home() {
     const tickInterval = getTickInterval(data.length);
 
     // Calculate average steps for the period
-    const validSteps = data.filter(entry => entry.steps !== null).map(entry => entry.steps);
-    const averageSteps = validSteps.length > 0 
-      ? Math.round(
-          validSteps.reduce((acc, curr) => acc + curr, 0) / validSteps.length
-        )
-      : 0;
+    const validSteps = data
+      .filter((entry) => entry.steps !== null)
+      .map((entry) => entry.steps);
+    const averageSteps =
+      validSteps.length > 0
+        ? Math.round(
+            validSteps.reduce((acc, curr) => acc + curr, 0) / validSteps.length
+          )
+        : 0;
 
     return (
-      <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Daily Steps
         </h3>
-        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data} margin={{ bottom: 50 }}>
               <defs>
@@ -2245,15 +2575,15 @@ export default function Home() {
                 strokeWidth={3}
               />
               {/* Add ReferenceLine for average */}
-              <ReferenceLine 
-                y={averageSteps} 
-                stroke="#eab308" 
+              <ReferenceLine
+                y={averageSteps}
+                stroke="#eab308"
                 strokeDasharray="3 3"
-                label={{ 
+                label={{
                   value: `Avg: ${averageSteps.toLocaleString()}`,
                   position: 'right',
                   fill: '#eab308',
-                  fontSize: 12
+                  fontSize: 12,
                 }}
               />
             </AreaChart>
@@ -2270,7 +2600,7 @@ export default function Home() {
 
     if (validData.length === 0) {
       return (
-        <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+        <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
           <h3
             className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
           >
@@ -2303,7 +2633,7 @@ export default function Home() {
     const standardDeviation = Math.round(Math.sqrt(meanSquaredDiff));
 
     return (
-      <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+      <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
         <h3
           className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
         >
@@ -2402,7 +2732,7 @@ export default function Home() {
     const [showAwakeTime, setShowAwakeTime] = useState(true);
 
     return (
-      <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative mb-8">
+      <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative mb-8">
         <div className="flex items-center justify-between mb-4">
           <h3
             className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}
@@ -2554,6 +2884,197 @@ export default function Home() {
         {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
       </div>
     );
+  };
+
+  const ExerciseProgressChart = ({ data }: { data: any[] }) => {
+    const [selectedExercise, setSelectedExercise] = useState<string>('');
+
+    // Get unique exercises from all logs
+    const exercises = useMemo(() => {
+      if (!data || !Array.isArray(data)) return [];
+
+      const exerciseSet = new Set<string>();
+      data.forEach((log) => {
+        if (log.exercise_log) {
+          Object.keys(log.exercise_log).forEach((exercise) => {
+            exerciseSet.add(exercise);
+          });
+        }
+      });
+      return Array.from(exerciseSet);
+    }, [data]);
+
+    // Prepare data for the selected exercise
+    const chartData = useMemo(() => {
+      if (!selectedExercise) return [];
+
+      return data
+        .filter((log) => log.exercise_log[selectedExercise])
+        .map((log) => {
+          const exerciseData = log.exercise_log[selectedExercise];
+          const maxWeight = Math.max(
+            ...exerciseData.sets.map((set: any) => set.weight)
+          );
+          const totalVolume = exerciseData.sets.reduce(
+            (acc: number, set: any) => {
+              return acc + set.weight * set.reps;
+            },
+            0
+          );
+
+          return {
+            date: new Date(log.date).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+            }),
+            maxWeight,
+            totalVolume,
+            sets: exerciseData.sets,
+          };
+        });
+    }, [data, selectedExercise]);
+
+    return (
+      <div className="lg:col-span-4 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+        <div className="flex items-center justify-between mb-4">
+          <h3
+            className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}
+          >
+            Exercise Progress
+          </h3>
+          <select
+            value={selectedExercise}
+            onChange={(e) => setSelectedExercise(e.target.value)}
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1 text-sm"
+          >
+            <option value="">Select Exercise</option>
+            {exercises.map((exercise) => (
+              <option key={exercise} value={exercise}>
+                {exercise
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedExercise && (
+          <div
+            className={`transition-opacity duration-200 ${
+              isLoadingCharts ? 'opacity-50' : 'opacity-100'
+            }`}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={chartData} margin={{ bottom: 50 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  interval={0}
+                  tick={{ dy: 10 }}
+                />
+                <YAxis
+                  yAxisId="weight"
+                  label={{
+                    value: 'Weight (kg)',
+                    angle: -90,
+                    position: 'insideLeft',
+                  }}
+                />
+                <YAxis
+                  yAxisId="volume"
+                  orientation="right"
+                  label={{
+                    value: 'Volume (kg)',
+                    angle: 90,
+                    position: 'insideRight',
+                  }}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                          <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">
+                            {label}
+                          </p>
+                          <div className="space-y-1">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                              Max Weight: {data.maxWeight}kg
+                            </p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                              Total Volume: {data.totalVolume}kg
+                            </p>
+                            <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                              {data.sets.map((set: any, index: number) => (
+                                <p
+                                  key={index}
+                                  className="text-sm text-slate-600 dark:text-slate-400"
+                                >
+                                  Set {set.order}: {set.weight}kg × {set.reps}{' '}
+                                  reps
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar
+                  yAxisId="weight"
+                  dataKey="maxWeight"
+                  fill="#a855f7"
+                  name="Max Weight"
+                />
+                <Line
+                  yAxisId="volume"
+                  type="monotone"
+                  dataKey="totalVolume"
+                  stroke="#14b8a6"
+                  strokeWidth={2}
+                  dot={{ fill: '#14b8a6' }}
+                  name="Total Volume"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleGymSubmit = async () => {
+    if (!sessionType || !exercises) return;
+
+    setIsSubmittingGym(true);
+    try {
+      const response = await fetch('/api/supabase/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: sessionType,
+          date: new Date().toISOString().split('T')[0],
+          exercises,
+          notes: notes || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save gym session');
+      setShowGymForm(false);
+      setSessionType('' as GymSessionType);
+      setExercises('');
+      setNotes('');
+    } catch (error) {
+      console.error('Failed to save gym session:', error);
+    } finally {
+      setIsSubmittingGym(false);
+    }
   };
 
   return (
@@ -2957,7 +3478,7 @@ export default function Home() {
                         lightSleepHours:
                           (totalSleepHours *
                             (100 - entry.deepSleep - entry.remSleep)) /
-                          100,
+                            100,
                       };
                     })}
                     margin={{ bottom: 50 }}
@@ -3129,6 +3650,24 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <WeightAnalytics data={prepareChartData()} />
               <WeightChart data={prepareChartData()} />
+            </div>
+          </>
+        )}
+
+        {/* Exercise Section */}
+        {(activeSection === 'all' || activeSection === 'gym') && (
+          <>
+            <h2
+              className={`text-3xl font-bold mb-8 ${
+                activeSection === 'all' ? 'mt-12' : ''
+              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
+                outfit.className
+              }`}
+            >
+              Exercise Analysis
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <ExerciseProgressChart data={exerciseData} />
             </div>
           </>
         )}
@@ -3308,6 +3847,8 @@ export default function Home() {
             >
               <WorkoutCalendar
                 onLoadingChange={(loading) => setIsCalendarLoading(loading)}
+                showGymForm={showGymForm}
+                setShowGymForm={setShowGymForm}
               />
             </div>
             {(isLoadingCharts || isCalendarLoading) && (
