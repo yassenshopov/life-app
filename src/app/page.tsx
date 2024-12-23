@@ -141,18 +141,6 @@ const getTickInterval = (dataLength: number) => {
   return Math.floor(dataLength / 10); // Show roughly 10 ticks for larger datasets
 };
 
-// Update the Workout type to match running data
-type Workout = {
-  id: string;
-  date: string;
-  type: 'strength' | 'run';
-  title?: string;
-  distance?: number;
-  duration?: number;
-  pace?: number;
-  notes?: string;
-};
-
 interface WorkoutCalendarProps {
   onLoadingChange: (loading: boolean) => void;
   showGymForm: boolean;
@@ -176,15 +164,6 @@ const formatGymType = (type: string): string => {
       return type;
   }
 };
-
-// Add these TypeScript interfaces if you haven't already
-interface GymSession {
-  id: string;
-  type: string;
-  date: string;
-  exercises: string;
-  notes?: string | null;
-}
 
 interface WorkoutEvent {
   id: string;
@@ -440,7 +419,6 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
 };
 
 export const WorkoutCalendar = ({
-  onLoadingChange,
   showGymForm,
   setShowGymForm,
 }: WorkoutCalendarProps) => {
@@ -449,7 +427,6 @@ export const WorkoutCalendar = ({
   const [isLoading, setIsLoading] = useState(true);
   const [gymSessions, setGymSessions] = useState<any[]>([]);
 
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [sessionType, setSessionType] = useState<GymSessionType>('legs');
   const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
   const [exerciseSearch, setExerciseSearch] = useState('');
