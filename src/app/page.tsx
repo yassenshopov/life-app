@@ -64,10 +64,28 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ChartLoadingOverlay } from '@/components/ChartLoadingOverlay';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { NavigationTabs } from '@/components/NavigationTabs';
+import { SectionHeader } from '@/components/SectionHeader';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -300,7 +318,10 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
     if (a.totalSets > 0 && b.totalSets === 0) return -1;
     if (a.totalSets === 0 && b.totalSets > 0) return 1;
     if (a.totalSets > 0 && b.totalSets > 0) {
-      return new Date(b.lastPerformed).getTime() - new Date(a.lastPerformed).getTime();
+      return (
+        new Date(b.lastPerformed).getTime() -
+        new Date(a.lastPerformed).getTime()
+      );
     }
     return a.name.localeCompare(b.name);
   });
@@ -378,35 +399,27 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
 
             <div className="grid grid-cols-2 gap-y-4">
               <div>
-                <div className="text-sm text-slate-400">
-                  Max Weight
-                </div>
+                <div className="text-sm text-slate-400">Max Weight</div>
                 <div className="text-base font-medium text-slate-100">
                   {stat.maxWeight}{' '}
                   <span className="text-xs text-slate-400">kg</span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400">
-                  Avg Weight
-                </div>
+                <div className="text-sm text-slate-400">Avg Weight</div>
                 <div className="text-base font-medium text-slate-100">
                   {stat.avgWeight}{' '}
                   <span className="text-xs text-slate-400">kg</span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400">
-                  Total Sets
-                </div>
+                <div className="text-sm text-slate-400">Total Sets</div>
                 <div className="text-base font-medium text-slate-100">
                   {stat.totalSets}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400">
-                  Total Reps
-                </div>
+                <div className="text-sm text-slate-400">Total Reps</div>
                 <div className="text-base font-medium text-slate-100">
                   {stat.totalReps}
                 </div>
@@ -448,7 +461,9 @@ export const WorkoutCalendar = ({
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
 
   // Add state to track collapsed exercises
-  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
+  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(
+    new Set()
+  );
 
   // Add toggle function
   const toggleExercise = (index: number) => {
@@ -539,19 +554,6 @@ export const WorkoutCalendar = ({
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDayOfMonth = getFirstDayOfMonth(currentDate);
 
-  const ChartLoadingOverlay = ({
-    color = 'purple',
-  }: {
-    color?: 'purple' | 'yellow' | 'red' | 'teal' | 'orange';
-  }) => {
-    return (
-      <div className="absolute inset-0 top-[52px] flex items-center justify-center">
-        <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
-        <LoadingSpinner color={color} label="Loading data..." />
-      </div>
-    );
-  };
-
   const handleGymSubmit = async () => {
     if (!sessionType || selectedExercises.length === 0) return;
     setIsSubmittingGym(true);
@@ -576,7 +578,7 @@ export const WorkoutCalendar = ({
     try {
       const endpoint = '/api/supabase/exercises';
       const method = editingWorkout ? 'PUT' : 'POST';
-      
+
       const response = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -588,9 +590,9 @@ export const WorkoutCalendar = ({
           notes: notes || null,
         }),
       });
-      
+
       if (!response.ok) throw new Error('Failed to save gym session');
-      
+
       // Reset form
       setShowGymForm(false);
       setSessionType('' as GymSessionType);
@@ -612,15 +614,20 @@ export const WorkoutCalendar = ({
     setSessionType(workout.type);
     setGymDate(workout.date);
     setNotes(workout.notes || '');
-    
+
     // Transform exercise_log back into selectedExercises format
-    const exercises = Object.entries(workout.exercise_log).map(([name, data]: [string, any]) => ({
-      name: name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-      sets: data.sets.map((set: any) => ({
-        reps: set.reps,
-        weight: set.weight,
-      })),
-    }));
+    const exercises = Object.entries(workout.exercise_log).map(
+      ([name, data]: [string, any]) => ({
+        name: name
+          .split('_')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' '),
+        sets: data.sets.map((set: any) => ({
+          reps: set.reps,
+          weight: set.weight,
+        })),
+      })
+    );
     setSelectedExercises(exercises);
   };
 
@@ -736,14 +743,19 @@ export const WorkoutCalendar = ({
                       {activitiesForDay.length > 0 && (
                         <div className="absolute bottom-1 right-1 flex gap-1">
                           {activitiesForDay.map((activity, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <div className={`w-2 h-2 rounded-full ${
-                                activity.type === 'run'
-                                  ? 'bg-orange-500'
-                                  : activity.type === 'gym'
-                                  ? 'bg-purple-500'
-                                  : 'bg-blue-500'
-                              }`} />
+                            <div
+                              key={index}
+                              className="flex items-center justify-between"
+                            >
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  activity.type === 'run'
+                                    ? 'bg-orange-500'
+                                    : activity.type === 'gym'
+                                    ? 'bg-purple-500'
+                                    : 'bg-blue-500'
+                                }`}
+                              />
                               {activity.type === 'gym' && (
                                 <Button
                                   variant="ghost"
@@ -1017,12 +1029,17 @@ export const WorkoutCalendar = ({
                   {/* Selected Exercises List */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {selectedExercises.map((exercise, index) => (
-                      <div key={index} className="border rounded-lg p-4 dark:border-slate-700">
-                        <div 
+                      <div
+                        key={index}
+                        className="border rounded-lg p-4 dark:border-slate-700"
+                      >
+                        <div
                           className="flex items-center justify-between cursor-pointer"
                           onClick={() => toggleExercise(index)}
                         >
-                          <h3 className="text-lg font-medium">{exercise.name}</h3>
+                          <h3 className="text-lg font-medium">
+                            {exercise.name}
+                          </h3>
                           <Button variant="ghost" size="sm">
                             {collapsedExercises.has(index) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1031,7 +1048,7 @@ export const WorkoutCalendar = ({
                             )}
                           </Button>
                         </div>
-                        
+
                         {!collapsedExercises.has(index) && (
                           <div className="mt-4">
                             {/* Existing exercise sets content */}
@@ -1050,13 +1067,14 @@ export const WorkoutCalendar = ({
                                   value={set.reps || ''}
                                   onChange={(e) => {
                                     const newExercises = [...selectedExercises];
-                                    newExercises[index].sets[
-                                      setIndex
-                                    ].reps = Number(e.target.value);
+                                    newExercises[index].sets[setIndex].reps =
+                                      Number(e.target.value);
                                     setSelectedExercises(newExercises);
                                   }}
                                 />
-                                <span className="text-sm text-slate-500">×</span>
+                                <span className="text-sm text-slate-500">
+                                  ×
+                                </span>
                                 <input
                                   type="number"
                                   placeholder="Weight"
@@ -1064,13 +1082,14 @@ export const WorkoutCalendar = ({
                                   value={set.weight || ''}
                                   onChange={(e) => {
                                     const newExercises = [...selectedExercises];
-                                    newExercises[index].sets[
-                                      setIndex
-                                    ].weight = Number(e.target.value);
+                                    newExercises[index].sets[setIndex].weight =
+                                      Number(e.target.value);
                                     setSelectedExercises(newExercises);
                                   }}
                                 />
-                                <span className="text-sm text-slate-500">kg</span>
+                                <span className="text-sm text-slate-500">
+                                  kg
+                                </span>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1125,7 +1144,10 @@ export const WorkoutCalendar = ({
                   />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setShowGymForm(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowGymForm(false)}
+                  >
                     Cancel
                   </Button>
                   <Button
@@ -1141,8 +1163,10 @@ export const WorkoutCalendar = ({
                         <LoadingSpinner size="sm" />
                         Saving...
                       </span>
+                    ) : editingWorkout ? (
+                      'Update Session'
                     ) : (
-                      editingWorkout ? 'Update Session' : 'Save Session'
+                      'Save Session'
                     )}
                   </Button>
                 </div>
@@ -1217,7 +1241,9 @@ export default function HealthDashboard() {
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
 
   // Add state to track collapsed exercises
-  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
+  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(
+    new Set()
+  );
 
   // Add toggle function
   const toggleExercise = (index: number) => {
@@ -2952,19 +2978,6 @@ export default function HealthDashboard() {
     };
   };
 
-  const ChartLoadingOverlay = ({
-    color = 'purple',
-  }: {
-    color?: 'purple' | 'yellow' | 'red' | 'teal' | 'orange';
-  }) => {
-    return (
-      <div className="absolute inset-0 top-[52px] flex items-center justify-center">
-        <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
-        <LoadingSpinner color={color} label="Loading data..." />
-      </div>
-    );
-  };
-
   const StepsChart = ({ data }: { data: any[] }) => {
     const tickInterval = getTickInterval(data.length);
 
@@ -3536,7 +3549,7 @@ export default function HealthDashboard() {
     try {
       const endpoint = '/api/supabase/exercises';
       const method = editingWorkout ? 'PUT' : 'POST';
-      
+
       const response = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -3548,9 +3561,9 @@ export default function HealthDashboard() {
           notes: notes || null,
         }),
       });
-      
+
       if (!response.ok) throw new Error('Failed to save gym session');
-      
+
       // Reset form
       setShowGymForm(false);
       setSessionType('' as GymSessionType);
@@ -3572,25 +3585,30 @@ export default function HealthDashboard() {
     setSessionType(workout.type);
     setGymDate(workout.date);
     setNotes(workout.notes || '');
-    
+
     // Transform exercise_log back into selectedExercises format
-    const exercises = Object.entries(workout.exercise_log).map(([name, data]: [string, any]) => ({
-      name: name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-      sets: data.sets.map((set: any) => ({
-        reps: set.reps,
-        weight: set.weight,
-      })),
-    }));
+    const exercises = Object.entries(workout.exercise_log).map(
+      ([name, data]: [string, any]) => ({
+        name: name
+          .split('_')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' '),
+        sets: data.sets.map((set: any) => ({
+          reps: set.reps,
+          weight: set.weight,
+        })),
+      })
+    );
     setSelectedExercises(exercises);
   };
 
   // Create a sortable exercise component
-  const SortableExercise = ({ 
-    exercise, 
-    index, 
-    isCollapsed, 
-    onToggle, 
-    children 
+  const SortableExercise = ({
+    exercise,
+    index,
+    isCollapsed,
+    onToggle,
+    children,
   }: {
     exercise: { name: string; sets: Array<{ reps: number; weight: number }> };
     index: number;
@@ -3614,13 +3632,15 @@ export default function HealthDashboard() {
     };
 
     return (
-      <div 
+      <div
         ref={setNodeRef}
         style={style}
-        className={`border rounded-lg p-4 dark:border-slate-700 ${isDragging ? 'opacity-50' : ''}`}
+        className={`border rounded-lg p-4 dark:border-slate-700 ${
+          isDragging ? 'opacity-50' : ''
+        }`}
       >
         <div className="flex items-center justify-between">
-          <div 
+          <div
             {...attributes}
             {...listeners}
             className="flex items-center gap-2 cursor-move"
@@ -3628,11 +3648,7 @@ export default function HealthDashboard() {
             <GripVertical className="h-4 w-4 text-slate-400" />
             <h3 className="text-lg font-medium">{exercise.name}</h3>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => onToggle(index)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => onToggle(index)}>
             {isCollapsed ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
@@ -3640,27 +3656,33 @@ export default function HealthDashboard() {
             )}
           </Button>
         </div>
-        
-        {!isCollapsed && (
-          <div className="mt-4">
-            {children}
-          </div>
-        )}
+
+        {!isCollapsed && <div className="mt-4">{children}</div>}
       </div>
     );
   };
 
   // Update the exercises container
-  const ExercisesGrid = ({ 
-    selectedExercises, 
+  const ExercisesGrid = ({
+    selectedExercises,
     setSelectedExercises,
     handleSetChange,
     handleRemoveSet,
-    ...props 
-  }: { 
-    selectedExercises: Array<{ name: string; sets: Array<{ reps: number; weight: number }> }>;
-    setSelectedExercises: React.Dispatch<React.SetStateAction<typeof selectedExercises>>;
-    handleSetChange: (exerciseIndex: number, setIndex: number, field: 'reps' | 'weight', value: number) => void;
+    ...props
+  }: {
+    selectedExercises: Array<{
+      name: string;
+      sets: Array<{ reps: number; weight: number }>;
+    }>;
+    setSelectedExercises: React.Dispatch<
+      React.SetStateAction<typeof selectedExercises>
+    >;
+    handleSetChange: (
+      exerciseIndex: number,
+      setIndex: number,
+      field: 'reps' | 'weight',
+      value: number
+    ) => void;
     handleRemoveSet: (exerciseIndex: number, setIndex: number) => void;
     collapsedExercises: Set<number>;
     onToggleExercise: (index: number) => void;
@@ -3674,12 +3696,12 @@ export default function HealthDashboard() {
 
     const handleDragEnd = (event: DragEndEvent) => {
       const { active, over } = event;
-      
+
       if (active.id !== over?.id && over) {
         setSelectedExercises((exercises) => {
           const oldIndex = exercises.findIndex((e) => e.name === active.id);
           const newIndex = exercises.findIndex((e) => e.name === over.id);
-          
+
           return arrayMove(exercises, oldIndex, newIndex);
         });
       }
@@ -3693,7 +3715,7 @@ export default function HealthDashboard() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SortableContext
-            items={selectedExercises.map(e => e.name)}
+            items={selectedExercises.map((e) => e.name)}
             strategy={verticalListSortingStrategy}
           >
             {selectedExercises.map((exercise, index) => (
@@ -3708,9 +3730,33 @@ export default function HealthDashboard() {
                 {exercise.sets.map((set, setIndex) => (
                   // ... existing set inputs
                   <div key={setIndex}>
-                    <input type="number" value={set.reps} onChange={(e) => handleSetChange(index, setIndex, 'reps', parseInt(e.target.value))} />
-                    <input type="number" value={set.weight} onChange={(e) => handleSetChange(index, setIndex, 'weight', parseInt(e.target.value))} />
-                    <button onClick={() => handleRemoveSet(index, setIndex)}>Remove</button>
+                    <input
+                      type="number"
+                      value={set.reps}
+                      onChange={(e) =>
+                        handleSetChange(
+                          index,
+                          setIndex,
+                          'reps',
+                          parseInt(e.target.value)
+                        )
+                      }
+                    />
+                    <input
+                      type="number"
+                      value={set.weight}
+                      onChange={(e) =>
+                        handleSetChange(
+                          index,
+                          setIndex,
+                          'weight',
+                          parseInt(e.target.value)
+                        )
+                      }
+                    />
+                    <button onClick={() => handleRemoveSet(index, setIndex)}>
+                      Remove
+                    </button>
                   </div>
                 ))}
               </SortableExercise>
@@ -3727,134 +3773,19 @@ export default function HealthDashboard() {
     >
       {/* Update the header section styling */}
       <div className="fixed top-0 right-0 left-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
-        {/* Update navigation tabs border */}
-        <div className="border-b border-slate-200 dark:border-slate-800">
-          <div className="max-w-7xl mx-auto px-4">
-            <nav className="flex space-x-4">
-              {[
-                { name: 'All', icon: <Menu className="w-4 h-4" /> },
-                { name: 'Sleep', icon: <Moon className="w-4 h-4" /> },
-                { name: 'RHR', icon: <Heart className="w-4 h-4" /> },
-                { name: 'Steps', icon: <Footprints className="w-4 h-4" /> },
-                { name: 'Weight', icon: <Weight className="w-4 h-4" /> },
-                {
-                  name: 'Checklist',
-                  icon: <CheckSquare className="w-4 h-4" />,
-                  showNotification: (() => {
-                    const today = new Date().toISOString().split('T')[0];
-                    const yesterday = new Date(Date.now() - 86400000)
-                      .toISOString()
-                      .split('T')[0];
+        <NavigationTabs
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          entries={entries}
+        />
 
-                    const todayEntry = entries.find(
-                      (entry) => entry.date === today
-                    );
-                    const yesterdayEntry = entries.find(
-                      (entry) => entry.date === yesterday
-                    );
-
-                    const hasTodaySleepData =
-                      todayEntry &&
-                      (todayEntry.totalSleepHours > 0 ||
-                        todayEntry.totalSleepMinutes > 0);
-                    const hasYesterdayRHR =
-                      yesterdayEntry?.restingHeartRate != null;
-                    const hasYesterdaySteps = yesterdayEntry?.steps != null;
-                    const hasTodayWeight = todayEntry?.weight != null;
-
-                    return (
-                      !hasTodaySleepData ||
-                      !hasYesterdayRHR ||
-                      !hasYesterdaySteps ||
-                      !hasTodayWeight
-                    );
-                  })(),
-                },
-                { name: 'Gym', icon: <DumbbellIcon className="w-4 h-4" /> },
-              ].map((tab) => (
-                <button
-                  key={tab.name}
-                  onClick={() =>
-                    setActiveSection(
-                      tab.name.toLowerCase().replace(' ', '') as DisplaySection
-                    )
-                  }
-                  className={`py-4 px-2 text-sm font-medium transition-colors flex items-center gap-2 relative ${
-                    activeSection === tab.name.toLowerCase().replace(' ', '')
-                      ? 'text-purple-600 dark:text-white border-b-2 border-purple-600 dark:border-white'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.name}
-                  {tab.showNotification && (
-                    <span className="absolute top-3 right-0 h-2 w-2 rounded-full bg-red-500" />
-                  )}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-
-        {/* Update date range controls border and styling */}
-        <div className="border-b border-slate-200 dark:border-slate-800">
-          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {['3D', '7D', '30D', '90D', '1Y', 'YTD'].map((period) => (
-                <button
-                  key={period}
-                  onClick={() => {
-                    setActiveTab(period);
-                    if (period === 'YTD') {
-                      const to = new Date();
-                      const from = new Date(to.getFullYear(), 0, 1);
-                      setDateRange({ from, to });
-                    } else if (period === '1Y') {
-                      handleDateRangeFilter('1Y');
-                    } else {
-                      handleDateRangeFilter(parseInt(period));
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                    activeTab === period
-                      ? 'bg-purple-100 text-purple-700 dark:bg-slate-800 dark:text-white'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-                  }`}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="date"
-                value={dateRange.from.toISOString().split('T')[0]}
-                onChange={(e) => {
-                  setActiveTab(null);
-                  setDateRange((prev) => ({
-                    ...prev,
-                    from: new Date(e.target.value),
-                  }));
-                }}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs"
-              />
-              <input
-                type="date"
-                value={dateRange.to.toISOString().split('T')[0]}
-                onChange={(e) => {
-                  setActiveTab(null);
-                  setDateRange((prev) => ({
-                    ...prev,
-                    to: new Date(e.target.value),
-                  }));
-                }}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs"
-              />
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
+        <DateRangeFilter
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          handleDateRangeFilter={handleDateRangeFilter}
+        />
       </div>
 
       {/* Update the main content top padding to account for the fixed header */}
@@ -3862,11 +3793,7 @@ export default function HealthDashboard() {
         {/* Sleep Section */}
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
-            <h2
-              className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
-            >
-              Sleep Analysis
-            </h2>
+            <SectionHeader title="Sleep Analysis" />
             {renderManualEntryForm()}
             {entries.length > 0 &&
               (() => {
@@ -4122,7 +4049,7 @@ export default function HealthDashboard() {
                         lightSleepHours:
                           (totalSleepHours *
                             (100 - entry.deepSleep - entry.remSleep)) /
-                            100,
+                          100,
                       };
                     })}
                     margin={{ bottom: 50 }}
@@ -4240,15 +4167,10 @@ export default function HealthDashboard() {
         {/* Heart Rate Section */}
         {(activeSection === 'all' || activeSection === 'rhr') && (
           <>
-            <h2
-              className={`text-3xl font-bold mb-8 ${
-                activeSection === 'all' ? 'mt-12' : ''
-              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
-                outfit.className
-              }`}
-            >
-              Heart Rate Analysis
-            </h2>
+            <SectionHeader
+              title="Heart Rate Analysis"
+              className={activeSection === 'all' ? 'mt-12' : ''}
+            />
             <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
               <div className="lg:col-span-3 relative">
                 <RHRChart data={prepareChartData()} />
@@ -4261,15 +4183,10 @@ export default function HealthDashboard() {
         {/* Steps Section */}
         {(activeSection === 'all' || activeSection === 'steps') && (
           <>
-            <h2
-              className={`text-3xl font-bold mb-8 ${
-                activeSection === 'all' ? 'mt-12' : ''
-              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
-                outfit.className
-              }`}
-            >
-              Steps Analysis
-            </h2>
+            <SectionHeader
+              title="Steps Analysis"
+              className={activeSection === 'all' ? 'mt-12' : ''}
+            />
             <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
               <StepsAnalytics data={prepareChartData()} />
               <div className="lg:col-span-3 relative">
@@ -4282,15 +4199,10 @@ export default function HealthDashboard() {
         {/* Weight Section */}
         {(activeSection === 'all' || activeSection === 'weight') && (
           <>
-            <h2
-              className={`text-3xl font-bold mb-8 ${
-                activeSection === 'all' ? 'mt-12' : ''
-              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
-                outfit.className
-              }`}
-            >
-              Weight Analysis
-            </h2>
+            <SectionHeader
+              title="Weight Analysis"
+              className={activeSection === 'all' ? 'mt-12' : ''}
+            />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <WeightAnalytics data={prepareChartData()} />
               <WeightChart data={prepareChartData()} />
@@ -4301,15 +4213,10 @@ export default function HealthDashboard() {
         {/* Exercise Section */}
         {(activeSection === 'all' || activeSection === 'gym') && (
           <>
-            <h2
-              className={`text-3xl font-bold mb-8 ${
-                activeSection === 'all' ? 'mt-12' : ''
-              } text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${
-                outfit.className
-              }`}
-            >
-              Exercise Analysis
-            </h2>
+            <SectionHeader
+              title="Exercise Analysis"
+              className={activeSection === 'all' ? 'mt-12' : ''}
+            />
             <ExerciseAnalysis gymSessions={gymSessions} />
           </>
         )}
@@ -4474,11 +4381,7 @@ export default function HealthDashboard() {
 
       {activeSection === 'gym' && (
         <>
-          <h2
-            className={`text-3xl font-bold mb-8 text-center bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
-          >
-            Gym Planner
-          </h2>
+          <SectionHeader title="Gym Planner" />
           <div className="relative">
             <div
               className={`transition-opacity duration-200 ${
