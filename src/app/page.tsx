@@ -49,6 +49,9 @@ import {
   Users,
   ArrowUpDown,
   Activity,
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -61,6 +64,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -193,6 +199,7 @@ const EXERCISE_LIBRARY = {
   ],
   back_and_chest: [
     'Bench Press',
+    'Pec Fly Machine',
     'Incline Bench Press',
     'Barbell Row',
     'Lat Pulldown',
@@ -289,17 +296,11 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
 
   // Return all exercises, sorting performed ones first, then alphabetically
   return Array.from(exerciseStats.values()).sort((a, b) => {
-    // First sort by whether the exercise has been performed
     if (a.totalSets > 0 && b.totalSets === 0) return -1;
     if (a.totalSets === 0 && b.totalSets > 0) return 1;
-    // Then sort by last performed date (if both have been performed)
     if (a.totalSets > 0 && b.totalSets > 0) {
-      return (
-        new Date(b.lastPerformed).getTime() -
-        new Date(a.lastPerformed).getTime()
-      );
+      return new Date(b.lastPerformed).getTime() - new Date(a.lastPerformed).getTime();
     }
-    // Finally sort alphabetically
     return a.name.localeCompare(b.name);
   });
 };
@@ -333,11 +334,17 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
               <ArrowUpDown className="h-4 w-4" />
               <span>Legs</span>
             </SelectItem>
-            <SelectItem value="back_and_chest" className="flex items-center gap-2">
+            <SelectItem
+              value="back_and_chest"
+              className="flex items-center gap-2"
+            >
               <Users className="h-4 w-4" />
               <span>Back & Chest</span>
             </SelectItem>
-            <SelectItem value="shoulders_and_arms" className="flex items-center gap-2">
+            <SelectItem
+              value="shoulders_and_arms"
+              className="flex items-center gap-2"
+            >
               <DumbbellIcon className="h-4 w-4" />
               <span>Shoulders & Arms</span>
             </SelectItem>
@@ -357,56 +364,56 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
         {filteredStats.map((stat) => (
           <div
             key={stat.name}
-            className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
+            className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-700 hover:shadow-md transition-shadow"
           >
             <div className="flex items-start justify-between mb-4">
-              <h4 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+              <h4 className="text-lg font-medium text-slate-100">
                 {stat.name}
               </h4>
-              <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+              <span className="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-400">
                 {stat.category.replace(/_/g, ' ')}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-y-4">
               <div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="text-sm text-slate-400">
                   Max Weight
                 </div>
-                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                <div className="text-base font-medium text-slate-100">
                   {stat.maxWeight}{' '}
-                  <span className="text-xs text-slate-500">kg</span>
+                  <span className="text-xs text-slate-400">kg</span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="text-sm text-slate-400">
                   Avg Weight
                 </div>
-                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                <div className="text-base font-medium text-slate-100">
                   {stat.avgWeight}{' '}
-                  <span className="text-xs text-slate-500">kg</span>
+                  <span className="text-xs text-slate-400">kg</span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="text-sm text-slate-400">
                   Total Sets
                 </div>
-                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                <div className="text-base font-medium text-slate-100">
                   {stat.totalSets}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="text-sm text-slate-400">
                   Total Reps
                 </div>
-                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
+                <div className="text-base font-medium text-slate-100">
                   {stat.totalReps}
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
-              <div className="text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-4 pt-3 border-t border-slate-700">
+              <div className="text-xs text-slate-400">
                 Last performed:{' '}
                 {new Date(stat.lastPerformed).toLocaleDateString()}
               </div>
@@ -437,6 +444,21 @@ export const WorkoutCalendar = ({
 
   // Add this with your other state declarations
   const [gymDate, setGymDate] = useState<string | null>(null);
+  const [editingWorkout, setEditingWorkout] = useState<any>(null);
+
+  // Add state to track collapsed exercises
+  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
+
+  // Add toggle function
+  const toggleExercise = (index: number) => {
+    const newCollapsed = new Set(collapsedExercises);
+    if (newCollapsed.has(index)) {
+      newCollapsed.delete(index);
+    } else {
+      newCollapsed.add(index);
+    }
+    setCollapsedExercises(newCollapsed);
+  };
 
   useEffect(() => {
     const startDate = new Date(
@@ -562,31 +584,58 @@ export const WorkoutCalendar = ({
           order: setIndex + 1,
         })),
       };
-      return acc;
-    }, {} as Record<string, { order: number; sets: Array<{ reps: number; weight: number; order: number }> }>);
+      return acc as { [key: string]: any };
+    }, {} as { [key: string]: any });
 
     try {
-      const response = await fetch('/api/supabase/exercises', {
-        method: 'POST',
+      const endpoint = '/api/supabase/exercises';
+      const method = editingWorkout ? 'PUT' : 'POST';
+      
+      const response = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingWorkout?.id, // Include ID if editing
           type: sessionType,
-          date: selectedDate, // Use the selected date
+          date: selectedDate,
           exercise_log: exerciseLog,
           notes: notes || null,
         }),
       });
+      
       if (!response.ok) throw new Error('Failed to save gym session');
+      
+      // Reset form
       setShowGymForm(false);
       setSessionType('' as GymSessionType);
       setSelectedExercises([]);
       setNotes('');
-      setGymDate(null); // Reset the date after submission
+      setGymDate(null);
+      setEditingWorkout(null);
     } catch (error) {
       console.error('Failed to save gym session:', error);
     } finally {
       setIsSubmittingGym(false);
     }
+  };
+
+  // Add function to handle editing a workout
+  const handleEditWorkout = (workout: any) => {
+    setEditingWorkout(workout);
+    setShowGymForm(true);
+    setSessionType(workout.type);
+    setGymDate(workout.date);
+    setNotes(workout.notes || '');
+    
+    // Transform exercise_log back into selectedExercises format
+    const exercises = Object.entries(workout.exercise_log).map(([name, data]: [string, any]) => ({
+      name: name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+      sets: data.sets.map((set: any) => ({
+        reps: set.reps,
+        weight: set.weight,
+      })),
+    }));
+    setSelectedExercises(exercises);
   };
 
   return (
@@ -701,16 +750,28 @@ export const WorkoutCalendar = ({
                       {activitiesForDay.length > 0 && (
                         <div className="absolute bottom-1 right-1 flex gap-1">
                           {activitiesForDay.map((activity, index) => (
-                            <div
-                              key={index}
-                              className={`w-2 h-2 rounded-full ${
+                            <div key={index} className="flex items-center justify-between">
+                              <div className={`w-2 h-2 rounded-full ${
                                 activity.type === 'run'
                                   ? 'bg-orange-500'
                                   : activity.type === 'gym'
                                   ? 'bg-purple-500'
                                   : 'bg-blue-500'
-                              }`}
-                            />
+                              }`} />
+                              {activity.type === 'gym' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditWorkout(gymSessionsForDay[index]);
+                                  }}
+                                  className="h-6 w-6"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
@@ -839,246 +900,261 @@ export const WorkoutCalendar = ({
       </div>
 
       {showGymForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-800 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
-                Add Gym Session
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowGymForm(false)}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                  {editingWorkout ? 'Edit Gym Session' : 'Add Gym Session'}
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowGymForm(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  // Handle form submission
+                }}
+                className="space-y-4"
               >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                // Handle form submission
-              }}
-              className="space-y-4"
-            >
-              {/* Add this date input */}
-              <div>
-                <label
-                  htmlFor="date"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                >
-                  Date
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  value={gymDate || new Date().toISOString().split('T')[0]}
-                  onChange={(e) => setGymDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="sessionType"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                >
-                  Session Type
-                </label>
-                <Select
-                  value={sessionType}
-                  onValueChange={(value) =>
-                    setSessionType(value as GymSessionType)
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select session type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="legs" className="flex items-center gap-2">
-                      <ArrowUpDown className="h-4 w-4" />
-                      <span>Legs</span>
-                    </SelectItem>
-                    <SelectItem value="back_and_chest" className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <span>Back & Chest</span>
-                    </SelectItem>
-                    <SelectItem value="shoulders_and_arms" className="flex items-center gap-2">
-                      <DumbbellIcon className="h-4 w-4" />
-                      <span>Shoulders & Arms</span>
-                    </SelectItem>
-                    <SelectItem value="cardio" className="flex items-center gap-2">
-                      <Activity className="h-4 w-4" />
-                      <span>Cardio</span>
-                    </SelectItem>
-                    <SelectItem value="full_body" className="flex items-center gap-2">
-                      <HeartPulse className="h-4 w-4" />
-                      <span>Full Body</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label
-                  htmlFor="exercises"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-                >
-                  Exercises
-                </label>
-
-                {/* Exercise Search & Add */}
-                <div className="flex gap-2 mb-4">
+                {/* Add this date input */}
+                <div>
+                  <label
+                    htmlFor="date"
+                    className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                  >
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    id="date"
+                    value={gymDate || new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setGymDate(e.target.value)}
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="sessionType"
+                    className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                  >
+                    Session Type
+                  </label>
                   <Select
-                    value={exerciseSearch}
-                    onValueChange={(value) => {
-                      if (value) {
-                        setSelectedExercises([
-                          ...selectedExercises,
-                          { name: value, sets: [{ reps: 0, weight: 0 }] },
-                        ]);
-                        setExerciseSearch('');
-                      }
-                    }}
+                    value={sessionType}
+                    onValueChange={(value) =>
+                      setSessionType(value as GymSessionType)
+                    }
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select an exercise" />
+                      <SelectValue placeholder="Select session type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {EXERCISE_LIBRARY[sessionType]?.map((exercise) => (
-                        <SelectItem key={exercise} value={exercise}>
-                          {exercise}
-                        </SelectItem>
-                      ))}
+                      <SelectItem
+                        value="legs"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                        <span>Legs</span>
+                      </SelectItem>
+                      <SelectItem
+                        value="back_and_chest"
+                        className="flex items-center gap-2"
+                      >
+                        <Users className="h-4 w-4" />
+                        <span>Back & Chest</span>
+                      </SelectItem>
+                      <SelectItem
+                        value="shoulders_and_arms"
+                        className="flex items-center gap-2"
+                      >
+                        <DumbbellIcon className="h-4 w-4" />
+                        <span>Shoulders & Arms</span>
+                      </SelectItem>
+                      <SelectItem
+                        value="cardio"
+                        className="flex items-center gap-2"
+                      >
+                        <Activity className="h-4 w-4" />
+                        <span>Cardio</span>
+                      </SelectItem>
+                      <SelectItem
+                        value="full_body"
+                        className="flex items-center gap-2"
+                      >
+                        <HeartPulse className="h-4 w-4" />
+                        <span>Full Body</span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <label
+                    htmlFor="exercises"
+                    className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+                  >
+                    Exercises
+                  </label>
 
-                {/* Selected Exercises List */}
-                <div className="space-y-4">
-                  {selectedExercises.map((exercise, exerciseIndex) => (
-                    <div
-                      key={exerciseIndex}
-                      className="border border-slate-200 dark:border-slate-700 rounded-lg p-4"
+                  {/* Exercise Search & Add */}
+                  <div className="flex gap-2 mb-4">
+                    <Select
+                      value={exerciseSearch}
+                      onValueChange={(value) => {
+                        if (value) {
+                          setSelectedExercises([
+                            ...selectedExercises,
+                            { name: value, sets: [{ reps: 0, weight: 0 }] },
+                          ]);
+                          setExerciseSearch('');
+                        }
+                      }}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{exercise.name}</h4>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newExercises = [...selectedExercises];
-                            newExercises.splice(exerciseIndex, 1);
-                            setSelectedExercises(newExercises);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select an exercise" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXERCISE_LIBRARY[sessionType]?.map((exercise) => (
+                          <SelectItem key={exercise} value={exercise}>
+                            {exercise}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                      {/* Sets */}
-                      <div className="space-y-2">
-                        {exercise.sets.map((set, setIndex) => (
-                          <div
-                            key={setIndex}
-                            className="flex items-center gap-2"
-                          >
-                            <span className="text-sm text-slate-500 w-10">
-                              Set {setIndex + 1}
-                            </span>
-                            <input
-                              type="number"
-                              placeholder="Reps"
-                              className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                              value={set.reps || ''}
-                              onChange={(e) => {
-                                const newExercises = [...selectedExercises];
-                                newExercises[exerciseIndex].sets[
-                                  setIndex
-                                ].reps = Number(e.target.value);
-                                setSelectedExercises(newExercises);
-                              }}
-                            />
-                            <span className="text-sm text-slate-500">×</span>
-                            <input
-                              type="number"
-                              placeholder="Weight"
-                              className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                              value={set.weight || ''}
-                              onChange={(e) => {
-                                const newExercises = [...selectedExercises];
-                                newExercises[exerciseIndex].sets[
-                                  setIndex
-                                ].weight = Number(e.target.value);
-                                setSelectedExercises(newExercises);
-                              }}
-                            />
-                            <span className="text-sm text-slate-500">kg</span>
+                  {/* Selected Exercises List */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedExercises.map((exercise, index) => (
+                      <div key={index} className="border rounded-lg p-4 dark:border-slate-700">
+                        <div 
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => toggleExercise(index)}
+                        >
+                          <h3 className="text-lg font-medium">{exercise.name}</h3>
+                          <Button variant="ghost" size="sm">
+                            {collapsedExercises.has(index) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        
+                        {!collapsedExercises.has(index) && (
+                          <div className="mt-4">
+                            {/* Existing exercise sets content */}
+                            {exercise.sets.map((set, setIndex) => (
+                              <div
+                                key={setIndex}
+                                className="flex items-center gap-2"
+                              >
+                                <span className="text-sm text-slate-500 w-10">
+                                  Set {setIndex + 1}
+                                </span>
+                                <input
+                                  type="number"
+                                  placeholder="Reps"
+                                  className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                                  value={set.reps || ''}
+                                  onChange={(e) => {
+                                    const newExercises = [...selectedExercises];
+                                    newExercises[index].sets[
+                                      setIndex
+                                    ].reps = Number(e.target.value);
+                                    setSelectedExercises(newExercises);
+                                  }}
+                                />
+                                <span className="text-sm text-slate-500">×</span>
+                                <input
+                                  type="number"
+                                  placeholder="Weight"
+                                  className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                                  value={set.weight || ''}
+                                  onChange={(e) => {
+                                    const newExercises = [...selectedExercises];
+                                    newExercises[index].sets[
+                                      setIndex
+                                    ].weight = Number(e.target.value);
+                                    setSelectedExercises(newExercises);
+                                  }}
+                                />
+                                <span className="text-sm text-slate-500">kg</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newExercises = [...selectedExercises];
+                                    newExercises[index].sets.splice(
+                                      setIndex,
+                                      1
+                                    );
+                                    setSelectedExercises(newExercises);
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
+                              className="w-full mt-2"
                               onClick={() => {
                                 const newExercises = [...selectedExercises];
-                                newExercises[exerciseIndex].sets.splice(
-                                  setIndex,
-                                  1
-                                );
+                                newExercises[index].sets.push({
+                                  reps: 0,
+                                  weight: 0,
+                                });
                                 setSelectedExercises(newExercises);
                               }}
                             >
-                              <X className="h-4 w-4" />
+                              Add Set
                             </Button>
                           </div>
-                        ))}
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full mt-2"
-                          onClick={() => {
-                            const newExercises = [...selectedExercises];
-                            newExercises[exerciseIndex].sets.push({
-                              reps: 0,
-                              weight: 0,
-                            });
-                            setSelectedExercises(newExercises);
-                          }}
-                        >
-                          Add Set
-                        </Button>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="notes"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                >
-                  Notes (optional)
-                </label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Enter notes"
-                  className="w-full"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowGymForm(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleGymSubmit}
-                  disabled={
-                    !sessionType ||
-                    selectedExercises.length === 0 ||
-                    isSubmittingGym
-                  }
-                >
-                  {isSubmittingGym ? 'Saving...' : 'Save Session'}
-                </Button>
-              </div>
-            </form>
+                <div>
+                  <label
+                    htmlFor="notes"
+                    className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                  >
+                    Notes (optional)
+                  </label>
+                  <Textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Enter notes"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowGymForm(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleGymSubmit}
+                    disabled={
+                      !sessionType ||
+                      selectedExercises.length === 0 ||
+                      isSubmittingGym
+                    }
+                  >
+                    {isSubmittingGym ? 'Saving...' : editingWorkout ? 'Update Session' : 'Save Session'}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -1143,6 +1219,23 @@ export default function HealthDashboard() {
 
   // Add this near your other state declarations
   const [gymDate, setGymDate] = useState<string | null>(null);
+
+  // Add a new state for tracking the workout being edited
+  const [editingWorkout, setEditingWorkout] = useState<any>(null);
+
+  // Add state to track collapsed exercises
+  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
+
+  // Add toggle function
+  const toggleExercise = (index: number) => {
+    const newCollapsed = new Set(collapsedExercises);
+    if (newCollapsed.has(index)) {
+      newCollapsed.delete(index);
+    } else {
+      newCollapsed.add(index);
+    }
+    setCollapsedExercises(newCollapsed);
+  };
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -3497,31 +3590,195 @@ export default function HealthDashboard() {
           order: setIndex + 1,
         })),
       };
-      return acc as Record<string, { order: number; sets: Array<{ reps: number; weight: number; order: number }> }>;
-    }, {} as Record<string, { order: number; sets: Array<{ reps: number; weight: number; order: number }> }>);
+      return acc as { [key: string]: any };
+    }, {} as { [key: string]: any });
 
     try {
-      const response = await fetch('/api/supabase/exercises', {
-        method: 'POST',
+      const endpoint = '/api/supabase/exercises';
+      const method = editingWorkout ? 'PUT' : 'POST';
+      
+      const response = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingWorkout?.id, // Include ID if editing
           type: sessionType,
-          date: selectedDate, // Use the selected date
+          date: selectedDate,
           exercise_log: exerciseLog,
           notes: notes || null,
         }),
       });
+      
       if (!response.ok) throw new Error('Failed to save gym session');
+      
+      // Reset form
       setShowGymForm(false);
       setSessionType('' as GymSessionType);
       setSelectedExercises([]);
       setNotes('');
-      setGymDate(null); // Reset the date after submission
+      setGymDate(null);
+      setEditingWorkout(null);
     } catch (error) {
       console.error('Failed to save gym session:', error);
     } finally {
       setIsSubmittingGym(false);
     }
+  };
+
+  // Add function to handle editing a workout
+  const handleEditWorkout = (workout: any) => {
+    setEditingWorkout(workout);
+    setShowGymForm(true);
+    setSessionType(workout.type);
+    setGymDate(workout.date);
+    setNotes(workout.notes || '');
+    
+    // Transform exercise_log back into selectedExercises format
+    const exercises = Object.entries(workout.exercise_log).map(([name, data]: [string, any]) => ({
+      name: name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+      sets: data.sets.map((set: any) => ({
+        reps: set.reps,
+        weight: set.weight,
+      })),
+    }));
+    setSelectedExercises(exercises);
+  };
+
+  // Create a sortable exercise component
+  const SortableExercise = ({ 
+    exercise, 
+    index, 
+    isCollapsed, 
+    onToggle, 
+    children 
+  }: {
+    exercise: { name: string; sets: Array<{ reps: number; weight: number }> };
+    index: number;
+    isCollapsed: boolean;
+    onToggle: (index: number) => void;
+    children?: React.ReactNode;
+  }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: exercise.name });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      zIndex: isDragging ? 1 : 0,
+    };
+
+    return (
+      <div 
+        ref={setNodeRef}
+        style={style}
+        className={`border rounded-lg p-4 dark:border-slate-700 ${isDragging ? 'opacity-50' : ''}`}
+      >
+        <div className="flex items-center justify-between">
+          <div 
+            {...attributes}
+            {...listeners}
+            className="flex items-center gap-2 cursor-move"
+          >
+            <GripVertical className="h-4 w-4 text-slate-400" />
+            <h3 className="text-lg font-medium">{exercise.name}</h3>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => onToggle(index)}
+          >
+            {isCollapsed ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronUp className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        
+        {!isCollapsed && (
+          <div className="mt-4">
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Update the exercises container
+  const ExercisesGrid = ({ 
+    selectedExercises, 
+    setSelectedExercises,
+    handleSetChange,
+    handleRemoveSet,
+    ...props 
+  }: { 
+    selectedExercises: Array<{ name: string; sets: Array<{ reps: number; weight: number }> }>;
+    setSelectedExercises: React.Dispatch<React.SetStateAction<typeof selectedExercises>>;
+    handleSetChange: (exerciseIndex: number, setIndex: number, field: 'reps' | 'weight', value: number) => void;
+    handleRemoveSet: (exerciseIndex: number, setIndex: number) => void;
+    collapsedExercises: Set<number>;
+    onToggleExercise: (index: number) => void;
+  }) => {
+    const sensors = useSensors(
+      useSensor(PointerSensor),
+      useSensor(KeyboardSensor, {
+        coordinateGetter: sortableKeyboardCoordinates,
+      })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+      const { active, over } = event;
+      
+      if (active.id !== over?.id && over) {
+        setSelectedExercises((exercises) => {
+          const oldIndex = exercises.findIndex((e) => e.name === active.id);
+          const newIndex = exercises.findIndex((e) => e.name === over.id);
+          
+          return arrayMove(exercises, oldIndex, newIndex);
+        });
+      }
+    };
+
+    return (
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SortableContext
+            items={selectedExercises.map(e => e.name)}
+            strategy={verticalListSortingStrategy}
+          >
+            {selectedExercises.map((exercise, index) => (
+              <SortableExercise
+                key={exercise.name}
+                exercise={exercise}
+                index={index}
+                isCollapsed={props.collapsedExercises.has(index)}
+                onToggle={props.onToggleExercise}
+              >
+                {/* Existing exercise sets content */}
+                {exercise.sets.map((set, setIndex) => (
+                  // ... existing set inputs
+                  <div key={setIndex}>
+                    <input type="number" value={set.reps} onChange={(e) => handleSetChange(index, setIndex, 'reps', parseInt(e.target.value))} />
+                    <input type="number" value={set.weight} onChange={(e) => handleSetChange(index, setIndex, 'weight', parseInt(e.target.value))} />
+                    <button onClick={() => handleRemoveSet(index, setIndex)}>Remove</button>
+                  </div>
+                ))}
+              </SortableExercise>
+            ))}
+          </SortableContext>
+        </div>
+      </DndContext>
+    );
   };
 
   return (
@@ -3925,7 +4182,7 @@ export default function HealthDashboard() {
                         lightSleepHours:
                           (totalSleepHours *
                             (100 - entry.deepSleep - entry.remSleep)) /
-                          100,
+                            100,
                       };
                     })}
                     margin={{ bottom: 50 }}

@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { format } from 'date-fns';
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,4 +61,24 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function PUT(request: Request) {
+  const data = await request.json();
+  
+  const { error } = await supabase
+    .from('training_sessions')
+    .update({
+      type: data.type,
+      date: data.date,
+      exercise_log: data.exercise_log,
+      notes: data.notes,
+    })
+    .eq('id', data.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }
