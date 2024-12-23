@@ -67,6 +67,7 @@ import { cn } from '@/lib/utils';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -543,25 +544,10 @@ export const WorkoutCalendar = ({
   }: {
     color?: 'purple' | 'yellow' | 'red' | 'teal' | 'orange';
   }) => {
-    const borderColorClass = {
-      purple: 'border-purple-500',
-      yellow: 'border-yellow-500',
-      red: 'border-red-500',
-      teal: 'border-teal-500',
-      orange: 'border-orange-500',
-    }[color];
-
     return (
       <div className="absolute inset-0 top-[52px] flex items-center justify-center">
         <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
-        <div className="flex flex-col items-center gap-2 z-10">
-          <div
-            className={`w-8 h-8 border-4 ${borderColorClass} border-t-transparent rounded-full animate-spin`}
-          />
-          <span className="text-sm text-slate-600 dark:text-slate-400">
-            Loading data...
-          </span>
-        </div>
+        <LoadingSpinner color={color} label="Loading data..." />
       </div>
     );
   };
@@ -1150,7 +1136,14 @@ export const WorkoutCalendar = ({
                       isSubmittingGym
                     }
                   >
-                    {isSubmittingGym ? 'Saving...' : editingWorkout ? 'Update Session' : 'Save Session'}
+                    {isSubmittingGym ? (
+                      <span className="flex items-center gap-2">
+                        <LoadingSpinner size="sm" />
+                        Saving...
+                      </span>
+                    ) : (
+                      editingWorkout ? 'Update Session' : 'Save Session'
+                    )}
                   </Button>
                 </div>
               </form>
@@ -1292,12 +1285,7 @@ export default function HealthDashboard() {
   if (initialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <div className="text-slate-600 dark:text-slate-400 text-lg font-medium">
-            Loading Sleep Data...
-          </div>
-        </div>
+        <LoadingSpinner size="lg" label="Loading your data..." />
       </div>
     );
   }
@@ -1563,25 +1551,7 @@ export default function HealthDashboard() {
                   >
                     {isSubmitting ? (
                       <span className="flex items-center gap-2">
-                        <svg
-                          className="animate-spin h-4 w-4"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            fill="none"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
+                        <LoadingSpinner size="sm" />
                         Saving...
                       </span>
                     ) : (
@@ -1717,22 +1687,7 @@ export default function HealthDashboard() {
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
+                    <LoadingSpinner size="sm" />
                     Saving...
                   </span>
                 ) : (
@@ -3002,25 +2957,10 @@ export default function HealthDashboard() {
   }: {
     color?: 'purple' | 'yellow' | 'red' | 'teal' | 'orange';
   }) => {
-    const borderColorClass = {
-      purple: 'border-purple-500',
-      yellow: 'border-yellow-500',
-      red: 'border-red-500',
-      teal: 'border-teal-500',
-      orange: 'border-orange-500',
-    }[color];
-
     return (
       <div className="absolute inset-0 top-[52px] flex items-center justify-center">
         <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80" />
-        <div className="flex flex-col items-center gap-2 z-10">
-          <div
-            className={`w-8 h-8 border-4 ${borderColorClass} border-t-transparent rounded-full animate-spin`}
-          />
-          <span className="text-sm text-slate-600 dark:text-slate-400">
-            Loading data...
-          </span>
-        </div>
+        <LoadingSpinner color={color} label="Loading data..." />
       </div>
     );
   };
