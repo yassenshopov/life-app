@@ -90,7 +90,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
 
-interface SleepEntry {
+interface DayEntry {
   id: string;
   date: string;
   sleepTime: string;
@@ -1158,7 +1158,7 @@ export const WorkoutCalendar = ({
 
 export default function HealthDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [entries, setEntries] = useState<SleepEntry[]>([]);
+  const [entries, setEntries] = useState<DayEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoadingCharts, setIsLoadingCharts] = useState(false);
   const [sleepTime, setSleepTime] = useState('');
@@ -1307,7 +1307,7 @@ export default function HealthDashboard() {
       todayEntry &&
       (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
 
-    const setFormValues = (entry: SleepEntry | undefined) => {
+    const setFormValues = (entry: DayEntry | undefined) => {
       if (entry) {
         // Convert times to 24-hour format
         const convertTo24Hour = (time: string) => {
@@ -2495,7 +2495,7 @@ export default function HealthDashboard() {
     setDateRange({ from, to });
   };
 
-  const analyzeSleepData = (entry: SleepEntry): SleepAnalysis => {
+  const analyzeSleepData = (entry: DayEntry): SleepAnalysis => {
     const insights: Array<{
       text: string;
       metric?: { value: number; min: number; max: number; unit: string };
@@ -2600,8 +2600,8 @@ export default function HealthDashboard() {
   };
 
   const getHistoricalInsights = (
-    todayEntry: SleepEntry,
-    recentEntries: SleepEntry[]
+    todayEntry: DayEntry,
+    recentEntries: DayEntry[]
   ) => {
     if (!todayEntry || recentEntries.length < 2) return [];
 
@@ -2662,7 +2662,7 @@ export default function HealthDashboard() {
     return insights;
   };
 
-  const SleepAnalysisCard = ({ entry }: { entry: SleepEntry }) => {
+  const SleepAnalysisCard = ({ entry }: { entry: DayEntry }) => {
     // If no entry is provided, show the prompt message
     if (!entry) {
       return (
@@ -2718,9 +2718,7 @@ export default function HealthDashboard() {
       metricType: string
     ) => {
       return (
-        // Remove fixed width (w-96) and make it responsive
         <div className="h-6 w-full sm:w-48 md:w-64 lg:w-96 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden relative">
-          {/* Target range indicator (striped) */}
           <div
             className="absolute h-full bg-stripes"
             style={{
@@ -2735,7 +2733,6 @@ export default function HealthDashboard() {
               )`,
             }}
           />
-          {/* Actual value bar */}
           <div
             className={`h-full transition-all ${getProgressColor(metricType)}`}
             style={{
@@ -2869,7 +2866,7 @@ export default function HealthDashboard() {
     return formatted + '%';
   };
 
-  const calculateStats = (entries: SleepEntry[]) => {
+  const calculateStats = (entries: DayEntry[]) => {
     if (entries.length === 0) return null;
 
     // Filter out entries with zero total sleep

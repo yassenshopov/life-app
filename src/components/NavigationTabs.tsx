@@ -31,7 +31,41 @@ export const NavigationTabs = ({
       icon: <CheckSquare className="w-4 h-4" />,
       showNotification: Boolean(
         (() => {
-          // ... existing notification logic ...
+          const checklistItems = [
+            {
+              name: 'Daily Sleep',
+              done: entries.some(
+                (entry) => entry.date === new Date().toISOString().split('T')[0]
+              ),
+            },
+            {
+              name: 'Daily Weight',
+              done: entries.some((entry) => entry.weight !== null),
+            },
+            {
+              name: 'RHR for Previous Day',
+              done: entries.some(
+                (entry) =>
+                  entry.date ===
+                    new Date(Date.now() - 86400000)
+                      .toISOString()
+                      .split('T')[0] && entry.restingHeartRate !== null
+              ),
+            },
+            {
+              name: 'Steps for Previous Day',
+              done: entries.some(
+                (entry) =>
+                  entry.date ===
+                    new Date(Date.now() - 86400000)
+                      .toISOString()
+                      .split('T')[0] && entry.steps !== null
+              ),
+            },
+          ];
+
+          const showNotification = checklistItems.some((item) => !item.done);
+          return showNotification;
         })()
       ),
     },
