@@ -88,6 +88,7 @@ import { NavigationTabs } from '@/components/NavigationTabs';
 import { SectionHeader } from '@/components/SectionHeader';
 import { DisplaySection } from '@/types/display-section';
 import { FloatingToc } from '@/components/FloatingToc';
+import { EXERCISE_LIBRARY, GymSessionType } from '@/constants/exercises';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -116,21 +117,6 @@ interface SleepAnalysis {
   }>;
   recommendations: string[];
 }
-// Add this type near the top with other type definitions
-type GymSessionType =
-  | 'legs'
-  | 'back_and_chest'
-  | 'shoulders_and_arms'
-  | 'cardio'
-  | 'full_body';
-
-// Add this helper function near the top of the file
-const getTickInterval = (dataLength: number) => {
-  if (dataLength <= 7) return 0; // Show all ticks for 7 or fewer points
-  if (dataLength <= 14) return 1; // Show every other tick for up to 14 points
-  if (dataLength <= 30) return 2; // Show every third tick for up to 30 points
-  return Math.floor(dataLength / 10); // Show roughly 10 ticks for larger datasets
-};
 
 interface WorkoutCalendarProps {
   onLoadingChange: (loading: boolean) => void;
@@ -138,7 +124,6 @@ interface WorkoutCalendarProps {
   setShowGymForm: (show: boolean) => void;
 }
 
-// Add this helper function before your component
 const formatGymType = (type: string): string => {
   switch (type.toLowerCase()) {
     case 'upper':
@@ -167,7 +152,6 @@ interface WorkoutEvent {
   notes?: string;
 }
 
-// Add these types near your other interfaces
 interface Exercise {
   name: string;
   sets: Array<{
@@ -176,44 +160,6 @@ interface Exercise {
   }>;
 }
 
-// Add this constant with your exercise library
-const EXERCISE_LIBRARY = {
-  legs: [
-    'Barbell Squat',
-    'Romanian Deadlift',
-    'Leg Press',
-    'Leg Extension',
-    'Leg Curl',
-    'Calf Raises',
-  ],
-  back_and_chest: [
-    'Bench Press',
-    'Pec Fly Machine',
-    'Incline Bench Press',
-    'Barbell Row',
-    'Lat Pulldown',
-    'Cable Flyes',
-    'Pull-ups',
-  ],
-  shoulders_and_arms: [
-    'Overhead Press',
-    'Lateral Raises',
-    'Bicep Curls',
-    'Tricep Extensions',
-    'Face Pulls',
-    'Hammer Curls',
-  ],
-  cardio: [
-    'Treadmill',
-    'Rowing Machine',
-    'Exercise Bike',
-    'Elliptical',
-    'Jump Rope',
-  ],
-  full_body: ['Deadlift', 'Push-ups', 'Pull-ups', 'Dips', 'Lunges', 'Planks'],
-} as const;
-
-// Add these types near your other interfaces
 interface ExerciseStats {
   name: string;
   totalSets: number;
@@ -224,13 +170,11 @@ interface ExerciseStats {
   category: keyof typeof EXERCISE_LIBRARY;
 }
 
-// Add this helper function
 const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
   const exerciseStats = new Map<string, ExerciseStats>();
 
-  // Initialize stats for all exercises in the library
-  Object.entries(EXERCISE_LIBRARY).forEach(([category, exercises]) => {
-    exercises.forEach((exercise) => {
+  (Object.entries(EXERCISE_LIBRARY) as [string, readonly string[]][]).forEach(([category, exercises]) => {
+    exercises.forEach((exercise: string) => {
       exerciseStats.set(exercise.toLowerCase(), {
         name: exercise,
         totalSets: 0,
@@ -243,7 +187,6 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
     });
   });
 
-  // Process gym sessions
   gymSessions.forEach((session) => {
     const sessionDate = new Date(session.date).toISOString().split('T')[0];
     const exerciseLog = session.exercise_log || {};
@@ -265,7 +208,6 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
             sessionTotalSets++;
           });
 
-          // Update average weight
           stats.avgWeight = Number(
             (
               (stats.avgWeight * (stats.totalSets - sessionTotalSets) +
@@ -274,7 +216,6 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
             ).toFixed(1)
           );
 
-          // Update last performed date if more recent
           if (!stats.lastPerformed || sessionDate > stats.lastPerformed) {
             stats.lastPerformed = sessionDate;
           }
@@ -283,7 +224,6 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
     );
   });
 
-  // Return all exercises, sorting performed ones first, then alphabetically
   return Array.from(exerciseStats.values()).sort((a, b) => {
     if (a.totalSets > 0 && b.totalSets === 0) return -1;
     if (a.totalSets === 0 && b.totalSets > 0) return 1;
@@ -297,12 +237,9 @@ const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
   });
 };
 
-// Add this new component
 const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
   const exerciseStats = calculateExerciseStats(gymSessions);
-  const [selectedCategory, setSelectedCategory] = useState<
-    keyof typeof EXERCISE_LIBRARY | 'all'
-  >('legs');
+  const [selectedCategory, setSelectedCategory] = useState<string>('legs');
 
   const filteredStats = exerciseStats.filter(
     (stat) => selectedCategory === 'all' || stat.category === selectedCategory
@@ -313,9 +250,7 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
       <div className="flex items-center gap-4 mb-6">
         <Select
           value={selectedCategory}
-          onValueChange={(value) =>
-            setSelectedCategory(value as keyof typeof EXERCISE_LIBRARY | 'all')
-          }
+          onValueChange={(value: string) => setSelectedCategory(value)}
         >
           <SelectTrigger className="w-[180px] bg-white dark:bg-slate-800">
             <SelectValue placeholder="All Exercises" />
@@ -357,34 +292,43 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
               <h4 className="text-lg font-medium text-slate-900 dark:text-slate-100">
                 {stat.name}
               </h4>
-              {/* <span className="text-xs text-center px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
-                {stat.category.replace(/_/g, ' ')}
-              </span> */}
             </div>
 
             <div className="grid grid-cols-2 gap-y-4">
               <div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">Max Weight</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  Max Weight
+                </div>
                 <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.maxWeight}{' '}
-                  <span className="text-xs text-slate-600 dark:text-slate-400">kg</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                    kg
+                  </span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">Avg Weight</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  Avg Weight
+                </div>
                 <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.avgWeight}{' '}
-                  <span className="text-xs text-slate-600 dark:text-slate-400">kg</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                    kg
+                  </span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">Total Sets</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  Total Sets
+                </div>
                 <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.totalSets}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">Total Reps</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  Total Reps
+                </div>
                 <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.totalReps}
                 </div>
@@ -394,7 +338,14 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
             <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
               <div className="text-xs text-slate-600 dark:text-slate-400">
                 Last performed:{' '}
-                { new Date(stat.lastPerformed).toLocaleDateString() !== 'Invalid Date' ? new Date(stat.lastPerformed).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '--:--'}
+                {new Date(stat.lastPerformed).toLocaleDateString() !==
+                'Invalid Date'
+                  ? new Date(stat.lastPerformed).toLocaleString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : '--:--'}
               </div>
             </div>
           </div>
@@ -419,16 +370,13 @@ export const WorkoutCalendar = ({
   const [notes, setNotes] = useState('');
   const [isSubmittingGym, setIsSubmittingGym] = useState(false);
 
-  // Add this with your other state declarations
   const [gymDate, setGymDate] = useState<string | null>(null);
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
 
-  // Add state to track collapsed exercises
   const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(
     new Set()
   );
 
-  // Add toggle function
   const toggleExercise = (index: number) => {
     const newCollapsed = new Set(collapsedExercises);
     if (newCollapsed.has(index)) {
@@ -479,7 +427,7 @@ export const WorkoutCalendar = ({
     )
       .then((res) => res.json())
       .then((gymData) => {
-        console.log('Gym sessions:', gymData); // Debug log
+        console.log('Gym sessions:', gymData);
         setGymSessions(gymData);
       })
       .catch((error) => {
@@ -491,7 +439,6 @@ export const WorkoutCalendar = ({
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
 
-  // Modified to handle Monday as first day
   const getFirstDayOfMonth = (date: Date) => {
     let day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
     // Convert Sunday (0) to 6, and shift other days back by 1
@@ -975,7 +922,7 @@ export const WorkoutCalendar = ({
                         <SelectValue placeholder="Select an exercise" />
                       </SelectTrigger>
                       <SelectContent>
-                        {EXERCISE_LIBRARY[sessionType]?.map((exercise) => (
+                        {EXERCISE_LIBRARY[sessionType]?.map((exercise: string) => (
                           <SelectItem key={exercise} value={exercise}>
                             {exercise}
                           </SelectItem>
@@ -3724,13 +3671,45 @@ export default function HealthDashboard() {
 
   // Inside your HealthDashboard component, add this constant:
   const sections = [
-    { id: 'sleep-entry', title: 'Sleep Entry', icon: <Moon className="w-4 h-4" /> },
-    { id: 'sleep-pattern', title: 'Sleep Pattern', icon: <Activity className="w-4 h-4" /> },
-    { id: 'heart-rate', title: 'Heart Rate', icon: <Heart className="w-4 h-4" /> },
-    { id: 'weight', title: 'Weight', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'workouts', title: 'Workouts', icon: <Dumbbell className="w-4 h-4" /> },
-    { id: 'calendar', title: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
+    {
+      id: 'sleep-analysis',
+      title: 'Sleep Analysis',
+      icon: <Moon className="w-4 h-4" />,
+    },
+    {
+      id: 'heart-rate',
+      title: 'Heart Rate',
+      icon: <Heart className="w-4 h-4" />,
+    },
+    {
+      id: 'steps',
+      title: 'Steps',
+      icon: <Footprints className="w-4 h-4" />,
+    },
+    {
+      id: 'weight',
+      title: 'Weight',
+      icon: <BarChart2 className="w-4 h-4" />,
+    },
+    {
+      id: 'workouts',
+      title: 'Workouts',
+      icon: <Dumbbell className="w-4 h-4" />,
+    },
+    {
+      id: 'calendar',
+      title: 'Calendar',
+      icon: <Calendar className="w-4 h-4" />,
+    },
   ];
+
+  // Add this helper function before SleepPatternChart
+  const getTickInterval = (dataLength: number) => {
+    if (dataLength <= 7) return 0;
+    if (dataLength <= 14) return 1;
+    if (dataLength <= 31) return 2;
+    return Math.floor(dataLength / 15);
+  };
 
   return (
     <div
@@ -3753,7 +3732,7 @@ export default function HealthDashboard() {
         />
       </div>
 
-      <FloatingToc sections={sections} />
+      {activeSection === 'all' ? <FloatingToc sections={sections} /> : null}
 
       {/* Update the main content top padding to account for the fixed header */}
       <main className="max-w-7xl mx-auto pt-32">
@@ -3761,7 +3740,7 @@ export default function HealthDashboard() {
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
             <SectionHeader title="Sleep Analysis" />
-        {renderManualEntryForm()}
+            {renderManualEntryForm()}
             {entries.length > 0 &&
               (() => {
                 const todayEntry = entries.find(
@@ -3775,7 +3754,7 @@ export default function HealthDashboard() {
                 return hasMeaningfulSleepData ? (
                   <div className="mb-8">
                     <SleepAnalysisCard entry={todayEntry} />
-      </div>
+                  </div>
                 ) : null;
               })()}
 
@@ -3872,8 +3851,8 @@ export default function HealthDashboard() {
                   </ResponsiveContainer>
                 </div>
                 {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-      </div>
-      
+              </div>
+
               <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
                 <h3
                   className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
@@ -3899,8 +3878,8 @@ export default function HealthDashboard() {
                         <div className="text-sm text-slate-600 dark:text-slate-400">
                           Average Sleep Duration
                         </div>
-      </div>
-      
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">

@@ -66,7 +66,7 @@ export const FloatingToc = ({ sections }: FloatingTocProps) => {
                     'w-3 h-0.5 rounded-full',
                     activeSection === section.id
                       ? 'bg-purple-900 dark:bg-purple-300'
-                      : 'bg-slate-600 dark:bg-slate-400'
+                      : 'bg-slate-200 dark:bg-slate-800'
                   )} />
                 )}
                 {isExpanded && (
