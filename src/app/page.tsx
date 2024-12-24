@@ -86,6 +86,8 @@ import { ChartLoadingOverlay } from '@/components/ChartLoadingOverlay';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { NavigationTabs } from '@/components/NavigationTabs';
 import { SectionHeader } from '@/components/SectionHeader';
+import { DisplaySection } from '@/types/display-section';
+import { FloatingToc } from '@/components/FloatingToc';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -114,17 +116,6 @@ interface SleepAnalysis {
   }>;
   recommendations: string[];
 }
-
-// Add this type near the top with other type definitions
-type DisplaySection =
-  | 'all'
-  | 'sleep'
-  | 'rhr'
-  | 'steps'
-  | 'weight'
-  | 'checklist'
-  | 'gym';
-
 // Add this type near the top with other type definitions
 type GymSessionType =
   | 'legs'
@@ -311,7 +302,7 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
   const exerciseStats = calculateExerciseStats(gymSessions);
   const [selectedCategory, setSelectedCategory] = useState<
     keyof typeof EXERCISE_LIBRARY | 'all'
-  >('all');
+  >('legs');
 
   const filteredStats = exerciseStats.filter(
     (stat) => selectedCategory === 'all' || stat.category === selectedCategory
@@ -332,29 +323,24 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
           <SelectContent>
             <SelectItem value="all">All Exercises</SelectItem>
             <SelectItem value="legs" className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4" />
               <span>Legs</span>
             </SelectItem>
             <SelectItem
               value="back_and_chest"
               className="flex items-center gap-2"
             >
-              <Users className="h-4 w-4" />
               <span>Back & Chest</span>
             </SelectItem>
             <SelectItem
               value="shoulders_and_arms"
               className="flex items-center gap-2"
             >
-              <DumbbellIcon className="h-4 w-4" />
               <span>Shoulders & Arms</span>
             </SelectItem>
             <SelectItem value="cardio" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
               <span>Cardio</span>
             </SelectItem>
             <SelectItem value="full_body" className="flex items-center gap-2">
-              <HeartPulse className="h-4 w-4" />
               <span>Full Body</span>
             </SelectItem>
           </SelectContent>
@@ -365,50 +351,50 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
         {filteredStats.map((stat) => (
           <div
             key={stat.name}
-            className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-700 hover:shadow-md transition-shadow"
+            className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
           >
             <div className="flex items-start justify-between mb-4">
-              <h4 className="text-lg font-medium text-slate-100">
+              <h4 className="text-lg font-medium text-slate-900 dark:text-slate-100">
                 {stat.name}
               </h4>
-              <span className="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-400">
+              {/* <span className="text-xs text-center px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
                 {stat.category.replace(/_/g, ' ')}
-              </span>
+              </span> */}
             </div>
 
             <div className="grid grid-cols-2 gap-y-4">
               <div>
-                <div className="text-sm text-slate-400">Max Weight</div>
-                <div className="text-base font-medium text-slate-100">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Max Weight</div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.maxWeight}{' '}
-                  <span className="text-xs text-slate-400">kg</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">kg</span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400">Avg Weight</div>
-                <div className="text-base font-medium text-slate-100">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Avg Weight</div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.avgWeight}{' '}
-                  <span className="text-xs text-slate-400">kg</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">kg</span>
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400">Total Sets</div>
-                <div className="text-base font-medium text-slate-100">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Sets</div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.totalSets}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-slate-400">Total Reps</div>
-                <div className="text-base font-medium text-slate-100">
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Reps</div>
+                <div className="text-base font-medium text-slate-900 dark:text-slate-100">
                   {stat.totalReps}
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-700">
-              <div className="text-xs text-slate-400">
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div className="text-xs text-slate-600 dark:text-slate-400">
                 Last performed:{' '}
-                {new Date(stat.lastPerformed).toLocaleDateString()}
+                { new Date(stat.lastPerformed).toLocaleDateString() !== 'Invalid Date' ? new Date(stat.lastPerformed).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '--:--'}
               </div>
             </div>
           </div>
@@ -934,35 +920,30 @@ export const WorkoutCalendar = ({
                         value="legs"
                         className="flex items-center gap-2"
                       >
-                        <ArrowUpDown className="h-4 w-4" />
                         <span>Legs</span>
                       </SelectItem>
                       <SelectItem
                         value="back_and_chest"
                         className="flex items-center gap-2"
                       >
-                        <Users className="h-4 w-4" />
                         <span>Back & Chest</span>
                       </SelectItem>
                       <SelectItem
                         value="shoulders_and_arms"
                         className="flex items-center gap-2"
                       >
-                        <DumbbellIcon className="h-4 w-4" />
                         <span>Shoulders & Arms</span>
                       </SelectItem>
                       <SelectItem
                         value="cardio"
                         className="flex items-center gap-2"
                       >
-                        <Activity className="h-4 w-4" />
                         <span>Cardio</span>
                       </SelectItem>
                       <SelectItem
                         value="full_body"
                         className="flex items-center gap-2"
                       >
-                        <HeartPulse className="h-4 w-4" />
                         <span>Full Body</span>
                       </SelectItem>
                     </SelectContent>
@@ -3741,6 +3722,16 @@ export default function HealthDashboard() {
     );
   };
 
+  // Inside your HealthDashboard component, add this constant:
+  const sections = [
+    { id: 'sleep-entry', title: 'Sleep Entry', icon: <Moon className="w-4 h-4" /> },
+    { id: 'sleep-pattern', title: 'Sleep Pattern', icon: <Activity className="w-4 h-4" /> },
+    { id: 'heart-rate', title: 'Heart Rate', icon: <Heart className="w-4 h-4" /> },
+    { id: 'weight', title: 'Weight', icon: <BarChart2 className="w-4 h-4" /> },
+    { id: 'workouts', title: 'Workouts', icon: <Dumbbell className="w-4 h-4" /> },
+    { id: 'calendar', title: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
+  ];
+
   return (
     <div
       className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 ${inter.className}`}
@@ -3762,13 +3753,15 @@ export default function HealthDashboard() {
         />
       </div>
 
+      <FloatingToc sections={sections} />
+
       {/* Update the main content top padding to account for the fixed header */}
       <main className="max-w-7xl mx-auto pt-32">
         {/* Sleep Section */}
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
             <SectionHeader title="Sleep Analysis" />
-            {renderManualEntryForm()}
+        {renderManualEntryForm()}
             {entries.length > 0 &&
               (() => {
                 const todayEntry = entries.find(
@@ -3782,7 +3775,7 @@ export default function HealthDashboard() {
                 return hasMeaningfulSleepData ? (
                   <div className="mb-8">
                     <SleepAnalysisCard entry={todayEntry} />
-                  </div>
+      </div>
                 ) : null;
               })()}
 
@@ -3879,8 +3872,8 @@ export default function HealthDashboard() {
                   </ResponsiveContainer>
                 </div>
                 {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-              </div>
-
+      </div>
+      
               <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
                 <h3
                   className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
@@ -3906,8 +3899,8 @@ export default function HealthDashboard() {
                         <div className="text-sm text-slate-600 dark:text-slate-400">
                           Average Sleep Duration
                         </div>
-                      </div>
-
+      </div>
+      
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">

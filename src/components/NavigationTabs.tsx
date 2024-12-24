@@ -6,6 +6,7 @@ import {
   Weight,
   CheckSquare,
   DumbbellIcon,
+  DollarSign,
 } from 'lucide-react';
 import { DisplaySection } from '@/types/display-section';
 
@@ -70,6 +71,7 @@ export const NavigationTabs = ({
       ),
     },
     { name: 'Gym', icon: <DumbbellIcon className="w-4 h-4" /> },
+    { name: 'Money', icon: <DollarSign className="w-4 h-4" /> },
   ];
 
   return (
