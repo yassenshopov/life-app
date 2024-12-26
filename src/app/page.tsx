@@ -392,7 +392,7 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
   );
 };
 
-export const WorkoutCalendar = ({
+const WorkoutCalendar = ({
   showGymForm,
   setShowGymForm,
 }: WorkoutCalendarProps) => {
