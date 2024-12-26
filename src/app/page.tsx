@@ -477,7 +477,7 @@ export const WorkoutCalendar = ({
   };
 
   const getFirstDayOfMonth = (date: Date) => {
-    let day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
     // Convert Sunday (0) to 6, and shift other days back by 1
     return day === 0 ? 6 : day - 1;
   };
@@ -3801,6 +3801,36 @@ export default function HealthDashboard() {
 
   // Add this new component before ExerciseAnalysis
   const MuscleGroupAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
+    const [expandedCategories, setExpandedCategories] = useState<string[]>(['all']);
+    
+    // Group muscles by category
+    const muscleCategories = {
+      back: {
+        label: 'Back',
+        muscles: ['lats', 'traps', 'rhomboids', 'lower_back'],
+      },
+      legs: {
+        label: 'Legs',
+        muscles: ['quadriceps', 'hamstrings', 'glutes', 'calves', 'adductors'],
+      },
+      chest: {
+        label: 'Chest',
+        muscles: ['upper_chest', 'mid_chest', 'lower_chest'],
+      },
+      shoulders: {
+        label: 'Shoulders',
+        muscles: ['front_delts', 'side_delts', 'rear_delts'],
+      },
+      arms: {
+        label: 'Arms',
+        muscles: ['biceps', 'triceps', 'forearms'],
+      },
+      core: {
+        label: 'Core',
+        muscles: ['rectus_abdominis', 'obliques', 'transverse_abdominis'],
+      },
+    };
+
     // Calculate weekly sets per muscle group
     const muscleGroupStats = useMemo(() => {
       const stats = new Map<MuscleGroup, { sets: number; volume: number }>();
@@ -3882,55 +3912,86 @@ export default function HealthDashboard() {
       cardio: 0
     };
 
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        {Object.entries(recommendedSets)
-          .filter(([muscle]) => muscle !== 'full_body') // Exclude full_body from display
-          .map(([muscle, recommended]) => {
-            const stats = muscleGroupStats.get(muscle as MuscleGroup) || { sets: 0, volume: 0 };
-            const percentage = Math.min((stats.sets / recommended) * 100, 100);
-            
-            return (
-              <div 
-                key={muscle}
-                className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800"
-                id={muscle}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className={`font-medium text-slate-900 dark:text-slate-100 capitalize ${outfit.className}`}>
-                    {muscle.replace(/_/g, ' ')}
-                  </h3>
-                  <span className="text-sm text-slate-600 dark:text-slate-400">
-                    {stats.sets}/{recommended} sets
-                  </span>
-                </div>
-                
-                <div className="relative h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
-                      percentage >= 100 
-                        ? 'bg-green-500' 
-                        : percentage >= 75 
-                          ? 'bg-blue-500'
-                          : percentage >= 50
-                            ? 'bg-yellow-500'
-                            : 'bg-red-500'
-                    }`}
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
+    const toggleCategory = (category: string) => {
+      setExpandedCategories(prev => 
+        prev.includes(category)
+          ? prev.filter(c => c !== category)
+          : [...prev, category]
+      );
+    };
 
-                <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-                  <div className="flex justify-between items-center">
-                    <span>Weekly Volume:</span>
-                    <span className="font-medium">
-                      {Math.round(stats.volume).toLocaleString()} kg
-                    </span>
-                  </div>
-                </div>
+    return (
+      <div className="space-y-4 mb-8">
+        {Object.entries(muscleCategories).map(([category, { label, muscles }]) => (
+          <div key={category} className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-200 dark:border-slate-800">
+            {/* Category Header */}
+            <button
+              onClick={() => toggleCategory(category)}
+              className="w-full px-4 py-3 flex items-center justify-between text-left"
+            >
+              <h3 className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+                {label}
+              </h3>
+              <ChevronDown 
+                className={`w-5 h-5 text-slate-500 transition-transform ${
+                  expandedCategories.includes(category) ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {/* Muscle Groups Grid */}
+            {expandedCategories.includes(category) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border-t border-slate-200 dark:border-slate-700">
+                {muscles.map((muscle) => {
+                  const stats = muscleGroupStats.get(muscle as MuscleGroup) || { sets: 0, volume: 0 };
+                  const recommended = recommendedSets[muscle as MuscleGroup];
+                  const percentage = Math.min((stats.sets / recommended) * 100, 100);
+
+                  return (
+                    <div 
+                      key={muscle}
+                      className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700"
+                      id={muscle}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-slate-900 dark:text-slate-100 capitalize">
+                          {muscle.replace(/_/g, ' ')}
+                        </h4>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">
+                          {stats.sets}/{recommended} sets
+                        </span>
+                      </div>
+                      
+                      <div className="relative h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
+                            percentage >= 100 
+                              ? 'bg-green-500' 
+                              : percentage >= 75 
+                                ? 'bg-blue-500'
+                                : percentage >= 50
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+
+                      <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">
+                        <div className="flex justify-between items-center">
+                          <span>Weekly Volume:</span>
+                          <span className="font-medium">
+                            {Math.round(stats.volume).toLocaleString()} kg
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-        })}
+            )}
+          </div>
+        ))}
       </div>
     );
   };
