@@ -88,7 +88,8 @@ import { NavigationTabs } from '@/components/NavigationTabs';
 import { SectionHeader } from '@/components/SectionHeader';
 import { DisplaySection } from '@/types/display-section';
 import { FloatingToc } from '@/components/FloatingToc';
-import { EXERCISE_LIBRARY, GymSessionType } from '@/constants/exercises';
+import { EXERCISE_LIBRARY, GymSessionType, Exercise } from '@/constants/exercises';
+import { MuscleGroup } from '@/constants/muscle-groups';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -152,8 +153,10 @@ interface WorkoutEvent {
   notes?: string;
 }
 
-interface Exercise {
+interface WorkoutExercise {
   name: string;
+  primaryMuscle: MuscleGroup;
+  secondaryMuscles?: MuscleGroup[];
   sets: Array<{
     reps: number;
     weight: number;
@@ -168,21 +171,25 @@ interface ExerciseStats {
   totalReps: number;
   lastPerformed: string;
   category: keyof typeof EXERCISE_LIBRARY;
+  affectedMuscles: MuscleGroup[];
 }
 
 const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
   const exerciseStats = new Map<string, ExerciseStats>();
 
-  (Object.entries(EXERCISE_LIBRARY) as [string, readonly string[]][]).forEach(([category, exercises]) => {
-    exercises.forEach((exercise: string) => {
-      exerciseStats.set(exercise.toLowerCase(), {
-        name: exercise,
+  (
+    Object.entries(EXERCISE_LIBRARY) as [GymSessionType, readonly Exercise[]][]
+  ).forEach(([category, exercises]) => {
+    exercises.forEach((exercise) => {
+      exerciseStats.set(exercise.name.toLowerCase(), {
+        name: exercise.name,
         totalSets: 0,
         maxWeight: 0,
         avgWeight: 0,
         totalReps: 0,
         lastPerformed: '',
         category: category as keyof typeof EXERCISE_LIBRARY,
+        affectedMuscles: [exercise.primaryMuscle, ...(exercise.secondaryMuscles || [])] as MuscleGroup[]
       });
     });
   });
@@ -241,6 +248,14 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
   const exerciseStats = calculateExerciseStats(gymSessions);
   const [selectedCategory, setSelectedCategory] = useState<string>('legs');
 
+  const handleMuscleClick = (e: React.MouseEvent<HTMLAnchorElement>, muscle: string) => {
+    e.preventDefault();
+    const element = document.getElementById(muscle);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   const filteredStats = exerciseStats.filter(
     (stat) => selectedCategory === 'all' || stat.category === selectedCategory
   );
@@ -280,6 +295,10 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
             </SelectItem>
           </SelectContent>
         </Select>
+
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          {filteredStats.length} exercises
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -337,6 +356,24 @@ const ExerciseAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
 
             <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
               <div className="text-xs text-slate-600 dark:text-slate-400">
+                Affected Muscles: 
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {stat.affectedMuscles.map((muscle, index) => (
+                    <a
+                      key={index}
+                      href={`#${muscle}`}
+                      onClick={(e) => handleMuscleClick(e, muscle)}
+                      className="px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                    >
+                      {muscle.charAt(0).toUpperCase() + muscle.slice(1).replace('_', ' ')}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div className="text-xs text-slate-600 dark:text-slate-400">
                 Last performed:{' '}
                 {new Date(stat.lastPerformed).toLocaleDateString() !==
                 'Invalid Date'
@@ -365,7 +402,7 @@ export const WorkoutCalendar = ({
   const [gymSessions, setGymSessions] = useState<any[]>([]);
 
   const [sessionType, setSessionType] = useState<GymSessionType>('legs');
-  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
+  const [selectedExercises, setSelectedExercises] = useState<WorkoutExercise[]>([]);
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmittingGym, setIsSubmittingGym] = useState(false);
@@ -532,6 +569,9 @@ export const WorkoutCalendar = ({
           .split('_')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' '),
+        primaryMuscle:
+          findExerciseInLibrary(name)?.primaryMuscle ||
+          ('full_body' as MuscleGroup),
         sets: data.sets.map((set: any) => ({
           reps: set.reps,
           weight: set.weight,
@@ -539,6 +579,23 @@ export const WorkoutCalendar = ({
       })
     );
     setSelectedExercises(exercises);
+  };
+
+  // Add this helper function
+  const findExerciseInLibrary = (
+    name: string
+  ): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
+    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+      const exercise = exercises.find(
+        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
+      );
+      if (exercise)
+        return {
+          primaryMuscle: exercise.primaryMuscle,
+          secondaryMuscles: exercise.secondaryMuscles,
+        };
+    }
+    return undefined;
   };
 
   return (
@@ -912,7 +969,11 @@ export const WorkoutCalendar = ({
                         if (value) {
                           setSelectedExercises([
                             ...selectedExercises,
-                            { name: value, sets: [{ reps: 0, weight: 0 }] },
+                            {
+                              name: value,
+                              primaryMuscle: 'shoulders_and_arms' as MuscleGroup, // Default value
+                              sets: [{ reps: 0, weight: 0 }],
+                            },
                           ]);
                           setExerciseSearch('');
                         }
@@ -922,11 +983,16 @@ export const WorkoutCalendar = ({
                         <SelectValue placeholder="Select an exercise" />
                       </SelectTrigger>
                       <SelectContent>
-                        {EXERCISE_LIBRARY[sessionType]?.map((exercise: string) => (
-                          <SelectItem key={exercise} value={exercise}>
-                            {exercise}
-                          </SelectItem>
-                        ))}
+                        {EXERCISE_LIBRARY[sessionType]?.map(
+                          (exercise: Exercise) => (
+                            <SelectItem
+                              key={exercise.name}
+                              value={exercise.name}
+                            >
+                              {exercise.name}
+                            </SelectItem>
+                          )
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1134,7 +1200,7 @@ export default function HealthDashboard() {
 
   // Add near your other state declarations
   const [sessionType, setSessionType] = useState<GymSessionType>('legs');
-  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
+  const [selectedExercises, setSelectedExercises] = useState<WorkoutExercise[]>([]);
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmittingGym, setIsSubmittingGym] = useState(false);
@@ -3495,6 +3561,9 @@ export default function HealthDashboard() {
           .split('_')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' '),
+        primaryMuscle:
+          findExerciseInLibrary(name)?.primaryMuscle ||
+          ('shoulders_and_arms' as MuscleGroup),
         sets: data.sets.map((set: any) => ({
           reps: set.reps,
           weight: set.weight,
@@ -3709,6 +3778,161 @@ export default function HealthDashboard() {
     if (dataLength <= 14) return 1;
     if (dataLength <= 31) return 2;
     return Math.floor(dataLength / 15);
+  };
+
+  // Add before the component definitions
+  const findExerciseInLibrary = (
+    name: string
+  ):
+    | Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'>
+    | undefined => {
+    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+      const exercise = exercises.find(
+        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
+      );
+      if (exercise)
+        return {
+          primaryMuscle: exercise.primaryMuscle,
+          secondaryMuscles: exercise.secondaryMuscles,
+        };
+    }
+    return undefined;
+  };
+
+  // Add this new component before ExerciseAnalysis
+  const MuscleGroupAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
+    // Calculate weekly sets per muscle group
+    const muscleGroupStats = useMemo(() => {
+      const stats = new Map<MuscleGroup, { sets: number; volume: number }>();
+      
+      // Get sessions from the last 7 days
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      const weeklyGymSessions = gymSessions.filter(session => 
+        new Date(session.date) >= oneWeekAgo
+      );
+
+      weeklyGymSessions.forEach(session => {
+        Object.entries(session.exercise_log).forEach(([exerciseName, data]: [string, any]) => {
+          const exercise = findExerciseInLibrary(exerciseName);
+          if (!exercise) return;
+
+          // Count sets for primary muscle
+          const primaryStats = stats.get(exercise.primaryMuscle) || { sets: 0, volume: 0 };
+          stats.set(exercise.primaryMuscle, {
+            sets: primaryStats.sets + data.sets.length,
+            volume: primaryStats.volume + data.sets.reduce((acc: number, set: any) => 
+              acc + (set.weight * set.reps), 0
+            )
+          });
+
+          // Count half sets for secondary muscles
+          exercise.secondaryMuscles?.forEach(muscle => {
+            const secondaryStats = stats.get(muscle) || { sets: 0, volume: 0 };
+            stats.set(muscle, {
+              sets: secondaryStats.sets + Math.ceil(data.sets.length * 0.5),
+              volume: secondaryStats.volume + (data.sets.reduce((acc: number, set: any) => 
+                acc + (set.weight * set.reps), 0) * 0.5
+              )
+            });
+          });
+        });
+      });
+
+      return stats;
+    }, [gymSessions]);
+
+    // Define recommended weekly sets per muscle group
+    const recommendedSets: Record<MuscleGroup, number> = {
+      // Back muscles
+      lats: 10,
+      traps: 8,
+      rhomboids: 8,
+      lower_back: 6,
+      
+      // Leg muscles
+      quadriceps: 12,
+      hamstrings: 10,
+      glutes: 10,
+      calves: 8,
+      adductors: 6,
+      
+      // Chest muscles
+      upper_chest: 8,
+      mid_chest: 8,
+      lower_chest: 6,
+      
+      // Shoulder muscles
+      front_delts: 6,
+      side_delts: 8,
+      rear_delts: 8,
+      
+      // Arm muscles
+      biceps: 10,
+      triceps: 10,
+      forearms: 6,
+      
+      // Core muscles
+      rectus_abdominis: 8,
+      obliques: 6,
+      transverse_abdominis: 6,
+      
+      // Other
+      cardio: 0
+    };
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+        {Object.entries(recommendedSets)
+          .filter(([muscle]) => muscle !== 'full_body') // Exclude full_body from display
+          .map(([muscle, recommended]) => {
+            const stats = muscleGroupStats.get(muscle as MuscleGroup) || { sets: 0, volume: 0 };
+            const percentage = Math.min((stats.sets / recommended) * 100, 100);
+            
+            return (
+              <div 
+                key={muscle}
+                className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800"
+                id={muscle}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className={`font-medium text-slate-900 dark:text-slate-100 capitalize ${outfit.className}`}>
+                    {muscle.replace(/_/g, ' ')}
+                  </h3>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    {stats.sets}/{recommended} sets
+                  </span>
+                </div>
+                
+                <div className="relative h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div 
+                    className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
+                      percentage >= 100 
+                        ? 'bg-green-500' 
+                        : percentage >= 75 
+                          ? 'bg-blue-500'
+                          : percentage >= 50
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
+                    }`}
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+
+                <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">
+                  <div className="flex justify-between items-center">
+                    <span>Weekly Volume:</span>
+                    <span className="font-medium">
+                      {Math.round(stats.volume).toLocaleString()} kg
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -4159,6 +4383,12 @@ export default function HealthDashboard() {
         {/* Exercise Section */}
         {(activeSection === 'all' || activeSection === 'gym') && (
           <>
+            <SectionHeader
+              title="Muscle Group Analysis"
+              className={activeSection === 'all' ? 'mt-12' : ''}
+            />
+            <MuscleGroupAnalysis gymSessions={gymSessions} />
+
             <SectionHeader
               title="Exercise Analysis"
               className={activeSection === 'all' ? 'mt-12' : ''}
