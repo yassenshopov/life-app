@@ -1,20 +1,9 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { ThemeToggle } from '@/components/theme-toggle';
-import {
-  LineChart,
   AreaChart,
-  Line,
   Area,
   XAxis,
   YAxis,
@@ -22,38 +11,20 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Bar,
-  ComposedChart,
 } from 'recharts';
 import { Inter, Outfit } from 'next/font/google';
 import {
-  Menu,
   Moon,
   Heart,
   Footprints,
-  Weight,
   X,
   Pencil,
   CheckSquare,
   RefreshCw,
   Dumbbell,
-  Plus,
   Calendar,
   BarChart2,
-  ChevronLeft,
-  ChevronRight,
-  Dumbbell as DumbbellIcon,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { addDays, format, isSameDay, startOfMonth } from 'date-fns';
-import {
-  Tooltip as TooltipUI,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ChartLoadingOverlay } from '@/components/ChartLoadingOverlay';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
@@ -61,15 +32,8 @@ import { NavigationTabs } from '@/components/NavigationTabs';
 import { SectionHeader } from '@/components/SectionHeader';
 import { DisplaySection } from '@/types/display-section';
 import { FloatingToc } from '@/components/FloatingToc';
-import {
-  EXERCISE_LIBRARY,
-  GymSessionType,
-  Exercise,
-} from '@/constants/exercises';
-import { MuscleGroup } from '@/constants/muscle-groups';
-import { WorkoutEvent, WorkoutExercise, ExerciseStats } from '@/types/workout';
+import { EXERCISE_LIBRARY, Exercise } from '@/constants/exercises';
 import { RHRChart, RHRAnalytics } from '@/components/RHRCharts';
-import { Checkbox } from '@/components/ui/checkbox';
 import { WeightChart, WeightAnalytics } from '@/components/WeightCharts';
 import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
 import { SleepAnalysisCard } from '@/components/SleepAnalysis';
@@ -77,6 +41,9 @@ import { SleepPatternChart } from '@/components/SleepPatternChart';
 import { MuscleGroupAnalysis } from '@/components/MuscleGroupAnalysis';
 import { WorkoutCalendar } from '@/components/WorkoutCalendar';
 import { ExerciseAnalysis } from '@/components/ExerciseAnalysis';
+import { Checklist } from '@/components/Checklist';
+import { SleepCompositionChart } from '@/components/SleepCompositionChart';
+import { SleepStats } from '@/components/SleepStats';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -1060,88 +1027,7 @@ export default function Dashboard() {
                 {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
               </div>
 
-              <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-                <h3
-                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                >
-                  Sleep Stats
-                </h3>
-                {(() => {
-                  const stats = calculateStats(entries);
-                  if (!stats)
-                    return (
-                      <p className="text-slate-600 dark:text-slate-400">
-                        No data available
-                      </p>
-                    );
-
-                  return (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                          {stats.avgSleepDurationHours}h{' '}
-                          {stats.avgSleepDurationMins}m
-                        </div>
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                          Average Sleep Duration
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                            {stats.avgSleepTime.hours
-                              .toString()
-                              .padStart(2, '0')}
-                            :
-                            {stats.avgSleepTime.minutes
-                              .toString()
-                              .padStart(2, '0')}
-                          </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Avg. Bedtime
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                            {stats.avgWakeTime.hours
-                              .toString()
-                              .padStart(2, '0')}
-                            :
-                            {stats.avgWakeTime.minutes
-                              .toString()
-                              .padStart(2, '0')}
-                          </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Avg. Wake Time
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgDeepSleep.toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg. Deep Sleep
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {stats.avgRemSleep.toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              Avg. REM Sleep
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+              <SleepStats entries={entries} />
             </div>
 
             {/* Sleep Pattern Chart */}
@@ -1162,158 +1048,12 @@ export default function Dashboard() {
             </div>
 
             {/* Sleep Composition Chart */}
-            <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                >
-                  Sleep Composition
-                </h3>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="showAwakeTime"
-                    checked={showAwakeTime}
-                    onChange={(e) => setShowAwakeTime(e.target.checked)}
-                    className="rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label
-                    htmlFor="showAwakeTime"
-                    className="text-sm text-slate-600 dark:text-slate-400"
-                  >
-                    Show Awake Time
-                  </label>
-                </div>
-              </div>
-              <div
-                className={`transition-opacity duration-200 ${
-                  isLoadingCharts ? 'opacity-50' : 'opacity-100'
-                }`}
-              >
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart
-                    data={prepareChartData().map((entry) => {
-                      const totalSleepHours = entry.totalSleep;
-                      return {
-                        ...entry,
-                        deepSleepHours:
-                          (totalSleepHours * entry.deepSleep) / 100,
-                        remSleepHours: (totalSleepHours * entry.remSleep) / 100,
-                        lightSleepHours:
-                          (totalSleepHours *
-                            (100 - entry.deepSleep - entry.remSleep)) /
-                          100,
-                      };
-                    })}
-                    margin={{ bottom: 50 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="date"
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                      interval={0}
-                      tick={{ dy: 10 }}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      label={{
-                        value: 'Sleep Duration (hours)',
-                        angle: -90,
-                        position: 'insideLeft',
-                      }}
-                      domain={[0, 'auto']}
-                    />
-                    {showAwakeTime && (
-                      <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        label={{
-                          value: 'Awake Time (minutes)',
-                          angle: 90,
-                          position: 'insideRight',
-                        }}
-                        domain={[0, 'auto']}
-                      />
-                    )}
-                    <Tooltip
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const formatDuration = (hours: number) => {
-                            const h = Math.floor(hours);
-                            const m = Math.round((hours - h) * 60);
-                            return `${h}h ${m}m`;
-                          };
-
-                          const entry = payload[0].payload; // Get the full data point
-                          return (
-                            <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                              <p className="font-medium text-slate-900 dark:text-slate-100">
-                                {label}
-                              </p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Sleep Duration:{' '}
-                                {typeof payload[0].value === 'number'
-                                  ? payload[0].value.toFixed(1)
-                                  : payload[0].value}
-                                h
-                              </p>
-                              <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                                <p className="text-sm text-slate-600 dark:text-slate-400">
-                                  Light Sleep:{' '}
-                                  {100 - entry.deepSleep - entry.remSleep}%
-                                </p>
-                                <p className="text-sm text-slate-600 dark:text-slate-400">
-                                  Deep Sleep: {entry.deepSleep}%
-                                </p>
-                                <p className="text-sm text-slate-600 dark:text-slate-400">
-                                  REM Sleep: {entry.remSleep}%
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="deepSleepHours"
-                      stackId="a"
-                      fill="#3b82f6"
-                      name="Deep Sleep"
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="remSleepHours"
-                      stackId="a"
-                      fill="#14b8a6"
-                      name="REM Sleep"
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="lightSleepHours"
-                      stackId="a"
-                      fill="#60a5fa"
-                      name="Light Sleep"
-                    />
-                    {showAwakeTime && (
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="awakeTime"
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        dot={{ fill: '#ef4444' }}
-                        name="Awake Time"
-                      />
-                    )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-              {isLoadingCharts && <ChartLoadingOverlay color="purple" />}
-            </div>
+            <SleepCompositionChart
+              data={prepareChartData()}
+              isLoadingCharts={isLoadingCharts}
+              showAwakeTime={showAwakeTime}
+              setShowAwakeTime={setShowAwakeTime}
+            />
           </>
         )}
 
@@ -1392,160 +1132,13 @@ export default function Dashboard() {
       </main>
 
       {activeSection === 'checklist' && (
-        <div className="space-y-8 max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h2
-              className={`text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}
-            >
-              Daily Health Checklist
-            </h2>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setIsLoadingCharts(true);
-                fetch(
-                  `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
-                )
-                  .then((res) => res.json())
-                  .then((data) => {
-                    setEntries(data);
-                  })
-                  .finally(() => {
-                    setIsLoadingCharts(false);
-                  });
-              }}
-              className="h-10 w-10"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800 relative">
-            {(() => {
-              const today = new Date().toISOString().split('T')[0];
-              const yesterday = new Date(Date.now() - 86400000)
-                .toISOString()
-                .split('T')[0];
-
-              const todayEntry = entries.find((entry) => entry.date === today);
-              const yesterdayEntry = entries.find(
-                (entry) => entry.date === yesterday
-              );
-
-              const hasTodaySleepData =
-                todayEntry &&
-                (todayEntry.totalSleepHours > 0 ||
-                  todayEntry.totalSleepMinutes > 0);
-
-              const hasYesterdayRHR = yesterdayEntry?.restingHeartRate != null;
-              const hasYesterdaySteps = yesterdayEntry?.steps != null;
-              const hasTodayWeight = todayEntry?.weight != null;
-
-              const isComplete =
-                hasTodaySleepData &&
-                hasYesterdayRHR &&
-                hasYesterdaySteps &&
-                hasTodayWeight;
-
-              return (
-                isComplete && (
-                  <div className="mb-6 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-4 py-2 rounded-lg border border-green-200 dark:border-green-900 flex items-center gap-2">
-                    <CheckSquare className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      Great job! You've completed all your health tracking tasks
-                      for today! 🎉
-                    </span>
-                  </div>
-                )
-              );
-            })()}
-            {isLoadingCharts && (
-              <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg flex items-center justify-center z-50">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full animate-pulse bg-purple-600"></div>
-                  <div className="w-4 h-4 rounded-full animate-pulse bg-purple-600"></div>
-                  <div className="w-4 h-4 rounded-full animate-pulse bg-purple-600"></div>
-                </div>
-              </div>
-            )}
-            <div className="space-y-4">
-              {(() => {
-                const today = new Date().toISOString().split('T')[0];
-                const yesterday = new Date(Date.now() - 86400000)
-                  .toISOString()
-                  .split('T')[0];
-
-                const todayEntry = entries.find(
-                  (entry) => entry.date === today
-                );
-                const yesterdayEntry = entries.find(
-                  (entry) => entry.date === yesterday
-                );
-
-                const hasTodaySleepData =
-                  todayEntry &&
-                  (todayEntry.totalSleepHours > 0 ||
-                    todayEntry.totalSleepMinutes > 0);
-
-                const hasYesterdayRHR =
-                  yesterdayEntry?.restingHeartRate != null;
-                const hasYesterdaySteps = yesterdayEntry?.steps != null;
-                const hasTodayWeight = todayEntry?.weight != null;
-
-                const checklistItems = [
-                  {
-                    id: 'sleep',
-                    label: "Record today's sleep data",
-                    checked: hasTodaySleepData,
-                    autoCheck: true,
-                  },
-                  {
-                    id: 'rhr',
-                    label: "Record yesterday's resting heart rate",
-                    checked: hasYesterdayRHR,
-                    autoCheck: true,
-                  },
-                  {
-                    id: 'steps',
-                    label: "Record yesterday's steps",
-                    checked: hasYesterdaySteps,
-                    autoCheck: true,
-                  },
-                  {
-                    id: 'weight',
-                    label: "Record today's weight",
-                    checked: hasTodayWeight,
-                    autoCheck: true,
-                  },
-                ];
-
-                return checklistItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 transition-opacity ${
-                      item.checked ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <Checkbox
-                      id={item.id}
-                      className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
-                      checked={item.checked}
-                      disabled={item.autoCheck}
-                    />
-                    <label
-                      htmlFor={item.id}
-                      className={`flex-grow text-slate-700 dark:text-slate-300 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                        item.checked ? 'line-through' : ''
-                      }`}
-                    >
-                      {item.label}
-                    </label>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        </div>
+        <Checklist
+          entries={entries}
+          dateRange={dateRange}
+          isLoadingCharts={isLoadingCharts}
+          setIsLoadingCharts={setIsLoadingCharts}
+          setEntries={setEntries}
+        />
       )}
 
       {activeSection === 'gym' && (
