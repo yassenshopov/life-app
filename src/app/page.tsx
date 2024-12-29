@@ -189,14 +189,14 @@ export default function Dashboard() {
 
   const handleMuscleClick = (muscle: MuscleGroup) => {
     setSelectedMuscle(muscle);
-    
+
     // Add a small delay to ensure the category expands before scrolling
     setTimeout(() => {
       const element = document.getElementById(muscle);
       if (element) {
-        element.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
         });
       }
     }, 100);
@@ -208,27 +208,30 @@ export default function Dashboard() {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
       if (error || !session) {
         router.push('/login');
         return;
       }
-      
+
       setUser(session.user);
     };
 
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          router.push('/login');
-        } else if (session) {
-          setUser(session.user);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        router.push('/login');
+      } else if (session) {
+        setUser(session.user);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, [supabase, router]);
@@ -450,8 +453,8 @@ export default function Dashboard() {
                 title="Exercise Analysis"
                 className={activeSection === 'all' ? 'mt-12' : ''}
               />
-              <ExerciseAnalysis 
-                gymSessions={gymSessions} 
+              <ExerciseAnalysis
+                gymSessions={gymSessions}
                 onMuscleClick={handleMuscleClick}
               />
             </div>

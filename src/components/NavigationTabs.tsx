@@ -34,7 +34,10 @@ export const NavigationTabs = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -127,7 +130,7 @@ export const NavigationTabs = ({
             </button>
           ))}
         </nav>
-        
+
         {user && (
           <div className="flex items-center gap-2 py-4 text-sm text-slate-600 dark:text-slate-400">
             {user.user_metadata?.avatar_url ? (
@@ -138,7 +141,7 @@ export const NavigationTabs = ({
                 onClick={() => setShowDropdown(!showDropdown)}
               />
             ) : (
-              <div 
+              <div
                 className="w-6 h-6 rounded-full font-bold bg-purple-600 dark:bg-purple-500 flex items-center justify-center text-white cursor-pointer"
                 onClick={() => setShowDropdown(!showDropdown)}
               >
@@ -153,7 +156,7 @@ export const NavigationTabs = ({
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
-              
+
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 z-50">
                   <button
