@@ -72,6 +72,7 @@ import { RHRChart, RHRAnalytics } from '@/components/RHRCharts';
 import { Checkbox } from "@/components/ui/checkbox";
 import { WeightChart, WeightAnalytics } from '@/components/WeightCharts';
 import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
+import { SleepAnalysisCard } from '@/components/SleepAnalysis';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -1923,377 +1924,6 @@ export default function HealthDashboard() {
     setDateRange({ from, to });
   };
 
-  const analyzeSleepData = (entry: DayEntry): SleepAnalysis => {
-    const insights: Array<{
-      text: string;
-      metric?: { value: number; min: number; max: number; unit: string };
-    }> = [];
-    const recommendations: string[] = [];
-    let qualityScore = 100;
-
-    // Calculate total sleep duration in hours
-    const totalSleep = entry.totalSleepHours + entry.totalSleepMinutes / 60;
-
-    // Analyze sleep duration (without progress bar)
-    if (totalSleep < 7) {
-      qualityScore -= 20;
-      insights.push({
-        text: `You slept ${totalSleep.toFixed(
-          1
-        )} hours, which is below the recommended 7-9 hours`,
-      });
-      recommendations.push(
-        'Try to get to bed earlier to reach at least 7 hours of sleep'
-      );
-    } else if (totalSleep > 9) {
-      qualityScore -= 10;
-      insights.push({
-        text: `You slept ${totalSleep.toFixed(
-          1
-        )} hours, which is above the recommended range`,
-      });
-      recommendations.push(
-        'Consider adjusting your sleep schedule to avoid oversleeping'
-      );
-    } else {
-      insights.push({
-        text: `Your sleep duration of ${totalSleep.toFixed(
-          1
-        )} hours is within the ideal range`,
-      });
-    }
-
-    // Add Light sleep analysis (before Deep sleep)
-    const lightSleepPercentage =
-      100 - entry.deepSleepPercentage - entry.remSleepPercentage;
-    insights.push({
-      text: `Light sleep`,
-      metric: { value: lightSleepPercentage, min: 0, max: 55, unit: '%' },
-    });
-
-    // Analyze deep sleep
-    insights.push({
-      text: `Deep sleep`,
-      metric: { value: entry.deepSleepPercentage, min: 20, max: 60, unit: '%' },
-    });
-
-    // Analyze REM sleep
-    insights.push({
-      text: `REM sleep`,
-      metric: { value: entry.remSleepPercentage, min: 10, max: 30, unit: '%' },
-    });
-
-    // Enhanced awake time analysis
-    if (entry.awakeTimeMinutes > 0) {
-      if (entry.awakeTimeMinutes > 60) {
-        qualityScore -= 25;
-        insights.push({
-          text: `Significant sleep disruption: ${entry.awakeTimeMinutes} minutes spent awake`,
-          metric: { value: entry.awakeTimeMinutes, min: 0, max: 60, unit: 'm' },
-        });
-        recommendations.push(
-          'Consider checking for environmental disturbances (noise, light, temperature)'
-        );
-        recommendations.push(
-          'Evaluate if stress or anxiety might be affecting your sleep'
-        );
-      } else if (entry.awakeTimeMinutes > 30) {
-        qualityScore -= 15;
-        insights.push({
-          text: `Moderate sleep disruption: ${entry.awakeTimeMinutes} minutes spent awake`,
-          metric: { value: entry.awakeTimeMinutes, min: 0, max: 60, unit: 'm' },
-        });
-        recommendations.push(
-          'Try to minimize evening screen time and create a more sleep-friendly environment'
-        );
-      } else {
-        qualityScore -= 5;
-        insights.push({
-          text: `Minor sleep disruption: ${entry.awakeTimeMinutes} minutes spent awake`,
-          metric: { value: entry.awakeTimeMinutes, min: 0, max: 60, unit: 'm' },
-        });
-        recommendations.push(
-          'Consider your evening routine to minimize sleep disruptions'
-        );
-      }
-    }
-
-    // Determine quality label
-    let quality: SleepAnalysis['quality'] = 'Poor';
-    if (qualityScore >= 90) quality = 'Excellent';
-    else if (qualityScore >= 75) quality = 'Good';
-    else if (qualityScore >= 60) quality = 'Fair';
-
-    return { quality, qualityScore, insights, recommendations };
-  };
-
-  const getHistoricalInsights = (
-    todayEntry: DayEntry,
-    recentEntries: DayEntry[]
-  ) => {
-    if (!todayEntry || recentEntries.length < 2) return [];
-
-    const insights: string[] = [];
-    const last7Days = recentEntries
-      .filter((entry) => entry.date !== todayEntry.date)
-      .slice(0, 7);
-
-    // Calculate averages
-    const avgSleepTime =
-      last7Days.reduce(
-        (sum, entry) =>
-          sum + entry.totalSleepHours + entry.totalSleepMinutes / 60,
-        0
-      ) / last7Days.length;
-
-    const avgDeepSleep =
-      last7Days.reduce((sum, entry) => sum + entry.deepSleepPercentage, 0) /
-      last7Days.length;
-
-    const avgRemSleep =
-      last7Days.reduce((sum, entry) => sum + entry.remSleepPercentage, 0) /
-      last7Days.length;
-
-    const todayTotalSleep =
-      todayEntry.totalSleepHours + todayEntry.totalSleepMinutes / 60;
-
-    // Compare with today
-    if (Math.abs(todayTotalSleep - avgSleepTime) > 1) {
-      const comparison = todayTotalSleep > avgSleepTime ? 'more' : 'less';
-      insights.push(
-        `You slept ${Math.abs(todayTotalSleep - avgSleepTime).toFixed(
-          1
-        )} hours ${comparison} than your 7-day average`
-      );
-    }
-
-    if (Math.abs(todayEntry.deepSleepPercentage - avgDeepSleep) > 5) {
-      const comparison =
-        todayEntry.deepSleepPercentage > avgDeepSleep ? 'higher' : 'lower';
-      insights.push(
-        `Deep sleep was ${Math.abs(
-          todayEntry.deepSleepPercentage - avgDeepSleep
-        ).toFixed(1)}% ${comparison} than your recent average`
-      );
-    }
-
-    if (Math.abs(todayEntry.remSleepPercentage - avgRemSleep) > 5) {
-      const comparison =
-        todayEntry.remSleepPercentage > avgRemSleep ? 'higher' : 'lower';
-      insights.push(
-        `REM sleep was ${Math.abs(
-          todayEntry.remSleepPercentage - avgRemSleep
-        ).toFixed(1)}% ${comparison} than your recent average`
-      );
-    }
-
-    return insights;
-  };
-
-  const SleepAnalysisCard = ({ entry }: { entry: DayEntry }) => {
-    // If no entry is provided, show the prompt message
-    if (!entry) {
-      return (
-        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
-          <div className="flex flex-col items-center justify-center text-center py-8">
-            <div className="mb-4">
-              <svg
-                className="w-12 h-12 text-purple-500 mx-auto"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-              No Sleep Data for Today
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 max-w-md">
-              Track your sleep by logging today's data using the form above.
-              Regular tracking helps you understand your sleep patterns better.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    const analysis = analyzeSleepData(entry);
-    const historicalInsights = getHistoricalInsights(entry, entries);
-
-    const getProgressColor = (metricType: string) => {
-      switch (metricType) {
-        case 'deep':
-          return 'bg-blue-700';
-        case 'light':
-          return 'bg-blue-500';
-        case 'rem':
-          return 'bg-teal-400';
-        default:
-          return 'bg-blue-500';
-      }
-    };
-
-    const getProgressBarContent = (
-      value: number,
-      min: number,
-      max: number,
-      metricType: string
-    ) => {
-      return (
-        <div className="h-6 w-full sm:w-48 md:w-64 lg:w-96 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden relative">
-          <div
-            className="absolute h-full bg-stripes"
-            style={{
-              left: `${min}%`,
-              width: `${max - min}%`,
-              background: `repeating-linear-gradient(
-                45deg,
-                rgba(255, 255, 255, 0.2),
-                rgba(255, 255, 255, 0.2) 10px,
-                rgba(255, 255, 255, 0.3) 10px,
-                rgba(255, 255, 255, 0.3) 20px
-              )`,
-            }}
-          />
-          <div
-            className={`h-full transition-all ${getProgressColor(metricType)}`}
-            style={{
-              width: `${value}%`,
-            }}
-          />
-        </div>
-      );
-    };
-
-    return (
-      <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex flex-col">
-            <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 opacity-50 mb-2">
-              Today's Sleep Analysis (
-              {format(new Date(entry.date), 'MMM do yyyy')})
-            </h2>
-            <p className="text-2xl font-medium text-slate-900 dark:text-slate-100">
-              {entry.sleepTime} - {entry.wakeTime}
-            </p>
-          </div>
-          <div
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              analysis.quality === 'Excellent'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                : analysis.quality === 'Good'
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                : analysis.quality === 'Fair'
-                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-            }`}
-          >
-            {analysis.quality} ({analysis.qualityScore}%)
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
-              Key Insights
-            </h4>
-            <ul className="space-y-4">
-              {analysis.insights.map((insight, index) => (
-                <li key={index} className="text-sm">
-                  {insight.metric ? (
-                    // Update the layout to be more responsive
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-slate-900 dark:text-slate-100">
-                          {insight.text.split(':')[0]}
-                        </span>
-                        <span className="text-sm text-slate-600 dark:text-slate-400">
-                          {formatPercentage(insight.metric.value)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getProgressBarContent(
-                          insight.metric.value,
-                          insight.metric.min,
-                          insight.metric.max,
-                          insight.text.toLowerCase().includes('deep')
-                            ? 'deep'
-                            : insight.text.toLowerCase().includes('light')
-                            ? 'light'
-                            : insight.text.toLowerCase().includes('rem')
-                            ? 'rem'
-                            : 'default'
-                        )}
-                        <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {insight.metric.min}-{insight.metric.max}
-                          {insight.metric.unit}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-slate-600 dark:text-slate-400">
-                      {insight.text}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {analysis.recommendations.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
-                Recommendations
-              </h4>
-              <ul className="space-y-2">
-                {analysis.recommendations.map((rec, index) => (
-                  <li
-                    key={index}
-                    className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                    {rec}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {historicalInsights.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
-                Compared to Last 7 Days
-              </h4>
-              <ul className="space-y-2">
-                {historicalInsights.map((insight, index) => (
-                  <li
-                    key={index}
-                    className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                    {insight}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const formatPercentage = (value: number) => {
-    // Round to 1 decimal place and remove trailing .0 if present
-    const formatted = Number(value.toFixed(1));
-    return formatted + '%';
-  };
-
   const calculateStats = (entries: DayEntry[]) => {
     if (entries.length === 0) return null;
 
@@ -2665,16 +2295,66 @@ export default function HealthDashboard() {
     );
   };
 
-  const generateYAxisTicks = (min: number, max: number, average: number) => {
-    const ticks = new Set<number>();
-    ticks.add(Math.floor(min));
-    ticks.add(Math.ceil(max));
-    ticks.add(average);
-    for (let i = Math.floor(min); i <= Math.ceil(max); i++) {
-      ticks.add(i);
-    }
-    return Array.from(ticks).sort((a, b) => a - b);
-  };
+  const InsightSection = ({ title, insights, renderProgressBar }: {
+    title: string;
+    insights: Array<{
+      text: string;
+      metric?: { value: number; min: number; max: number; unit: string };
+    }>;
+    renderProgressBar: (value: number, min: number, max: number, type: string) => React.ReactElement;
+  }) => (
+    <div>
+      <h3 className="text-lg font-medium mb-4 text-slate-900 dark:text-slate-100">
+        {title}
+      </h3>
+      <div className="space-y-4">
+        {insights.map((insight, index) => (
+          <div key={index}>
+            {insight.metric ? (
+              renderProgressBar(
+                insight.metric.value, 
+                insight.metric.min, 
+                insight.metric.max, 
+                insight.text.toLowerCase() // Ensure exact match with color keys
+              )
+            ) : (
+              <p className="text-slate-600 dark:text-slate-400">{insight.text}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const RecommendationSection = ({ recommendations }: { recommendations: string[] }) => (
+    <div>
+      <h3 className="text-lg font-medium mb-4 text-slate-900 dark:text-slate-100">
+        Recommendations
+      </h3>
+      <ul className="list-disc list-inside space-y-2">
+        {recommendations.map((recommendation, index) => (
+          <li key={index} className="text-slate-600 dark:text-slate-400">
+            {recommendation}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const HistoricalSection = ({ insights }: { insights: string[] }) => (
+    <div>
+      <h3 className="text-lg font-medium mb-4 text-slate-900 dark:text-slate-100">
+        Historical Insights
+      </h3>
+      <ul className="list-disc list-inside space-y-2">
+        {insights.map((insight, index) => (
+          <li key={index} className="text-slate-600 dark:text-slate-400">
+            {insight}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 
   return (
     <div
@@ -2718,7 +2398,7 @@ export default function HealthDashboard() {
 
                 return hasMeaningfulSleepData ? (
                   <div className="mb-8">
-                    <SleepAnalysisCard entry={todayEntry} />
+                    <SleepAnalysisCard entry={todayEntry} entries={entries} />
                   </div>
                 ) : null;
               })()}
