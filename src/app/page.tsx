@@ -69,11 +69,12 @@ import {
 import { MuscleGroup } from '@/constants/muscle-groups';
 import { WorkoutEvent, WorkoutExercise, ExerciseStats } from '@/types/workout';
 import { RHRChart, RHRAnalytics } from '@/components/RHRCharts';
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from '@/components/ui/checkbox';
 import { WeightChart, WeightAnalytics } from '@/components/WeightCharts';
 import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
 import { SleepAnalysisCard } from '@/components/SleepAnalysis';
 import { SleepPatternChart } from '@/components/SleepPatternChart';
+import { MuscleGroupAnalysis } from '@/components/MuscleGroupAnalysis';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -515,6 +516,23 @@ const WorkoutCalendar = ({
     }
   };
 
+  // Add this helper function
+  const findExerciseInLibrary = (
+    name: string
+  ): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
+    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+      const exercise = exercises.find(
+        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
+      );
+      if (exercise)
+        return {
+          primaryMuscle: exercise.primaryMuscle,
+          secondaryMuscles: exercise.secondaryMuscles,
+        };
+    }
+    return undefined;
+  };
+
   // Add function to handle editing a workout
   const handleEditWorkout = (workout: any) => {
     setEditingWorkout(workout);
@@ -540,23 +558,6 @@ const WorkoutCalendar = ({
       })
     );
     setSelectedExercises(exercises);
-  };
-
-  // Add this helper function
-  const findExerciseInLibrary = (
-    name: string
-  ): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
-    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
-      const exercise = exercises.find(
-        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
-      );
-      if (exercise)
-        return {
-          primaryMuscle: exercise.primaryMuscle,
-          secondaryMuscles: exercise.secondaryMuscles,
-        };
-    }
-    return undefined;
   };
 
   return (
@@ -1773,6 +1774,7 @@ export default function Dashboard() {
           new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()
       );
   };
+
   const handleDateRangeFilter = (days: number | string) => {
     const to = new Date();
     const from = new Date();
@@ -1787,7 +1789,7 @@ export default function Dashboard() {
 
     setDateRange({ from, to });
   };
-  
+
   const calculateStats = (entries: DayEntry[]) => {
     if (entries.length === 0) return null;
 
@@ -1932,293 +1934,6 @@ export default function Dashboard() {
     }
     return undefined;
   };
-
-  // Add this new component before ExerciseAnalysis
-  const MuscleGroupAnalysis = ({ gymSessions }: { gymSessions: any[] }) => {
-    const [expandedCategories, setExpandedCategories] = useState<string[]>([
-      'all',
-    ]);
-
-    // Group muscles by category
-    const muscleCategories = {
-      back: {
-        label: 'Back',
-        muscles: ['lats', 'traps', 'rhomboids', 'lower_back'],
-      },
-      legs: {
-        label: 'Legs',
-        muscles: ['quadriceps', 'hamstrings', 'glutes', 'calves', 'adductors'],
-      },
-      chest: {
-        label: 'Chest',
-        muscles: ['upper_chest', 'mid_chest', 'lower_chest'],
-      },
-      shoulders: {
-        label: 'Shoulders',
-        muscles: ['front_delts', 'side_delts', 'rear_delts'],
-      },
-      arms: {
-        label: 'Arms',
-        muscles: ['biceps', 'triceps', 'forearms'],
-      },
-      core: {
-        label: 'Core',
-        muscles: ['rectus_abdominis', 'obliques', 'transverse_abdominis'],
-      },
-    };
-
-    // Calculate weekly sets per muscle group
-    const muscleGroupStats = useMemo(() => {
-      const stats = new Map<MuscleGroup, { sets: number; volume: number }>();
-
-      // Get sessions from the last 7 days
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-      const weeklyGymSessions = gymSessions.filter(
-        (session) => new Date(session.date) >= oneWeekAgo
-      );
-
-      weeklyGymSessions.forEach((session) => {
-        Object.entries(session.exercise_log).forEach(
-          ([exerciseName, data]: [string, any]) => {
-            const exercise = findExerciseInLibrary(exerciseName);
-            if (!exercise) return;
-
-            // Count sets for primary muscle
-            const primaryStats = stats.get(exercise.primaryMuscle) || {
-              sets: 0,
-              volume: 0,
-            };
-            stats.set(exercise.primaryMuscle, {
-              sets: primaryStats.sets + data.sets.length,
-              volume:
-                primaryStats.volume +
-                data.sets.reduce(
-                  (acc: number, set: any) => acc + set.weight * set.reps,
-                  0
-                ),
-            });
-
-            // Count half sets for secondary muscles
-            exercise.secondaryMuscles?.forEach((muscle) => {
-              const secondaryStats = stats.get(muscle) || {
-                sets: 0,
-                volume: 0,
-              };
-              stats.set(muscle, {
-                sets: secondaryStats.sets + Math.ceil(data.sets.length * 0.5),
-                volume:
-                  secondaryStats.volume +
-                  data.sets.reduce(
-                    (acc: number, set: any) => acc + set.weight * set.reps,
-                    0
-                  ) *
-                    0.5,
-              });
-            });
-          }
-        );
-      });
-
-      return stats;
-    }, [gymSessions]);
-
-    // Define recommended weekly sets per muscle group
-    const recommendedSets: Record<MuscleGroup, number> = {
-      // Back muscles
-      lats: 10,
-      traps: 8,
-      rhomboids: 8,
-      lower_back: 6,
-
-      // Leg muscles
-      quadriceps: 12,
-      hamstrings: 10,
-      glutes: 10,
-      calves: 8,
-      adductors: 6,
-
-      // Chest muscles
-      upper_chest: 8,
-      mid_chest: 8,
-      lower_chest: 6,
-
-      // Shoulder muscles
-      front_delts: 6,
-      side_delts: 8,
-      rear_delts: 8,
-
-      // Arm muscles
-      biceps: 10,
-      triceps: 10,
-      forearms: 6,
-
-      // Core muscles
-      rectus_abdominis: 8,
-      obliques: 6,
-      transverse_abdominis: 6,
-
-      // Other
-      cardio: 0,
-    };
-
-    const toggleCategory = (category: string) => {
-      setExpandedCategories((prev) =>
-        prev.includes(category)
-          ? prev.filter((c) => c !== category)
-          : [...prev, category]
-      );
-    };
-
-    return (
-      <div className="space-y-4 mb-8">
-        {Object.entries(muscleCategories).map(
-          ([category, { label, muscles }]) => (
-            <div
-              key={category}
-              className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg border border-slate-200 dark:border-slate-800"
-            >
-              {/* Category Header */}
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full px-4 py-3 flex items-center justify-between text-left"
-              >
-                <h3
-                  className={`text-lg font-medium text-slate-900 dark:text-slate-100 ${outfit.className}`}
-                >
-                  {label}
-                </h3>
-                <ChevronDown
-                  className={`w-5 h-5 text-slate-500 transition-transform ${
-                    expandedCategories.includes(category) ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Muscle Groups Grid */}
-              {expandedCategories.includes(category) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border-t border-slate-200 dark:border-slate-700">
-                  {muscles.map((muscle) => {
-                    const stats = muscleGroupStats.get(
-                      muscle as MuscleGroup
-                    ) || { sets: 0, volume: 0 };
-                    const recommended = recommendedSets[muscle as MuscleGroup];
-                    const percentage = Math.min(
-                      (stats.sets / recommended) * 100,
-                      100
-                    );
-
-                    return (
-                      <div
-                        key={muscle}
-                        className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700"
-                        id={muscle}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-slate-900 dark:text-slate-100 capitalize">
-                            {muscle.replace(/_/g, ' ')}
-                          </h4>
-                          <span className="text-sm text-slate-600 dark:text-slate-400">
-                            {stats.sets}/{recommended} sets
-                          </span>
-                        </div>
-
-                        <div className="relative h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
-                              percentage >= 100
-                                ? 'bg-green-500'
-                                : percentage >= 75
-                                ? 'bg-blue-500'
-                                : percentage >= 50
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
-                            }`}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-
-                        <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-                          <div className="flex justify-between items-center">
-                            <span>Weekly Volume:</span>
-                            <span className="font-medium">
-                              {Math.round(stats.volume).toLocaleString()} kg
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        )}
-      </div>
-    );
-  };
-
-  const InsightSection = ({ title, insights, renderProgressBar }: {
-    title: string;
-    insights: Array<{
-      text: string;
-      metric?: { value: number; min: number; max: number; unit: string };
-    }>;
-    renderProgressBar: (value: number, min: number, max: number, type: string) => React.ReactElement;
-  }) => (
-    <div>
-      <h3 className="text-lg font-medium mb-4 text-slate-900 dark:text-slate-100">
-        {title}
-      </h3>
-      <div className="space-y-4">
-        {insights.map((insight, index) => (
-          <div key={index}>
-            {insight.metric ? (
-              renderProgressBar(
-                insight.metric.value, 
-                insight.metric.min, 
-                insight.metric.max, 
-                insight.text.toLowerCase() // Ensure exact match with color keys
-              )
-            ) : (
-              <p className="text-slate-600 dark:text-slate-400">{insight.text}</p>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const RecommendationSection = ({ recommendations }: { recommendations: string[] }) => (
-    <div>
-      <h3 className="text-lg font-medium mb-4 text-slate-900 dark:text-slate-100">
-        Recommendations
-      </h3>
-      <ul className="list-disc list-inside space-y-2">
-        {recommendations.map((recommendation, index) => (
-          <li key={index} className="text-slate-600 dark:text-slate-400">
-            {recommendation}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-
-  const HistoricalSection = ({ insights }: { insights: string[] }) => (
-    <div>
-      <h3 className="text-lg font-medium mb-4 text-slate-900 dark:text-slate-100">
-        Historical Insights
-      </h3>
-      <ul className="list-disc list-inside space-y-2">
-        {insights.map((insight, index) => (
-          <li key={index} className="text-slate-600 dark:text-slate-400">
-            {insight}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 
   return (
     <div
@@ -2666,8 +2381,8 @@ export default function Dashboard() {
             />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <WeightAnalytics data={prepareChartData()} />
-              <WeightChart 
-                data={prepareChartData()} 
+              <WeightChart
+                data={prepareChartData()}
                 isLoadingCharts={isLoadingCharts}
                 tickInterval={getTickInterval(prepareChartData().length)}
               />
