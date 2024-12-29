@@ -36,16 +36,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import Link from 'next/link';
 
 interface WorkoutCalendarProps {
   onLoadingChange: (loading: boolean) => void;
   showGymForm: boolean;
   setShowGymForm: (show: boolean) => void;
+  onMuscleClick?: (muscle: MuscleGroup) => void;
 }
 
 export const WorkoutCalendar = ({
   showGymForm,
   setShowGymForm,
+  onMuscleClick,
 }: WorkoutCalendarProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [workouts, setWorkouts] = useState<WorkoutEvent[]>([]);
@@ -250,6 +253,40 @@ export const WorkoutCalendar = ({
     );
     setSelectedExercises(exercises);
   };
+
+  const calculateVolumeChange = (current: any, previous: any) => {
+    const getCurrentVolume = (session: any) => {
+      return Object.values(session.exercise_log).reduce(
+        (acc: number, exercise: any) => {
+          return (
+            acc +
+            exercise.sets.reduce((setAcc: number, set: any) => {
+              return setAcc + set.reps * set.weight;
+            }, 0)
+          );
+        },
+        0
+      );
+    };
+
+    const currentVolume = getCurrentVolume(current);
+    const previousVolume = getCurrentVolume(previous);
+    const difference = currentVolume - previousVolume;
+    const percentage = ((difference / previousVolume) * 100).toFixed(1);
+
+    return `${difference >= 0 ? '+' : ''}${percentage}%`;
+  };
+
+  const compareExerciseCount = (current: any, previous: any) => {
+    const currentCount = Object.keys(current.exercise_log).length;
+    const previousCount = Object.keys(previous.exercise_log).length;
+    const difference = currentCount - previousCount;
+
+    return difference === 0
+      ? 'Same'
+      : `${difference > 0 ? '+' : ''}${difference}`;
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
       {/* Calendar Section - Left Side */}
@@ -308,7 +345,6 @@ export const WorkoutCalendar = ({
               (event) => event.date === dateString
             );
             const gymSessionsForDay = gymSessions.filter((session) => {
-              // Add T00:00:00 to the date string before creating the Date object, just like we do for runs
               const sessionDate = new Date(session.date + 'T00:00:00')
                 .toISOString()
                 .split('T')[0];
@@ -333,7 +369,7 @@ export const WorkoutCalendar = ({
                 type: 'gym',
                 title: formatGymType(session.type) || 'Gym Session',
                 details: {
-                  exercises: session.exercises,
+                  exercises: session.exercise_log,
                   notes: session.notes,
                 },
               })),
@@ -395,60 +431,101 @@ export const WorkoutCalendar = ({
                     </div>
                   </TooltipTrigger>
                   {activitiesForDay.length > 0 && (
-                    <TooltipContent className="space-y-2">
+                    <TooltipContent className="p-4 space-y-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-lg min-w-[300px]">
                       {activitiesForDay.map((activity, index) => (
-                        <div key={index} className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
+                        <div key={index} className="flex flex-col">
+                          <div className="flex items-center gap-2 mb-3">
                             <div
                               className={`w-2 h-2 rounded-full ${
                                 activity.type === 'run'
-                                  ? 'bg-orange-500'
+                                  ? 'bg-orange-500/80'
                                   : activity.type === 'gym'
-                                  ? 'bg-purple-500'
-                                  : 'bg-blue-500'
+                                  ? 'bg-purple-500/80'
+                                  : 'bg-blue-500/80'
                               }`}
                             />
-                            <span className="font-medium">
-                              {activity.title}
+                            <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                              {activity.type === 'gym'
+                                ? formatGymType(activity.title)
+                                : activity.title}
                             </span>
                           </div>
-                          {activity.type === 'run' && (
-                            <div className="text-sm text-slate-500 dark:text-slate-400 pl-4 space-y-1">
-                              {'distance' in activity.details &&
-                                activity.details.distance && (
-                                  <div>
-                                    Distance: {activity.details.distance}km
+
+                          {activity.type === 'run' &&
+                            'distance' in activity.details && (
+                              <div className="space-y-2 pl-4">
+                                {activity.details.distance && (
+                                  <div className="grid grid-cols-[100px_1fr] text-sm">
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                      Distance:
+                                    </span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                                      {activity.details.distance} km
+                                    </span>
                                   </div>
                                 )}
-                              {'duration' in activity.details &&
-                                activity.details.duration && (
-                                  <div>
-                                    Duration: {activity.details.duration}min
+                                {activity.details.duration && (
+                                  <div className="grid grid-cols-[100px_1fr] text-sm">
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                      Duration:
+                                    </span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                                      {activity.details.duration} min
+                                    </span>
                                   </div>
                                 )}
-                              {'pace' in activity.details &&
-                                activity.details.pace && (
-                                  <div>Pace: {activity.details.pace}min/km</div>
-                                )}
-                              {'notes' in activity.details &&
-                                activity.details.notes && (
-                                  <div>Notes: {activity.details.notes}</div>
-                                )}
-                            </div>
-                          )}
-                          {activity.type === 'gym' && (
-                            <div className="text-sm text-slate-500 dark:text-slate-400 pl-4 space-y-1">
-                              {'exercises' in activity.details &&
-                                activity.details.exercises && (
-                                  <div>
-                                    Exercises: {activity.details.exercises}
+                                {activity.details.pace && (
+                                  <div className="grid grid-cols-[100px_1fr] text-sm">
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                      Pace:
+                                    </span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                                      {activity.details.pace} min/km
+                                    </span>
                                   </div>
                                 )}
-                              {activity.details.notes && (
-                                <div>Notes: {activity.details.notes}</div>
-                              )}
-                            </div>
-                          )}
+                              </div>
+                            )}
+
+                          {activity.type === 'gym' &&
+                            'exercises' in activity.details && (
+                              <div className="pl-4">
+                                <div className="space-y-2">
+                                  {Object.entries(
+                                    activity.details.exercises
+                                  ).map(([name, data]: [string, any]) => (
+                                    <div
+                                      key={name}
+                                      className="grid grid-cols-[1fr_80px] text-sm items-center"
+                                    >
+                                      <span className="text-slate-700 dark:text-slate-300">
+                                        {name
+                                          .split('_')
+                                          .map(
+                                            (word) =>
+                                              word.charAt(0).toUpperCase() +
+                                              word.slice(1)
+                                          )
+                                          .join(' ')}
+                                      </span>
+                                      <span className="text-slate-500 dark:text-slate-400 text-right">
+                                        {data.sets?.length || 0} sets
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {activity.details?.notes && (
+                                  <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                                      Notes:
+                                    </span>
+                                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+                                      {activity.details.notes}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                         </div>
                       ))}
                     </TooltipContent>
@@ -464,26 +541,165 @@ export const WorkoutCalendar = ({
       <div className="lg:col-span-2 space-y-4">
         <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">
-            Today's Workout
+            Today's Activity
           </h3>
           {workouts.some(
             (event) =>
               new Date(event.date).toDateString() === new Date().toDateString()
+          ) ||
+          gymSessions.some(
+            (session) =>
+              new Date(session.date).toDateString() ===
+              new Date().toDateString()
           ) ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  Upper Body + Core
-                </span>
-              </div>
-              <Button className="w-full bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700">
-                Start Workout
-              </Button>
+            <div className="space-y-6">
+              {/* Today's Activities List */}
+              {[...workouts, ...gymSessions]
+                .filter(
+                  (activity) =>
+                    new Date(activity.date).toDateString() ===
+                    new Date().toDateString()
+                )
+                .map((activity, index) => {
+                  const isGymSession =
+                    'type' in activity && activity.type !== 'run';
+                  const previousSession = isGymSession
+                    ? gymSessions
+                        .filter(
+                          (s) =>
+                            s.type === activity.type &&
+                            new Date(s.date) < new Date(activity.date)
+                        )
+                        .sort(
+                          (a, b) =>
+                            new Date(b.date).getTime() -
+                            new Date(a.date).getTime()
+                        )[0]
+                    : null;
+
+                  return (
+                    <div
+                      key={index}
+                      className="pb-4 border-b border-slate-200 dark:border-slate-700 last:border-0 last:pb-0"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            isGymSession ? 'bg-purple-500' : 'bg-orange-500'
+                          }`}
+                        />
+                        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                          {isGymSession
+                            ? formatGymType(activity.type)
+                            : activity.title}
+                        </span>
+                      </div>
+
+                      {isGymSession ? (
+                        <div className="space-y-3 pl-4">
+                          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                            <div>
+                              {Object.keys(activity.exercise_log).length} exercises · {
+                                String((Object.values(activity.exercise_log) as { sets: any[] }[]).reduce((acc: number, curr: { sets: any[] }) => 
+                                  acc + curr.sets.length, 0
+                                ))} total sets
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {Array.from(new Set(
+                                Object.keys(activity.exercise_log)
+                                  .map(name => {
+                                    const exercise = findExerciseInLibrary(name);
+                                    return exercise?.primaryMuscle;
+                                  })
+                                  .filter(Boolean)
+                              )).map((muscle, index) => (
+                                <Link 
+                                  key={index}
+                                  href={`#${muscle}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    const element = document.getElementById(muscle as string);
+                                    element?.scrollIntoView({ behavior: 'smooth' });
+                                    if (onMuscleClick) {
+                                      onMuscleClick(muscle as MuscleGroup);
+                                    }
+                                  }}
+                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                                >
+                                  {muscle?.split('_')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ')}
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+
+                          {previousSession && (
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-md p-3">
+                              <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">
+                                Compared to last {formatGymType(activity.type)}{' '}
+                                (
+                                {new Date(
+                                  previousSession.date
+                                ).toLocaleDateString()}
+                                ):
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-slate-500 dark:text-slate-400">
+                                    Total Volume:{' '}
+                                  </span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                                    {calculateVolumeChange(
+                                      activity,
+                                      previousSession
+                                    )}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500 dark:text-slate-400">
+                                    Exercise Count:{' '}
+                                  </span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                                    {compareExerciseCount(
+                                      activity,
+                                      previousSession
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-2 pl-4">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                Distance:{' '}
+                              </span>
+                              <span className="font-medium text-slate-700 dark:text-slate-200">
+                                {activity.distance} km
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                Pace:{' '}
+                              </span>
+                              <span className="font-medium text-slate-700 dark:text-slate-200">
+                                {activity.pace} min/km
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              No workout scheduled for today
+              No activities recorded today
             </p>
           )}
         </div>

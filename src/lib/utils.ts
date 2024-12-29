@@ -10,10 +10,12 @@ export function cn(...inputs: ClassValue[]) {
 
 export const formatGymType = (type: string): string => {
   switch (type.toLowerCase()) {
-    case 'upper':
-      return 'Upper Body';
-    case 'lower':
-      return 'Lower Body';
+    case 'back_and_chest':
+      return 'Back & Chest';
+    case 'arms':
+      return 'Arms';
+    case 'legs':
+      return 'Legs';
     case 'full':
       return 'Full Body';
     case 'cardio':

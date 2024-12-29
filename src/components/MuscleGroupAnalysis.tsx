@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Outfit } from 'next/font/google';
 import { Exercise, EXERCISE_LIBRARY } from '@/constants/exercises';
 import { MuscleGroup } from '@/constants/muscle-groups';
+import { Button } from "@/components/ui/button";
 
 const outfit = Outfit({ subsets: ['latin'] });
 
 // Define muscle categories
-const muscleCategories = {
+export const muscleCategories = {
   back: {
     label: 'Back',
     muscles: ['lats', 'traps', 'rhomboids', 'lower_back'],
@@ -34,22 +35,22 @@ const muscleCategories = {
   },
 };
 
-  // Add this helper function
-  const findExerciseInLibrary = (
-    name: string
-  ): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
-    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
-      const exercise = exercises.find(
-        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
-      );
-      if (exercise)
-        return {
-          primaryMuscle: exercise.primaryMuscle,
-          secondaryMuscles: exercise.secondaryMuscles,
-        };
-    }
-    return undefined;
-  };
+// Fix indentation of findExerciseInLibrary function
+const findExerciseInLibrary = (
+  name: string
+): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
+  for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+    const exercise = exercises.find(
+      (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
+    );
+    if (exercise)
+      return {
+        primaryMuscle: exercise.primaryMuscle,
+        secondaryMuscles: exercise.secondaryMuscles,
+      };
+  }
+  return undefined;
+};
 
 // Define recommended sets
 const recommendedSets: Record<MuscleGroup, number> = {
@@ -92,10 +93,70 @@ const recommendedSets: Record<MuscleGroup, number> = {
 
 interface MuscleGroupAnalysisProps {
   gymSessions: any[];
+  onMuscleClick?: (muscle: MuscleGroup) => void;
+  selectedMuscle?: MuscleGroup | null;
 }
 
-export function MuscleGroupAnalysis({ gymSessions }: MuscleGroupAnalysisProps) {
+export function MuscleGroupAnalysis({ 
+  gymSessions, 
+  onMuscleClick,
+  selectedMuscle 
+}: MuscleGroupAnalysisProps) {
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['all']);
+
+  useEffect(() => {
+    if (onMuscleClick) {
+      // Add this effect to handle muscle clicks
+      const handleHashChange = () => {
+        const hash = window.location.hash.slice(1);
+        if (hash) {
+          handleMuscleClick(hash as MuscleGroup);
+        }
+      };
+
+      // Handle initial hash
+      handleHashChange();
+
+      // Listen for hash changes
+      window.addEventListener('hashchange', handleHashChange);
+      return () => window.removeEventListener('hashchange', handleHashChange);
+    }
+  }, []);
+
+  // Add this effect to respond to selectedMuscle changes
+  useEffect(() => {
+    if (selectedMuscle) {
+      // Find the category containing the selected muscle
+      const category = Object.entries(muscleCategories).find(([_, { muscles }]) =>
+        muscles.includes(selectedMuscle)
+      )?.[0];
+
+      if (category) {
+        // Expand only the selected category, collapse others
+        setExpandedCategories([category]);
+      }
+    }
+  }, [selectedMuscle]);
+
+  const handleMuscleClick = (muscle: MuscleGroup) => {
+    const category = Object.entries(muscleCategories).find(([_, { muscles }]) =>
+      muscles.includes(muscle)
+    )?.[0];
+
+    if (category) {
+      setExpandedCategories(prev => 
+        prev.includes(category) ? prev : [...prev, category]
+      );
+      
+      setTimeout(() => {
+        const element = document.getElementById(muscle);
+        element?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }, 100);
+    }
+  };
 
   const muscleGroupStats = useMemo(() => {
     const stats = new Map<MuscleGroup, { sets: number; volume: number }>();
@@ -161,8 +222,27 @@ export function MuscleGroupAnalysis({ gymSessions }: MuscleGroupAnalysisProps) {
     );
   };
 
+  // Add toggle all function
+  const toggleAll = () => {
+    setExpandedCategories((prev) =>
+      prev.length === Object.keys(muscleCategories).length
+        ? []
+        : Object.keys(muscleCategories)
+    );
+  };
+
   return (
-    <div className="space-y-4 mb-8">
+    <div className="space-y-4 mb-8 relative">
+      <Button
+        onClick={toggleAll}
+        variant="outline"
+        className="mb-2 w-full sm:w-auto text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+      >
+        {expandedCategories.length === Object.keys(muscleCategories).length
+          ? 'Hide All Categories'
+          : 'Show All Categories'}
+      </Button>
+
       {Object.entries(muscleCategories).map(([category, { label, muscles }]) => (
         <div
           key={category}

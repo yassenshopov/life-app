@@ -43,6 +43,7 @@ import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
 import { MuscleGroupAnalysis } from '@/components/MuscleGroupAnalysis';
 import { WorkoutCalendar } from '@/components/WorkoutCalendar';
 import { ExerciseAnalysis } from '@/components/ExerciseAnalysis';
+import { MuscleGroup } from '@/constants/muscle-groups';
 
 // Form Components
 import { ManualEntryForm } from '@/components/ManualEntryForm';
@@ -87,6 +88,9 @@ export default function Dashboard() {
   const [showAwakeTime, setShowAwakeTime] = useState(true);
   const [showGymForm, setShowGymForm] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
+  const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(
+    null
+  );
 
   const {
     entries,
@@ -178,6 +182,21 @@ export default function Dashboard() {
     if (dataLength <= 14) return 1;
     if (dataLength <= 31) return 2;
     return Math.floor(dataLength / 15);
+  };
+
+  const handleMuscleClick = (muscle: MuscleGroup) => {
+    setSelectedMuscle(muscle);
+    
+    // Add a small delay to ensure the category expands before scrolling
+    setTimeout(() => {
+      const element = document.getElementById(muscle);
+      if (element) {
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+    }, 100);
   };
 
   if (isLoading) {
@@ -326,17 +345,73 @@ export default function Dashboard() {
 
         {(activeSection === 'all' || activeSection === 'gym') && (
           <>
-            <SectionHeader
-              title="Muscle Group Analysis"
-              className={activeSection === 'all' ? 'mt-12' : ''}
-            />
-            <MuscleGroupAnalysis gymSessions={gymSessions} />
+            {activeSection === 'gym' && (
+              <FloatingToc
+                sections={[
+                  {
+                    id: 'muscle-group-analysis',
+                    title: 'Muscle Groups',
+                    icon: <BarChart2 className="w-4 h-4" />,
+                  },
+                  {
+                    id: 'exercise-analysis',
+                    title: 'Exercises',
+                    icon: <Dumbbell className="w-4 h-4" />,
+                  },
+                  {
+                    id: 'gym-planner',
+                    title: 'Calendar',
+                    icon: <Calendar className="w-4 h-4" />,
+                  },
+                ]}
+              />
+            )}
 
-            <SectionHeader
-              title="Exercise Analysis"
-              className={activeSection === 'all' ? 'mt-12' : ''}
-            />
-            <ExerciseAnalysis gymSessions={gymSessions} />
+            <div id="gym-planner">
+              <SectionHeader
+                title="Gym Planner"
+                className={activeSection === 'all' ? 'mt-12' : ''}
+              />
+              <div className="relative">
+                <div
+                  className={`transition-opacity duration-200 ${
+                    isLoading || isCalendarLoading
+                      ? 'opacity-50'
+                      : 'opacity-100'
+                  }`}
+                >
+                  <WorkoutCalendar
+                    onLoadingChange={setIsCalendarLoading}
+                    showGymForm={showGymForm}
+                    setShowGymForm={setShowGymForm}
+                    onMuscleClick={handleMuscleClick}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div id="muscle-group-analysis">
+              <SectionHeader
+                title="Muscle Group Analysis"
+                className={activeSection === 'all' ? 'mt-12' : ''}
+              />
+              <MuscleGroupAnalysis
+                gymSessions={gymSessions}
+                onMuscleClick={handleMuscleClick}
+                selectedMuscle={selectedMuscle}
+              />
+            </div>
+
+            <div id="exercise-analysis">
+              <SectionHeader
+                title="Exercise Analysis"
+                className={activeSection === 'all' ? 'mt-12' : ''}
+              />
+              <ExerciseAnalysis 
+                gymSessions={gymSessions} 
+                onMuscleClick={handleMuscleClick}
+              />
+            </div>
           </>
         )}
 
@@ -348,25 +423,6 @@ export default function Dashboard() {
             setIsLoadingCharts={() => {}}
             setEntries={setEntries}
           />
-        )}
-
-        {activeSection === 'gym' && (
-          <>
-            <SectionHeader title="Gym Planner" />
-            <div className="relative">
-              <div
-                className={`transition-opacity duration-200 ${
-                  isLoading || isCalendarLoading ? 'opacity-50' : 'opacity-100'
-                }`}
-              >
-                <WorkoutCalendar
-                  onLoadingChange={setIsCalendarLoading}
-                  showGymForm={showGymForm}
-                  setShowGymForm={setShowGymForm}
-                />
-              </div>
-            </div>
-          </>
         )}
       </main>
     </div>

@@ -8,6 +8,8 @@ export type Exercise = {
 
 export type GymSessionType = 'legs' | 'back_and_chest' | 'shoulders_and_arms' | 'cardio' | 'full_body';
 
+export const GYM_SESSION_TYPES: GymSessionType[] = ['legs', 'back_and_chest', 'shoulders_and_arms', 'cardio', 'full_body'];
+
 type ExerciseLibrary = {
   [K in GymSessionType]: readonly Exercise[];
 };

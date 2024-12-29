@@ -9,23 +9,28 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { calculateExerciseStats } from '@/lib/utils';
+import { MuscleGroup } from '@/constants/muscle-groups';
+import { GymSessionType, GYM_SESSION_TYPES } from '@/constants/exercises';
 
 interface ExerciseAnalysisProps {
   gymSessions: any[];
+  onMuscleClick?: (muscle: MuscleGroup) => void;
 }
 
-export const ExerciseAnalysis = ({ gymSessions }: ExerciseAnalysisProps) => {
+export const ExerciseAnalysis = ({ gymSessions, onMuscleClick }: ExerciseAnalysisProps) => {
   const exerciseStats = calculateExerciseStats(gymSessions);
-  const [selectedCategory, setSelectedCategory] = useState<string>('legs');
+  const defaultCategory = gymSessions.length > 0 
+    ? (gymSessions[0].type as GymSessionType) 
+    : 'all';
+  const [selectedCategory, setSelectedCategory] = useState<string>(defaultCategory);
 
   const handleMuscleClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
     muscle: string
   ) => {
     e.preventDefault();
-    const element = document.getElementById(muscle);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (onMuscleClick) {
+      onMuscleClick(muscle as MuscleGroup);
     }
   };
 
@@ -45,21 +50,16 @@ export const ExerciseAnalysis = ({ gymSessions }: ExerciseAnalysisProps) => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Exercises</SelectItem>
-            <SelectItem value="legs" className="flex items-center gap-2">
-              <span>Legs</span>
-            </SelectItem>
-            <SelectItem value="back_and_chest" className="flex items-center gap-2">
-              <span>Back & Chest</span>
-            </SelectItem>
-            <SelectItem value="shoulders_and_arms" className="flex items-center gap-2">
-              <span>Shoulders & Arms</span>
-            </SelectItem>
-            <SelectItem value="cardio" className="flex items-center gap-2">
-              <span>Cardio</span>
-            </SelectItem>
-            <SelectItem value="full_body" className="flex items-center gap-2">
-              <span>Full Body</span>
-            </SelectItem>
+            {GYM_SESSION_TYPES.map((type) => (
+              <SelectItem key={type} value={type} className="flex items-center gap-2">
+                <span>
+                  {type
+                    .split('_')
+                    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ')}
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -72,7 +72,9 @@ export const ExerciseAnalysis = ({ gymSessions }: ExerciseAnalysisProps) => {
         {filteredStats.map((stat) => (
           <div
             key={stat.name}
-            className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
+            className={`bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow ${
+              !stat.lastPerformed ? 'opacity-60' : ''
+            }`}
           >
             <div className="flex items-start justify-between mb-4">
               <h4 className="text-lg font-medium text-slate-900 dark:text-slate-100">

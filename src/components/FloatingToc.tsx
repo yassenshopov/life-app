@@ -23,7 +23,7 @@ export const FloatingToc = ({ sections }: FloatingTocProps) => {
         });
       },
       {
-        rootMargin: '-20% 0px -80% 0px', // Adjust these values to change when sections become "active"
+        rootMargin: '-20% 0px -80% 0px',
       }
     );
 
