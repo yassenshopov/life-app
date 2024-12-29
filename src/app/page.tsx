@@ -73,6 +73,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { WeightChart, WeightAnalytics } from '@/components/WeightCharts';
 import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
 import { SleepAnalysisCard } from '@/components/SleepAnalysis';
+import { SleepPatternChart } from '@/components/SleepPatternChart';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -1111,8 +1112,7 @@ const WorkoutCalendar = ({
   );
 };
 
-export default function HealthDashboard() {
-  const [date, setDate] = useState<Date | undefined>(new Date());
+export default function Dashboard() {
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoadingCharts, setIsLoadingCharts] = useState(false);
@@ -1144,11 +1144,6 @@ export default function HealthDashboard() {
   // Add this state variable with other useState declarations
   const [showAwakeTime, setShowAwakeTime] = useState(true);
 
-  // Add this inside your Home component, with other state declarations
-  const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>(
-    {}
-  );
-
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
 
   // Add to your existing state declarations
@@ -1158,11 +1153,6 @@ export default function HealthDashboard() {
   const [gymSessions, setGymSessions] = useState<any[]>([]);
 
   const [showGymForm, setShowGymForm] = useState(false);
-
-  // Add state to track collapsed exercises
-  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(
-    new Set()
-  );
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -1783,132 +1773,6 @@ export default function HealthDashboard() {
           new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()
       );
   };
-
-  const SleepPatternChart = ({ data }: { data: any[] }) => {
-    const tickInterval = getTickInterval(data.length);
-
-    return (
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart
-          data={data}
-          margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="date"
-            scale="point"
-            padding={{ left: 20, right: 20 }}
-            tick={{ dy: 10, fontSize: 12 }}
-            interval={tickInterval}
-            angle={-45}
-            textAnchor="end"
-            height={60}
-          />
-          <YAxis
-            domain={[16, 0]}
-            ticks={[0, 2, 4, 6, 8, 10, 12, 14, 16]}
-            tickFormatter={(value) => {
-              const hour = (value - 4) % 24;
-              return hour.toString().padStart(2, '0') + ':00';
-            }}
-            label={{
-              value: 'Time of Day (24H)',
-              angle: -90,
-              position: 'insideLeft',
-            }}
-            reversed={true}
-          />
-          <Tooltip
-            content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const data = payload[0].payload;
-                const formatTime = (decimal: number) => {
-                  const hour = Math.floor((decimal + 18) % 24);
-                  const minute = Math.floor((decimal % 1) * 60);
-                  const period = hour >= 12 ? 'PM' : 'AM';
-                  const displayHour = hour % 12 || 12;
-                  return `${displayHour}:${minute
-                    .toString()
-                    .padStart(2, '0')} ${period}`;
-                };
-
-                const formatPercentage = (value: number) => {
-                  const formatted = value.toFixed(1);
-                  return formatted.endsWith('.0')
-                    ? Math.floor(value) + '%'
-                    : formatted + '%';
-                };
-
-                // Find the original entry data for additional stats
-                const entry = entries.find((e) => e.date === data.fullDate);
-
-                return (
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                    <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">
-                      {data.date}
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Sleep: {formatTime(data.sleepStart)}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Wake: {formatTime(data.sleepEnd)}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Duration: {data.duration.toFixed(1)}h
-                      </p>
-                      {entry && (
-                        <>
-                          <div className="my-2 border-t border-slate-200 dark:border-slate-700"></div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Deep Sleep:{' '}
-                            {formatPercentage(entry.deepSleepPercentage)}
-                          </p>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            REM Sleep:{' '}
-                            {formatPercentage(entry.remSleepPercentage)}
-                          </p>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Awake Time: {entry.awakeTimeMinutes}m
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-          <Line
-            type="step"
-            dataKey="sleepStart"
-            stroke="transparent"
-            dot={false}
-            activeDot={false}
-          />
-          {data.map((entry, index) => {
-            const xPercent = 9 + index * 3.005;
-            return (
-              <line
-                key={index}
-                x1={`${xPercent}%`}
-                x2={`${xPercent}%`}
-                y1={entry.sleepStart * (400 / 24)}
-                y2={entry.sleepEnd * (400 / 24)}
-                strokeWidth="16"
-                stroke="#a855f7"
-                strokeOpacity={0.9}
-                strokeLinecap="round"
-                className="transition-opacity hover:opacity-100"
-              />
-            );
-          })}
-        </LineChart>
-      </ResponsiveContainer>
-    );
-  };
-
   const handleDateRangeFilter = (days: number | string) => {
     const to = new Date();
     const from = new Date();
@@ -1923,7 +1787,7 @@ export default function HealthDashboard() {
 
     setDateRange({ from, to });
   };
-
+  
   const calculateStats = (entries: DayEntry[]) => {
     if (entries.length === 0) return null;
 
