@@ -20,6 +20,14 @@ export const SleepPatternChart = ({ data }: SleepPatternChartProps) => {
 
   const tickInterval = getTickInterval(data.length);
 
+  const formatTime = (decimal: number) => {
+    const adjustedHour = Math.floor((decimal + 18) % 24);
+    const minute = Math.floor((decimal % 1) * 60);
+    const period = adjustedHour >= 12 ? 'PM' : 'AM';
+    const displayHour = adjustedHour % 12 || 12;
+    return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+  };
+
   return (
     <ResponsiveContainer width="100%" height={400}>
       <LineChart
@@ -41,11 +49,11 @@ export const SleepPatternChart = ({ data }: SleepPatternChartProps) => {
           domain={[16, 0]}
           ticks={[0, 2, 4, 6, 8, 10, 12, 14, 16]}
           tickFormatter={(value) => {
-            const hour = (value - 4) % 24;
+            const hour = (value + 14) % 24;
             return hour.toString().padStart(2, '0') + ':00';
           }}
           label={{
-            value: 'Time of Day (24H)',
+            value: 'Time of Day',
             angle: -90,
             position: 'insideLeft',
           }}
@@ -53,16 +61,9 @@ export const SleepPatternChart = ({ data }: SleepPatternChartProps) => {
         />
         <Tooltip
           content={({ active, payload }) => {
-            if (active && payload && payload.length) {
+            if (active && payload?.[0]?.payload) {
               const data = payload[0].payload;
-              const formatTime = (decimal: number) => {
-                const hour = Math.floor((decimal + 18) % 24);
-                const minute = Math.floor((decimal % 1) * 60);
-                const period = hour >= 12 ? 'PM' : 'AM';
-                const displayHour = hour % 12 || 12;
-                return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
-              };
-
+              
               return (
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                   <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">
@@ -85,22 +86,19 @@ export const SleepPatternChart = ({ data }: SleepPatternChartProps) => {
             return null;
           }}
         />
-        <Line
-          type="step"
-          dataKey="sleepStart"
-          stroke="transparent"
-          dot={false}
-          activeDot={false}
-        />
+
         {data.map((entry, index) => {
-          const xPercent = 9 + index * 3.005;
+          const xPercent = (index * (82 / (data.length - 1))) + 9;
+          const yStart = (entry.sleepStart * (400 / 16));
+          const yEnd = (entry.sleepEnd * (400 / 16));
+          
           return (
             <line
               key={index}
               x1={`${xPercent}%`}
               x2={`${xPercent}%`}
-              y1={entry.sleepStart * (400 / 24)}
-              y2={entry.sleepEnd * (400 / 24)}
+              y1={yStart}
+              y2={yEnd}
               strokeWidth="16"
               stroke="#a855f7"
               strokeOpacity={0.9}

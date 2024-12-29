@@ -91,26 +91,15 @@ export default function Dashboard() {
         const [sleepHour, sleepMin] = entry.sleepTime.split(':').map(Number);
         const [wakeHour, wakeMin] = entry.wakeTime.split(':').map(Number);
 
-        let sleepDecimal = sleepHour + sleepMin / 60;
-        if (sleepDecimal >= 18) {
-          sleepDecimal = sleepDecimal - 18;
-        } else {
-          sleepDecimal = sleepDecimal + 6;
-        }
-
-        let wakeDecimal = wakeHour + wakeMin / 60;
-        if (wakeDecimal >= 18) {
-          wakeDecimal = wakeDecimal - 18;
-        } else {
-          wakeDecimal = wakeDecimal + 6;
-        }
+        const sleepDecimal = sleepHour + sleepMin / 60;
+        const wakeDecimal = wakeHour + wakeMin / 60;
 
         return {
           date: new Date(entry.date).toLocaleDateString(),
           fullDate: entry.date,
           sleepStart: sleepDecimal,
           sleepEnd: wakeDecimal,
-          duration: (wakeDecimal - sleepDecimal + 24) % 24,
+          duration: ((wakeDecimal - sleepDecimal + 24) % 24),
         };
       })
       .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime());
@@ -208,7 +197,7 @@ export default function Dashboard() {
                 Sleep Pattern
               </h3>
               <div className={`transition-opacity duration-200 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
-                <SleepPatternChart data={prepareSleepPatternData} />
+                <SleepPatternChart data={entries.length > 0 ? prepareSleepPatternData : []} />
               </div>
             </div>
 
