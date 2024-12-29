@@ -7,20 +7,47 @@ import {
   CheckSquare,
   DumbbellIcon,
   DollarSign,
+  User,
+  MoreVertical,
+  LogOut,
 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { DisplaySection } from '@/types/display-section';
 
 interface NavigationTabsProps {
   activeSection: DisplaySection;
   setActiveSection: (section: DisplaySection) => void;
   entries: any[];
+  user?: any;
 }
 
 export const NavigationTabs = ({
   activeSection,
   setActiveSection,
   entries,
+  user,
 }: NavigationTabsProps) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setShowDropdown(false);
+  };
+
   const tabs = [
     { name: 'All', icon: <Menu className="w-4 h-4" /> },
     { name: 'Sleep', icon: <Moon className="w-4 h-4" /> },
@@ -76,7 +103,7 @@ export const NavigationTabs = ({
 
   return (
     <div className="border-b border-slate-200 dark:border-slate-800">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
         <nav className="flex space-x-4">
           {tabs.map((tab) => (
             <button
@@ -100,6 +127,47 @@ export const NavigationTabs = ({
             </button>
           ))}
         </nav>
+        
+        {user && (
+          <div className="flex items-center gap-2 py-4 text-sm text-slate-600 dark:text-slate-400">
+            {user.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt="Profile"
+                className="w-6 h-6 rounded-full cursor-pointer"
+                onClick={() => setShowDropdown(!showDropdown)}
+              />
+            ) : (
+              <div 
+                className="w-6 h-6 rounded-full font-bold bg-purple-600 dark:bg-purple-500 flex items-center justify-center text-white cursor-pointer"
+                onClick={() => setShowDropdown(!showDropdown)}
+              >
+                {user.email[0].toUpperCase()}
+              </div>
+            )}
+            <span className="hidden sm:inline">{user.email}</span>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              
+              {showDropdown && (
+                <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 z-50">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

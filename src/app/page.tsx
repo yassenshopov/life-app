@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Inter, Outfit } from 'next/font/google';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+import { User } from '@supabase/supabase-js';
 
 // Icons
 import {
@@ -199,6 +202,45 @@ export default function Dashboard() {
     }, 100);
   };
 
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        router.push('/login');
+        return;
+      }
+      
+      setUser(session.user);
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          router.push('/login');
+        } else if (session) {
+          setUser(session.user);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950">
+        <LoadingSpinner size="lg" label="Authenticating..." />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950">
@@ -216,6 +258,7 @@ export default function Dashboard() {
           activeSection={activeSection}
           setActiveSection={setActiveSection}
           entries={entries}
+          user={user}
         />
         <DateRangeFilter
           dateRange={dateRange}
