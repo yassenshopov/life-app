@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Inter, Outfit } from 'next/font/google';
+
+// Icons
 import {
   Moon,
   Heart,
@@ -10,45 +12,92 @@ import {
   Dumbbell,
   Calendar,
 } from 'lucide-react';
+
+// Hooks
+import { useHealthData } from '@/hooks/useHealthData';
+import { useGymData } from '@/hooks/useGymData';
+
+// Types
+import { DisplaySection } from '@/types/display-section';
+
+// Layout Components
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { NavigationTabs } from '@/components/NavigationTabs';
 import { SectionHeader } from '@/components/SectionHeader';
-import { DisplaySection } from '@/types/display-section';
 import { FloatingToc } from '@/components/FloatingToc';
-import { RHRChart, RHRAnalytics } from '@/components/RHRCharts';
-import { WeightChart, WeightAnalytics } from '@/components/WeightCharts';
-import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
+
+// Sleep-related Components
 import { SleepAnalysisCard } from '@/components/SleepAnalysis';
 import { SleepPatternChart } from '@/components/SleepPatternChart';
-import { MuscleGroupAnalysis } from '@/components/MuscleGroupAnalysis';
-import { WorkoutCalendar } from '@/components/WorkoutCalendar';
-import { ExerciseAnalysis } from '@/components/ExerciseAnalysis';
-import { Checklist } from '@/components/Checklist';
 import { SleepCompositionChart } from '@/components/SleepCompositionChart';
 import { SleepStats } from '@/components/SleepStats';
 import { SleepDurationChart } from '@/components/SleepDurationChart';
+
+// Health Metric Components
+import { RHRChart, RHRAnalytics } from '@/components/RHRCharts';
+import { WeightChart, WeightAnalytics } from '@/components/WeightCharts';
+import { StepsChart, StepsAnalytics } from '@/components/StepsCharts';
+
+// Workout-related Components
+import { MuscleGroupAnalysis } from '@/components/MuscleGroupAnalysis';
+import { WorkoutCalendar } from '@/components/WorkoutCalendar';
+import { ExerciseAnalysis } from '@/components/ExerciseAnalysis';
+
+// Form Components
 import { ManualEntryForm } from '@/components/ManualEntryForm';
-import { useHealthData } from '@/hooks/useHealthData';
-import { useGymData } from '@/hooks/useGymData';
+import { Checklist } from '@/components/Checklist';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
 
 export default function Dashboard() {
+  const sections = [
+    {
+      id: 'sleep-analysis',
+      title: 'Sleep Analysis',
+      icon: <Moon className="w-4 h-4" />,
+    },
+    {
+      id: 'heart-rate',
+      title: 'Heart Rate',
+      icon: <Heart className="w-4 h-4" />,
+    },
+    { id: 'steps', title: 'Steps', icon: <Footprints className="w-4 h-4" /> },
+    { id: 'weight', title: 'Weight', icon: <BarChart2 className="w-4 h-4" /> },
+    {
+      id: 'workouts',
+      title: 'Workouts',
+      icon: <Dumbbell className="w-4 h-4" />,
+    },
+    {
+      id: 'calendar',
+      title: 'Calendar',
+      icon: <Calendar className="w-4 h-4" />,
+    },
+  ];
+
   const [dateRange, setDateRange] = useState(() => ({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    to: new Date()
+    to: new Date(),
   }));
-  
+
   const [activeTab, setActiveTab] = useState<string | null>('30D');
   const [activeSection, setActiveSection] = useState<DisplaySection>('all');
   const [showAwakeTime, setShowAwakeTime] = useState(true);
   const [showGymForm, setShowGymForm] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
 
-  const { entries, setEntries, loading: healthLoading } = useHealthData(dateRange);
-  const { exerciseData, gymSessions, loading: gymLoading } = useGymData(dateRange);
+  const {
+    entries,
+    setEntries,
+    loading: healthLoading,
+  } = useHealthData(dateRange);
+  const {
+    exerciseData,
+    gymSessions,
+    loading: gymLoading,
+  } = useGymData(dateRange);
 
   const isLoading = healthLoading || gymLoading;
 
@@ -67,10 +116,13 @@ export default function Dashboard() {
           })
           .replace(/(\d+)/, (match) => {
             const day = parseInt(match);
-            const suffix = ['th', 'st', 'nd', 'rd'][day % 10 > 3 ? 0 : day % 10] || 'th';
+            const suffix =
+              ['th', 'st', 'nd', 'rd'][day % 10 > 3 ? 0 : day % 10] || 'th';
             return `${day}${suffix}`;
           }),
-        totalSleep: Number((entry.totalSleepHours + entry.totalSleepMinutes / 60).toFixed(2)),
+        totalSleep: Number(
+          (entry.totalSleepHours + entry.totalSleepMinutes / 60).toFixed(2)
+        ),
         deepSleep: entry.deepSleepPercentage,
         remSleep: entry.remSleepPercentage,
         awakeTime: entry.awakeTimeMinutes,
@@ -99,10 +151,13 @@ export default function Dashboard() {
           fullDate: entry.date,
           sleepStart: sleepDecimal,
           sleepEnd: wakeDecimal,
-          duration: ((wakeDecimal - sleepDecimal + 24) % 24),
+          duration: (wakeDecimal - sleepDecimal + 24) % 24,
         };
       })
-      .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime());
+      .sort(
+        (a, b) =>
+          new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()
+      );
   }, [entries, dateRange]);
 
   const handleDateRangeFilter = (days: number | string) => {
@@ -117,15 +172,6 @@ export default function Dashboard() {
 
     setDateRange({ from, to });
   };
-
-  const sections = [
-    { id: 'sleep-analysis', title: 'Sleep Analysis', icon: <Moon className="w-4 h-4" /> },
-    { id: 'heart-rate', title: 'Heart Rate', icon: <Heart className="w-4 h-4" /> },
-    { id: 'steps', title: 'Steps', icon: <Footprints className="w-4 h-4" /> },
-    { id: 'weight', title: 'Weight', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'workouts', title: 'Workouts', icon: <Dumbbell className="w-4 h-4" /> },
-    { id: 'calendar', title: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
-  ];
 
   const getTickInterval = (dataLength: number) => {
     if (dataLength <= 7) return 0;
@@ -143,7 +189,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 ${inter.className}`}>
+    <div
+      className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 ${inter.className}`}
+    >
       <div className="fixed top-0 right-0 left-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
         <NavigationTabs
           activeSection={activeSection}
@@ -170,19 +218,22 @@ export default function Dashboard() {
               dateRange={dateRange}
               setEntries={setEntries}
             />
-            {entries.length > 0 && (() => {
-              const todayEntry = entries.find(
-                (e) => e.date === new Date().toISOString().split('T')[0]
-              );
-              const hasMeaningfulSleepData = todayEntry &&
-                (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+            {entries.length > 0 &&
+              (() => {
+                const todayEntry = entries.find(
+                  (e) => e.date === new Date().toISOString().split('T')[0]
+                );
+                const hasMeaningfulSleepData =
+                  todayEntry &&
+                  (todayEntry.totalSleepHours > 0 ||
+                    todayEntry.totalSleepMinutes > 0);
 
-              return hasMeaningfulSleepData ? (
-                <div className="mb-8">
-                  <SleepAnalysisCard entry={todayEntry} entries={entries} />
-                </div>
-              ) : null;
-            })()}
+                return hasMeaningfulSleepData ? (
+                  <div className="mb-8">
+                    <SleepAnalysisCard entry={todayEntry} entries={entries} />
+                  </div>
+                ) : null;
+              })()}
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
               <SleepDurationChart
@@ -193,11 +244,19 @@ export default function Dashboard() {
             </div>
 
             <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-              <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+              <h3
+                className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+              >
                 Sleep Pattern
               </h3>
-              <div className={`transition-opacity duration-200 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
-                <SleepPatternChart data={entries.length > 0 ? prepareSleepPatternData : []} />
+              <div
+                className={`transition-opacity duration-200 ${
+                  isLoading ? 'opacity-50' : 'opacity-100'
+                }`}
+              >
+                <SleepPatternChart
+                  data={entries.length > 0 ? prepareSleepPatternData : []}
+                />
               </div>
             </div>
 
@@ -295,9 +354,11 @@ export default function Dashboard() {
           <>
             <SectionHeader title="Gym Planner" />
             <div className="relative">
-              <div className={`transition-opacity duration-200 ${
-                isLoading || isCalendarLoading ? 'opacity-50' : 'opacity-100'
-              }`}>
+              <div
+                className={`transition-opacity duration-200 ${
+                  isLoading || isCalendarLoading ? 'opacity-50' : 'opacity-100'
+                }`}
+              >
                 <WorkoutCalendar
                   onLoadingChange={setIsCalendarLoading}
                   showGymForm={showGymForm}
