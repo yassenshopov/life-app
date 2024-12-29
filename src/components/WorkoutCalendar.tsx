@@ -92,11 +92,15 @@ export const WorkoutCalendar = ({
       0
     );
 
-    fetch(
-      `/api/notion/running?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
-    )
-      .then((res) => res.json())
-      .then((runs) => {
+    // Update to handle both fetches with Promise.all
+    Promise.all([
+      fetch(`/api/notion/running?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`),
+      fetch(`/api/supabase/exercises?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`)
+    ])
+      .then(async ([runsResponse, gymResponse]) => {
+        const runs = await runsResponse.json();
+        const gymData = await gymResponse.json();
+
         const formattedRuns = runs.map((run: any) => ({
           id: run.id,
           date: new Date(run.date + 'T00:00:00').toISOString().split('T')[0],
@@ -107,24 +111,17 @@ export const WorkoutCalendar = ({
           pace: run.pace,
           notes: run.notes,
         }));
-        setWorkouts(formattedRuns);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error fetching runs:', error);
-        setIsLoading(false);
-      });
 
-    fetch(
-      `/api/supabase/exercises?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
-    )
-      .then((res) => res.json())
-      .then((gymData) => {
-        console.log('Gym sessions:', gymData);
+        console.log('Fetched runs:', formattedRuns);
+        console.log('Fetched gym sessions:', gymData);
+
+        setWorkouts(formattedRuns);
         setGymSessions(gymData);
+        setIsLoading(false);
       })
       .catch((error) => {
-        console.error('Error fetching gym sessions:', error);
+        console.error('Error fetching data:', error);
+        setIsLoading(false);
       });
   }, [currentDate]);
 
@@ -554,20 +551,49 @@ export const WorkoutCalendar = ({
           ) ? (
             <div className="space-y-6">
               {/* Today's Activities List */}
-              {[...workouts, ...gymSessions]
-                .filter(
-                  (activity) =>
-                    new Date(activity.date).toDateString() ===
-                    new Date().toDateString()
-                )
+              {[
+                ...workouts.map(w => {
+                  console.log('Processing workout:', w);
+                  return { ...w, activityType: 'run' };
+                }),
+                ...gymSessions.map(g => ({ ...g, activityType: 'gym' }))
+              ]
+                .filter((activity) => {
+                  // Create date and add one day only for runs
+                  const activityDate = new Date(activity.date + 'T00:00:00');
+                  if (activity.activityType === 'run') {
+                    activityDate.setDate(activityDate.getDate() + 1);
+                  }
+                  
+                  // Compare using local date strings
+                  const activityDateString = activityDate.toLocaleDateString();
+                  const today = new Date().toLocaleDateString();
+                  
+                  console.log('Comparing dates:', { 
+                    activity: activity.activityType,
+                    activityDate: activityDateString, 
+                    today, 
+                    matches: activityDateString === today 
+                  });
+                  return activityDateString === today;
+                })
                 .map((activity, index) => {
-                  const isGymSession =
-                    'type' in activity && activity.type !== 'run';
+                  const isGymSession = activity.activityType === 'gym';
+                  const isRun = activity.activityType === 'run';
+                  
+                  console.log('Activity:', {
+                    activity,
+                    isGymSession,
+                    isRun,
+                    date: new Date(activity.date).toDateString(),
+                    today: new Date().toDateString()
+                  });
+
                   const previousSession = isGymSession
                     ? gymSessions
                         .filter(
                           (s) =>
-                            s.type === activity.type &&
+                            // s.type === activity.type &&
                             new Date(s.date) < new Date(activity.date)
                         )
                         .sort(
@@ -576,6 +602,26 @@ export const WorkoutCalendar = ({
                             new Date(a.date).getTime()
                         )[0]
                     : null;
+
+                  // Find previous run for comparison
+
+                  console.log('isRun:', isRun);
+                  console.log('workouts:', workouts);
+                  console.log('activity:', activity);
+                  const previousRun = isRun
+                    ? workouts
+                        .filter(
+                          (w) => 
+                            // w.type === 'run' && 
+                            new Date(w.date) < new Date(activity.date)
+                        )
+                        .sort(
+                          (a, b) =>
+                            new Date(b.date).getTime() - new Date(a.date).getTime()
+                        )[0]
+                    : null;
+
+                  console.log('previousRun:', previousRun);
 
                   return (
                     <div
@@ -589,82 +635,61 @@ export const WorkoutCalendar = ({
                           }`}
                         />
                         <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {isGymSession
-                            ? formatGymType(activity.type)
-                            : activity.title}
+                          {isGymSession ? formatGymType(activity.type) : activity.title}
                         </span>
                       </div>
 
-                      {isGymSession ? (
+                      {isRun ? (
                         <div className="space-y-3 pl-4">
-                          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-2">
-                            <div>
-                              {Object.keys(activity.exercise_log).length} exercises · {
-                                String((Object.values(activity.exercise_log) as { sets: any[] }[]).reduce((acc: number, curr: { sets: any[] }) => 
-                                  acc + curr.sets.length, 0
-                                ))} total sets
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="space-y-1">
+                              <div className="text-slate-500 dark:text-slate-400">Distance:</div>
+                              <div className="font-medium text-slate-700 dark:text-slate-200">
+                                {activity.distance} km
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              {Array.from(new Set(
-                                Object.keys(activity.exercise_log)
-                                  .map(name => {
-                                    const exercise = findExerciseInLibrary(name);
-                                    return exercise?.primaryMuscle;
-                                  })
-                                  .filter(Boolean)
-                              )).map((muscle, index) => (
-                                <Link 
-                                  key={index}
-                                  href={`#${muscle}`}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    const element = document.getElementById(muscle as string);
-                                    element?.scrollIntoView({ behavior: 'smooth' });
-                                    if (onMuscleClick) {
-                                      onMuscleClick(muscle as MuscleGroup);
-                                    }
-                                  }}
-                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
-                                >
-                                  {muscle?.split('_')
-                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                    .join(' ')}
-                                </Link>
-                              ))}
+                            <div className="space-y-1">
+                              <div className="text-slate-500 dark:text-slate-400">Duration:</div>
+                              <div className="font-medium text-slate-700 dark:text-slate-200">
+                                {activity.duration} min
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-slate-500 dark:text-slate-400">Pace:</div>
+                              <div className="font-medium text-slate-700 dark:text-slate-200">
+                                {activity.pace} min/km
+                              </div>
                             </div>
                           </div>
 
-                          {previousSession && (
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-md p-3">
-                              <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">
-                                Compared to last {formatGymType(activity.type)}{' '}
-                                (
-                                {new Date(
-                                  previousSession.date
-                                ).toLocaleDateString()}
-                                ):
+                          {previousRun && (
+                            <div className="mt-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                              <div className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
+                                Compared to last run ({Math.floor((new Date().getTime() - new Date(previousRun.date).getTime()) / (1000 * 60 * 60 * 24))} days ago):
                               </div>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                  <span className="text-slate-500 dark:text-slate-400">
-                                    Total Volume:{' '}
-                                  </span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-200">
-                                    {calculateVolumeChange(
-                                      activity,
-                                      previousSession
-                                    )}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="text-sm">
+                                  <span className="text-slate-500 dark:text-slate-400">Distance: </span>
+                                  <span className={`font-medium ${
+                                    previousRun?.distance && ((activity.distance - previousRun.distance) / previousRun.distance * 100) >= 0 
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {previousRun?.distance 
+                                      ? ((activity.distance - previousRun.distance) / previousRun.distance * 100).toFixed(1) + '%'
+                                      : 'N/A'}
                                   </span>
                                 </div>
-                                <div>
-                                  <span className="text-slate-500 dark:text-slate-400">
-                                    Exercise Count:{' '}
-                                  </span>
-                                  <span className="font-medium text-slate-700 dark:text-slate-200">
-                                    {compareExerciseCount(
-                                      activity,
-                                      previousSession
-                                    )}
+                                <div className="text-sm">
+                                  <span className="text-slate-500 dark:text-slate-400">Pace: </span>
+                                  <span className={`font-medium ${
+                                    previousRun?.pace && ((Number(previousRun.pace) - Number(activity.pace)) / Number(previousRun.pace) * 100) >= 0 
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {previousRun?.pace && activity.pace
+                                      ? ((Number(previousRun.pace) - Number(activity.pace)) / Number(previousRun.pace) * 100).toFixed(1) + '%'
+                                      : 'N/A'}
                                   </span>
                                 </div>
                               </div>
@@ -672,25 +697,73 @@ export const WorkoutCalendar = ({
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-2 pl-4">
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-slate-500 dark:text-slate-400">
-                                Distance:{' '}
-                              </span>
-                              <span className="font-medium text-slate-700 dark:text-slate-200">
-                                {activity.distance} km
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-slate-500 dark:text-slate-400">
-                                Pace:{' '}
-                              </span>
-                              <span className="font-medium text-slate-700 dark:text-slate-200">
-                                {activity.pace} min/km
-                              </span>
-                            </div>
+                        <div className="space-y-3 pl-4">
+                          <div className="text-sm text-slate-600 dark:text-slate-400">
+                            {Object.keys(activity.exercise_log).length} exercises · {
+                              String((Object.values(activity.exercise_log) as { sets: any[] }[]).reduce((acc: number, curr: { sets: any[] }) => 
+                                acc + curr.sets.length, 0
+                              ))} total sets
                           </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.from(new Set(
+                              Object.keys(activity.exercise_log)
+                                .map(name => {
+                                  const exercise = findExerciseInLibrary(name);
+                                  return exercise?.primaryMuscle;
+                                })
+                                .filter(Boolean)
+                            )).map((muscle, index) => (
+                              <Link 
+                                key={index}
+                                href={`#${muscle}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  const element = document.getElementById(muscle as string);
+                                  element?.scrollIntoView({ behavior: 'smooth' });
+                                  if (onMuscleClick) {
+                                    onMuscleClick(muscle as MuscleGroup);
+                                  }
+                                }}
+                                className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                              >
+                                {muscle?.split('_')
+                                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                  .join(' ')}
+                              </Link>
+                            ))}
+                          </div>
+
+                          {previousSession && (
+                            <div className="mt-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                              <div className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
+                                Compared to last {formatGymType(activity.type)} workout ({Math.floor((new Date().getTime() - new Date(previousSession.date).getTime()) / (1000 * 60 * 60 * 24))} days ago):
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="text-sm">
+                                  <span className="text-slate-500 dark:text-slate-400">Total Volume: </span>
+                                  <span className={`font-medium ${
+                                    calculateVolumeChange(activity, previousSession).startsWith('+')
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {calculateVolumeChange(activity, previousSession)}
+                                  </span>
+                                </div>
+                                <div className="text-sm">
+                                  <span className="text-slate-500 dark:text-slate-400">Exercise Count: </span>
+                                  <span className={`font-medium ${
+                                    compareExerciseCount(activity, previousSession).startsWith('+')
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : compareExerciseCount(activity, previousSession) === 'Same'
+                                      ? 'text-slate-600 dark:text-slate-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {compareExerciseCount(activity, previousSession)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

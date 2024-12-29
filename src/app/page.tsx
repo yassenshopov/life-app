@@ -395,6 +395,11 @@ export default function Dashboard() {
               <FloatingToc
                 sections={[
                   {
+                    id: 'gym-planner',
+                    title: 'Calendar',
+                    icon: <Calendar className="w-4 h-4" />,
+                  },
+                  {
                     id: 'muscle-group-analysis',
                     title: 'Muscle Groups',
                     icon: <BarChart2 className="w-4 h-4" />,
@@ -403,11 +408,6 @@ export default function Dashboard() {
                     id: 'exercise-analysis',
                     title: 'Exercises',
                     icon: <Dumbbell className="w-4 h-4" />,
-                  },
-                  {
-                    id: 'gym-planner',
-                    title: 'Calendar',
-                    icon: <Calendar className="w-4 h-4" />,
                   },
                 ]}
               />
