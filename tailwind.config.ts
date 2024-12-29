@@ -59,6 +59,25 @@ const config: Config = {
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
   			}
+  		},
+  		animation: {
+  			blob: "blob 10s infinite",
+  		},
+  		keyframes: {
+  			blob: {
+  				"0%": {
+  					transform: "translate(0px, 0px) scale(1)",
+  				},
+  				"33%": {
+  					transform: "translate(100px, -100px) scale(1.2)",
+  				},
+  				"66%": {
+  					transform: "translate(-50px, 50px) scale(0.8)",
+  				},
+  				"100%": {
+  					transform: "translate(0px, 0px) scale(1)",
+  				},
+  			},
   		}
   	}
   },
