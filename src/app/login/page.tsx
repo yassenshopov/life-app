@@ -30,7 +30,7 @@ export default function Login() {
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           providers={['github']}
-          redirectTo={`${window.location.origin}/auth/callback`}
+          redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`}
         />
       </div>
     </div>
