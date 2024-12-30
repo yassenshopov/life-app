@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(
     null
   );
+  const [autoOpenManualEntry, setAutoOpenManualEntry] = useState(true);
 
   const {
     entries,
@@ -236,6 +237,20 @@ export default function Dashboard() {
     return () => subscription.unsubscribe();
   }, [supabase, router]);
 
+  useEffect(() => {
+    if (!entries.length) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const todayEntry = entries.find(entry => entry.date === today);
+    
+    // If there's no entry at all for today, show the form
+    if (!todayEntry) {
+      setAutoOpenManualEntry(true);
+    } else {
+      setAutoOpenManualEntry(false);
+    }
+  }, [entries]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950">
@@ -282,6 +297,7 @@ export default function Dashboard() {
               entries={entries}
               dateRange={dateRange}
               setEntries={setEntries}
+              autoOpen={autoOpenManualEntry}
             />
             {entries.length > 0 &&
               (() => {

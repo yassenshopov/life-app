@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { X, Pencil, Plus } from 'lucide-react';
+import { X, Pencil, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DayEntry } from '@/types/day-entry';
 import {
   Dialog,
@@ -17,12 +17,14 @@ interface ManualEntryFormProps {
   entries: DayEntry[];
   dateRange: { from: Date; to: Date };
   setEntries: (entries: DayEntry[]) => void;
+  autoOpen?: boolean;
 }
 
 export function ManualEntryForm({
   entries,
   dateRange,
   setEntries,
+  autoOpen = false,
 }: ManualEntryFormProps) {
   const [sleepTime, setSleepTime] = useState('');
   const [wakeTime, setWakeTime] = useState('');
@@ -36,14 +38,15 @@ export function ManualEntryForm({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const todayEntry = entries.find(
-    (entry) => entry.date === new Date().toISOString().split('T')[0]
+  const selectedEntry = entries.find(
+    (entry) => entry.date === selectedDate.toISOString().split('T')[0]
   );
 
   const hasMeaningfulSleepData =
-    todayEntry &&
-    (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+    selectedEntry &&
+    (selectedEntry.totalSleepHours > 0 || selectedEntry.totalSleepMinutes > 0);
 
   const setFormValues = (entry: DayEntry | undefined) => {
     if (entry) {
@@ -68,7 +71,7 @@ export function ManualEntryForm({
 
   const handleEditClick = () => {
     if (!showUpdateForm) {
-      setFormValues(todayEntry);
+      setFormValues(selectedEntry);
     } else {
       setSleepTime('');
       setWakeTime('');
@@ -82,6 +85,15 @@ export function ManualEntryForm({
     setShowUpdateForm(!showUpdateForm);
   };
 
+  const handleDateChange = (days: number) => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+    setFormValues(entries.find(
+      (entry) => entry.date === newDate.toISOString().split('T')[0]
+    ));
+  };
+
   const handleSubmit = async () => {
     if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime)
       return;
@@ -92,17 +104,16 @@ export function ManualEntryForm({
     const [sleepHour, sleepMinute] = sleepTime.split(':');
     const [wakeHour, wakeMinute] = wakeTime.split(':');
 
-    // Find today's entry
-    const today = new Date().toISOString().split('T')[0];
-    const todayEntry = entries.find((entry) => entry.date === today);
+    const entryDate = selectedDate.toISOString().split('T')[0];
+    const existingEntry = entries.find((entry) => entry.date === entryDate);
 
     try {
       const response = await fetch('/api/notion/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: today,
-          pageId: todayEntry?.id,
+          date: entryDate,
+          pageId: existingEntry?.id,
           GoneToSleepH: parseInt(sleepHour),
           GoneToSleepM: parseInt(sleepMinute),
           AwokeH: parseInt(wakeHour),
@@ -144,11 +155,31 @@ export function ManualEntryForm({
     }
   };
 
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setSelectedDate(new Date());
+    }
+  };
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayEntry = entries.find(entry => entry.date === today);
+    
+    // Only auto-open if there's no meaningful sleep data for today AND autoOpen is true
+    const hasMeaningfulData = todayEntry && 
+      (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+    
+    if (!hasMeaningfulData && autoOpen) {
+      setIsOpen(true);
+    }
+  }, [autoOpen, entries]);
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
-          {todayEntry && hasMeaningfulSleepData ? (
+          {selectedEntry && hasMeaningfulSleepData ? (
             <>
               <Pencil className="h-4 w-4" />
               Edit Daily Data
@@ -163,19 +194,35 @@ export function ManualEntryForm({
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] dark:bg-gray-900 border-gray-200 dark:border-gray-800">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            Record Today's Data <br />(
-            {new Date(todayEntry?.date ?? new Date()).toLocaleDateString(
-              'en-US',
-              {
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-semibold">
+              Record Data for <br />
+              {selectedDate.toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
-              }
-            )}
-            )
-          </DialogTitle>
+              })}
+            </DialogTitle>
+            <div className="flex items-center gap-1 mr-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleDateChange(-1)}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleDateChange(1)}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
