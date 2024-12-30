@@ -5,6 +5,7 @@ import { Inter, Outfit } from 'next/font/google';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
+import { Analytics } from "@vercel/analytics/react";
 
 // Icons
 import {
@@ -276,6 +277,7 @@ export default function Dashboard() {
     <div
       className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
     >
+      <Analytics />
       <div className="fixed top-0 right-0 left-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
         <NavigationTabs
           activeSection={activeSection}
