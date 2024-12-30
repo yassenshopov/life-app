@@ -23,10 +23,14 @@ export async function GET(request: Request) {
     // Get the database ID from the query params
     const databaseId = searchParams.get('databaseId');
     
-    // Default to last 7 days if no dates provided
-    const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
-    const startDate = searchParams.get('startDate') || 
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Get the full ISO string for the dates
+    const endDate = searchParams.get('endDate') 
+      ? new Date(searchParams.get('endDate')!).toISOString()
+      : new Date().toISOString();
+      
+    const startDate = searchParams.get('startDate')
+      ? new Date(searchParams.get('startDate')!).toISOString()
+      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     console.log('Fetching entries with params:', { databaseId, startDate, endDate }); // Debug log
 

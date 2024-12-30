@@ -15,6 +15,38 @@ export const DateRangeFilter = ({
   setActiveTab,
   handleDateRangeFilter,
 }: DateRangeFilterProps) => {
+  const handlePeriodClick = (period: string) => {
+    setActiveTab(period);
+    const now = new Date();
+    const to = new Date(now);
+    let from = new Date(now);
+
+    switch (period) {
+      case '90D':
+        from.setDate(now.getDate() - 90);
+        break;
+      case '1Y':
+        from.setFullYear(now.getFullYear() - 1);
+        break;
+      case 'YTD':
+        from = new Date(now.getFullYear(), 0, 1); // January 1st of current year
+        break;
+      default:
+        const days = parseInt(period);
+        if (!isNaN(days)) {
+          from = new Date(now);
+          from.setDate(now.getDate() - days);
+        }
+    }
+    
+    // Ensure we're working with the start of the day for 'from' and end of the day for 'to'
+    from.setHours(0, 0, 0, 0);
+    to.setHours(23, 59, 59, 999);
+    
+    console.log('Setting date range:', { from, to });
+    setDateRange({ from, to });
+  };
+
   return (
     <div className="border-b border-slate-200 dark:border-slate-800">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
@@ -22,18 +54,7 @@ export const DateRangeFilter = ({
           {['3D', '7D', '30D', '90D', '1Y', 'YTD'].map((period) => (
             <button
               key={period}
-              onClick={() => {
-                setActiveTab(period);
-                if (period === 'YTD') {
-                  const to = new Date();
-                  const from = new Date(to.getFullYear(), 0, 1);
-                  setDateRange({ from, to });
-                } else if (period === '1Y') {
-                  handleDateRangeFilter('1Y');
-                } else {
-                  handleDateRangeFilter(parseInt(period));
-                }
-              }}
+              onClick={() => handlePeriodClick(period)}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                 activeTab === period
                   ? 'bg-purple-100 text-purple-700 dark:bg-slate-800 dark:text-white'

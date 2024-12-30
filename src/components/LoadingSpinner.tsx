@@ -25,7 +25,7 @@ export const LoadingSpinner = ({
     red: "border-red-200/30 border-t-red-500",
     teal: "border-teal-200/30 border-t-teal-500",
     orange: "border-orange-200/30 border-t-orange-500",
-    white: "border-white/20 border-t-white",
+    white: "border-gray-400 border-t-gray-600 dark:border-white/20 dark:border-t-white",
   };
 
   return (
@@ -39,7 +39,7 @@ export const LoadingSpinner = ({
         style={{ borderStyle: "solid" }}
       />
       {label && (
-        <span className="text-sm text-white/80">
+        <span className="text-sm text-gray-700 dark:text-white/80">
           {label}
         </span>
       )}

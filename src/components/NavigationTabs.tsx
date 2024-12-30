@@ -10,10 +10,12 @@ import {
   User,
   MoreVertical,
   LogOut,
+  Settings,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { DisplaySection } from '@/types/display-section';
+import Link from 'next/link';
 
 interface NavigationTabsProps {
   activeSection: DisplaySection;
@@ -161,6 +163,13 @@ export function NavigationTabs({
 
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 z-50">
+                  <Link
+                    href="/settings"
+                    className="w-full px-4 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="w-full px-4 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
