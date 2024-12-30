@@ -100,8 +100,9 @@ export default function Dashboard() {
   const {
     entries,
     setEntries,
-    loading: healthLoading,
-  } = useHealthData(dateRange);
+    isLoading: healthLoading,
+    error
+  } = useHealthData();
   const {
     gymSessions,
     loading: gymLoading,

@@ -50,5 +50,5 @@ export function useHealthData() {
     fetchEntries();
   }, []);
 
-  return { entries, isLoading, error };
+  return { entries, setEntries, isLoading, error };
 } 
