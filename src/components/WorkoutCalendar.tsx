@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -45,30 +45,133 @@ interface WorkoutCalendarProps {
   onMuscleClick?: (muscle: MuscleGroup) => void;
 }
 
+// Add type for activity data
+type ActivityData = {
+  type: 'run' | 'gym';
+  title: string;
+  details: {
+    distance?: number;
+    duration?: number;
+    pace?: number;
+    exercises?: Record<string, any>;
+    notes?: string;
+  };
+};
+
 export const WorkoutCalendar = ({
+  onLoadingChange,
   showGymForm,
   setShowGymForm,
   onMuscleClick,
 }: WorkoutCalendarProps) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [workouts, setWorkouts] = useState<WorkoutEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [gymSessions, setGymSessions] = useState<any[]>([]);
+  // Consolidate date-related state
+  const [calendarState, setCalendarState] = useState({
+    currentDate: new Date(),
+    selectedDate: new Date(),
+    gymDate: null as string | null,
+  });
 
-  const [sessionType, setSessionType] = useState<GymSessionType>('legs');
-  const [selectedExercises, setSelectedExercises] = useState<WorkoutExercise[]>(
-    []
-  );
-  const [exerciseSearch, setExerciseSearch] = useState('');
-  const [notes, setNotes] = useState('');
-  const [isSubmittingGym, setIsSubmittingGym] = useState(false);
+  // Consolidate data-related state
+  const [workoutData, setWorkoutData] = useState({
+    workouts: [] as WorkoutEvent[],
+    gymSessions: [] as any[],
+    isLoading: true,
+  });
 
-  const [gymDate, setGymDate] = useState<string | null>(null);
-  const [editingWorkout, setEditingWorkout] = useState<any>(null);
+  // Consolidate form-related state
+  const [formState, setFormState] = useState({
+    sessionType: '' as GymSessionType,
+    selectedExercises: [] as WorkoutExercise[],
+    exerciseSearch: '',
+    notes: '',
+    isSubmittingGym: false,
+    editingWorkout: null as any,
+    gymDate: null as string | null,
+  });
 
+  // Memoize collapsed exercises set
   const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(
     new Set()
   );
+
+  // Memoize data fetching
+  const fetchWorkoutData = useCallback(async () => {
+    const startDate = new Date(
+      calendarState.currentDate.getFullYear(),
+      calendarState.currentDate.getMonth(),
+      1
+    );
+    const endDate = new Date(
+      calendarState.currentDate.getFullYear(),
+      calendarState.currentDate.getMonth() + 1,
+      0
+    );
+
+    try {
+      const [runsResponse, gymResponse] = await Promise.all([
+        fetch(
+          `/api/notion/running?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+        ),
+        fetch(
+          `/api/supabase/exercises?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+        ),
+      ]);
+
+      const [runs, gymData] = await Promise.all([
+        runsResponse.json(),
+        gymResponse.json(),
+      ]);
+
+      const formattedRuns = formatRunData(runs);
+
+      setWorkoutData((prev) => ({
+        ...prev,
+        workouts: formattedRuns,
+        gymSessions: gymData,
+        isLoading: false,
+      }));
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setWorkoutData((prev) => ({ ...prev, isLoading: false }));
+    }
+  }, [calendarState.currentDate]);
+
+  // Memoize exercise library lookup
+  const findExerciseInLibrary = useCallback((name: string) => {
+    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+      const exercise = exercises.find(
+        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
+      );
+      if (exercise) {
+        return {
+          primaryMuscle: exercise.primaryMuscle,
+          secondaryMuscles: exercise.secondaryMuscles,
+        };
+      }
+    }
+    return undefined;
+  }, []);
+
+  // Memoize volume calculations
+  const calculateVolumeChange = useCallback((current: any, previous: any) => {
+    const getVolume = (session: any) =>
+      Object.values(session.exercise_log).reduce(
+        (acc: number, exercise: any) =>
+          acc +
+          exercise.sets.reduce(
+            (setAcc: number, set: any) => setAcc + set.reps * set.weight,
+            0
+          ),
+        0
+      );
+
+    const currentVolume = getVolume(current);
+    const previousVolume = getVolume(previous);
+    const difference = currentVolume - previousVolume;
+    const percentage = ((difference / previousVolume) * 100).toFixed(1);
+
+    return `${difference >= 0 ? '+' : ''}${percentage}%`;
+  }, []);
 
   const toggleExercise = (index: number) => {
     const newCollapsed = new Set(collapsedExercises);
@@ -81,49 +184,8 @@ export const WorkoutCalendar = ({
   };
 
   useEffect(() => {
-    const startDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      1
-    );
-    const endDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() + 1,
-      0
-    );
-
-    // Update to handle both fetches with Promise.all
-    Promise.all([
-      fetch(`/api/notion/running?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`),
-      fetch(`/api/supabase/exercises?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`)
-    ])
-      .then(async ([runsResponse, gymResponse]) => {
-        const runs = await runsResponse.json();
-        const gymData = await gymResponse.json();
-
-        const formattedRuns = runs.map((run: any) => ({
-          id: run.id,
-          date: new Date(run.date + 'T00:00:00').toISOString().split('T')[0],
-          type: 'run' as const,
-          title: run.name,
-          distance: run.distance,
-          duration: run.duration,
-          pace: run.pace,
-          notes: run.notes,
-        }));
-
-        console.log('Fetched runs:', formattedRuns);
-        console.log('Fetched gym sessions:', gymData);
-
-        setWorkouts(formattedRuns);
-        setGymSessions(gymData);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error fetching data:', error);
-        setIsLoading(false);
-      });
-  }, [currentDate]);
+    fetchWorkoutData();
+  }, [fetchWorkoutData]);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -136,58 +198,71 @@ export const WorkoutCalendar = ({
   };
 
   const handlePreviousMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1)
-    );
+    setCalendarState((prev) => ({
+      ...prev,
+      currentDate: new Date(
+        prev.currentDate.getFullYear(),
+        prev.currentDate.getMonth() - 1
+      ),
+    }));
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1)
-    );
+    setCalendarState((prev) => ({
+      ...prev,
+      currentDate: new Date(
+        prev.currentDate.getFullYear(),
+        prev.currentDate.getMonth() + 1
+      ),
+    }));
   };
 
-  const monthYear = currentDate.toLocaleString('default', {
+  const monthYear = calendarState.currentDate.toLocaleString('default', {
     month: 'long',
     year: 'numeric',
   });
-  const daysInMonth = getDaysInMonth(currentDate);
-  const firstDayOfMonth = getFirstDayOfMonth(currentDate);
+  const daysInMonth = getDaysInMonth(calendarState.currentDate);
+  const firstDayOfMonth = getFirstDayOfMonth(calendarState.currentDate);
 
   const handleGymSubmit = async () => {
-    if (!sessionType || selectedExercises.length === 0) return;
-    setIsSubmittingGym(true);
+    if (!formState.sessionType || formState.selectedExercises.length === 0)
+      return;
+    setFormState((prev) => ({ ...prev, isSubmittingGym: true }));
 
     // Get the selected date or default to today
-    const selectedDate = gymDate || new Date().toISOString().split('T')[0];
+    const selectedDate =
+      formState.gymDate || new Date().toISOString().split('T')[0];
 
     // Transform exercises into the required format
-    const exerciseLog = selectedExercises.reduce((acc, exercise, index) => {
-      const exerciseName = exercise.name.toLowerCase().replace(/\s+/g, '_');
-      acc[exerciseName] = {
-        order: index + 1,
-        sets: exercise.sets.map((set, setIndex) => ({
-          reps: set.reps,
-          weight: set.weight,
-          order: setIndex + 1,
-        })),
-      };
-      return acc as { [key: string]: any };
-    }, {} as { [key: string]: any });
+    const exerciseLog = formState.selectedExercises.reduce(
+      (acc, exercise, index) => {
+        const exerciseName = exercise.name.toLowerCase().replace(/\s+/g, '_');
+        acc[exerciseName] = {
+          order: index + 1,
+          sets: exercise.sets.map((set, setIndex) => ({
+            reps: set.reps,
+            weight: set.weight,
+            order: setIndex + 1,
+          })),
+        };
+        return acc as { [key: string]: any };
+      },
+      {} as { [key: string]: any }
+    );
 
     try {
       const endpoint = '/api/supabase/exercises';
-      const method = editingWorkout ? 'PUT' : 'POST';
+      const method = formState.editingWorkout ? 'PUT' : 'POST';
 
       const response = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: editingWorkout?.id, // Include ID if editing
-          type: sessionType,
+          id: formState.editingWorkout?.id, // Include ID if editing
+          type: formState.sessionType,
           date: selectedDate,
           exercise_log: exerciseLog,
-          notes: notes || null,
+          notes: formState.notes || null,
         }),
       });
 
@@ -195,42 +270,30 @@ export const WorkoutCalendar = ({
 
       // Reset form
       setShowGymForm(false);
-      setSessionType('' as GymSessionType);
-      setSelectedExercises([]);
-      setNotes('');
-      setGymDate(null);
-      setEditingWorkout(null);
+      setFormState((prev) => ({
+        ...prev,
+        sessionType: '' as GymSessionType,
+        selectedExercises: [],
+        notes: '',
+        gymDate: null,
+        editingWorkout: null,
+      }));
     } catch (error) {
       console.error('Failed to save gym session:', error);
     } finally {
-      setIsSubmittingGym(false);
+      setFormState((prev) => ({ ...prev, isSubmittingGym: false }));
     }
-  };
-
-  // Add this helper function
-  const findExerciseInLibrary = (
-    name: string
-  ): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
-    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
-      const exercise = exercises.find(
-        (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
-      );
-      if (exercise)
-        return {
-          primaryMuscle: exercise.primaryMuscle,
-          secondaryMuscles: exercise.secondaryMuscles,
-        };
-    }
-    return undefined;
   };
 
   // Add function to handle editing a workout
   const handleEditWorkout = (workout: any) => {
-    setEditingWorkout(workout);
-    setShowGymForm(true);
-    setSessionType(workout.type);
-    setGymDate(workout.date);
-    setNotes(workout.notes || '');
+    setFormState((prev) => ({
+      ...prev,
+      editingWorkout: workout,
+      sessionType: workout.type,
+      gymDate: workout.date,
+      notes: workout.notes || '',
+    }));
 
     // Transform exercise_log back into selectedExercises format
     const exercises = Object.entries(workout.exercise_log).map(
@@ -248,30 +311,7 @@ export const WorkoutCalendar = ({
         })),
       })
     );
-    setSelectedExercises(exercises);
-  };
-
-  const calculateVolumeChange = (current: any, previous: any) => {
-    const getCurrentVolume = (session: any) => {
-      return Object.values(session.exercise_log).reduce(
-        (acc: number, exercise: any) => {
-          return (
-            acc +
-            exercise.sets.reduce((setAcc: number, set: any) => {
-              return setAcc + set.reps * set.weight;
-            }, 0)
-          );
-        },
-        0
-      );
-    };
-
-    const currentVolume = getCurrentVolume(current);
-    const previousVolume = getCurrentVolume(previous);
-    const difference = currentVolume - previousVolume;
-    const percentage = ((difference / previousVolume) * 100).toFixed(1);
-
-    return `${difference >= 0 ? '+' : ''}${percentage}%`;
+    setFormState((prev) => ({ ...prev, selectedExercises: exercises }));
   };
 
   const compareExerciseCount = (current: any, previous: any) => {
@@ -283,6 +323,23 @@ export const WorkoutCalendar = ({
       ? 'Same'
       : `${difference > 0 ? '+' : ''}${difference}`;
   };
+
+  const handleDayClick = (date: Date) => {
+    setCalendarState((prev) => ({ ...prev, selectedDate: date }));
+  };
+
+  // Helper function to format run data
+  const formatRunData = (runs: any[]): WorkoutEvent[] =>
+    runs.map((run) => ({
+      id: run.id,
+      date: new Date(run.date + 'T00:00:00').toISOString().split('T')[0],
+      type: 'run' as const,
+      title: run.name,
+      distance: run.distance,
+      duration: run.duration,
+      pace: run.pace,
+      notes: run.notes,
+    }));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
@@ -333,20 +390,22 @@ export const WorkoutCalendar = ({
           {/* Calendar Days */}
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
             const currentMonthDate = new Date(
-              currentDate.getFullYear(),
-              currentDate.getMonth(),
+              calendarState.currentDate.getFullYear(),
+              calendarState.currentDate.getMonth(),
               day
             );
             const dateString = currentMonthDate.toISOString().split('T')[0];
-            const workoutsForDay = workouts.filter(
+            const workoutsForDay = workoutData.workouts.filter(
               (event) => event.date === dateString
             );
-            const gymSessionsForDay = gymSessions.filter((session) => {
-              const sessionDate = new Date(session.date + 'T00:00:00')
-                .toISOString()
-                .split('T')[0];
-              return sessionDate === dateString;
-            });
+            const gymSessionsForDay = workoutData.gymSessions.filter(
+              (session) => {
+                const sessionDate = new Date(session.date + 'T00:00:00')
+                  .toISOString()
+                  .split('T')[0];
+                return sessionDate === dateString;
+              }
+            );
             const isToday =
               currentMonthDate.toDateString() === new Date().toDateString();
 
@@ -377,11 +436,17 @@ export const WorkoutCalendar = ({
                 <TooltipUI delayDuration={200}>
                   <TooltipTrigger asChild>
                     <div
+                      onClick={() => handleDayClick(currentMonthDate)}
                       className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative ${
                         isToday
                           ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
                           : ''
-                      } cursor-default`}
+                      } ${
+                        currentMonthDate.toDateString() ===
+                        calendarState.selectedDate.toDateString()
+                          ? 'ring-2 ring-purple-500 dark:ring-purple-400'
+                          : ''
+                      } cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}
                     >
                       <span
                         className={`text-sm ${
@@ -538,13 +603,23 @@ export const WorkoutCalendar = ({
       <div className="lg:col-span-2 space-y-4">
         <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">
-            Today's Activity
+            {calendarState.selectedDate.toDateString() ===
+            new Date().toDateString()
+              ? "Today's Activity"
+              : `Activity for ${calendarState.selectedDate.toLocaleDateString(
+                  'default',
+                  {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  }
+                )}`}
           </h3>
-          {workouts.some(
+          {workoutData.workouts.some(
             (event) =>
               new Date(event.date).toDateString() === new Date().toDateString()
           ) ||
-          gymSessions.some(
+          workoutData.gymSessions.some(
             (session) =>
               new Date(session.date).toDateString() ===
               new Date().toDateString()
@@ -552,45 +627,39 @@ export const WorkoutCalendar = ({
             <div className="space-y-6">
               {/* Today's Activities List */}
               {[
-                ...workouts.map(w => {
+                ...workoutData.workouts.map((w) => {
                   console.log('Processing workout:', w);
                   return { ...w, activityType: 'run' };
                 }),
-                ...gymSessions.map(g => ({ ...g, activityType: 'gym' }))
+                ...workoutData.gymSessions.map((g) => ({
+                  ...g,
+                  activityType: 'gym',
+                })),
               ]
                 .filter((activity) => {
-                  // Create date and add one day only for runs
                   const activityDate = new Date(activity.date + 'T00:00:00');
                   if (activity.activityType === 'run') {
                     activityDate.setDate(activityDate.getDate() + 1);
                   }
-                  
-                  // Compare using local date strings
-                  const activityDateString = activityDate.toLocaleDateString();
-                  const today = new Date().toLocaleDateString();
-                  
-                  console.log('Comparing dates:', { 
-                    activity: activity.activityType,
-                    activityDate: activityDateString, 
-                    today, 
-                    matches: activityDateString === today 
-                  });
-                  return activityDateString === today;
+                  return (
+                    activityDate.toDateString() ===
+                    calendarState.selectedDate.toDateString()
+                  );
                 })
                 .map((activity, index) => {
                   const isGymSession = activity.activityType === 'gym';
                   const isRun = activity.activityType === 'run';
-                  
+
                   console.log('Activity:', {
                     activity,
                     isGymSession,
                     isRun,
                     date: new Date(activity.date).toDateString(),
-                    today: new Date().toDateString()
+                    today: new Date().toDateString(),
                   });
 
                   const previousSession = isGymSession
-                    ? gymSessions
+                    ? workoutData.gymSessions
                         .filter(
                           (s) =>
                             // s.type === activity.type &&
@@ -606,18 +675,19 @@ export const WorkoutCalendar = ({
                   // Find previous run for comparison
 
                   console.log('isRun:', isRun);
-                  console.log('workouts:', workouts);
+                  console.log('workouts:', workoutData.workouts);
                   console.log('activity:', activity);
                   const previousRun = isRun
-                    ? workouts
+                    ? workoutData.workouts
                         .filter(
-                          (w) => 
-                            // w.type === 'run' && 
+                          (w) =>
+                            // w.type === 'run' &&
                             new Date(w.date) < new Date(activity.date)
                         )
                         .sort(
                           (a, b) =>
-                            new Date(b.date).getTime() - new Date(a.date).getTime()
+                            new Date(b.date).getTime() -
+                            new Date(a.date).getTime()
                         )[0]
                     : null;
 
@@ -635,7 +705,9 @@ export const WorkoutCalendar = ({
                           }`}
                         />
                         <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {isGymSession ? formatGymType(activity.type) : activity.title}
+                          {isGymSession
+                            ? formatGymType(activity.type)
+                            : activity.title}
                         </span>
                       </div>
 
@@ -643,19 +715,25 @@ export const WorkoutCalendar = ({
                         <div className="space-y-3 pl-4">
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="space-y-1">
-                              <div className="text-slate-500 dark:text-slate-400">Distance:</div>
+                              <div className="text-slate-500 dark:text-slate-400">
+                                Distance:
+                              </div>
                               <div className="font-medium text-slate-700 dark:text-slate-200">
                                 {activity.distance} km
                               </div>
                             </div>
                             <div className="space-y-1">
-                              <div className="text-slate-500 dark:text-slate-400">Duration:</div>
+                              <div className="text-slate-500 dark:text-slate-400">
+                                Duration:
+                              </div>
                               <div className="font-medium text-slate-700 dark:text-slate-200">
                                 {activity.duration} min
                               </div>
                             </div>
                             <div className="space-y-1">
-                              <div className="text-slate-500 dark:text-slate-400">Pace:</div>
+                              <div className="text-slate-500 dark:text-slate-400">
+                                Pace:
+                              </div>
                               <div className="font-medium text-slate-700 dark:text-slate-200">
                                 {activity.pace} min/km
                               </div>
@@ -665,30 +743,64 @@ export const WorkoutCalendar = ({
                           {previousRun && (
                             <div className="mt-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
                               <div className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                                Compared to last run ({Math.floor((new Date().getTime() - new Date(previousRun.date).getTime()) / (1000 * 60 * 60 * 24))} days ago):
+                                Compared to last run (
+                                {Math.floor(
+                                  (new Date().getTime() -
+                                    new Date(previousRun.date).getTime()) /
+                                    (1000 * 60 * 60 * 24)
+                                )}{' '}
+                                days ago):
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="text-sm">
-                                  <span className="text-slate-500 dark:text-slate-400">Distance: </span>
-                                  <span className={`font-medium ${
-                                    previousRun?.distance && ((activity.distance - previousRun.distance) / previousRun.distance * 100) >= 0 
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}>
-                                    {previousRun?.distance 
-                                      ? ((activity.distance - previousRun.distance) / previousRun.distance * 100).toFixed(1) + '%'
+                                  <span className="text-slate-500 dark:text-slate-400">
+                                    Distance:{' '}
+                                  </span>
+                                  <span
+                                    className={`font-medium ${
+                                      previousRun?.distance &&
+                                      ((activity.distance -
+                                        previousRun.distance) /
+                                        previousRun.distance) *
+                                        100 >=
+                                        0
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}
+                                  >
+                                    {previousRun?.distance
+                                      ? (
+                                          ((activity.distance -
+                                            previousRun.distance) /
+                                            previousRun.distance) *
+                                          100
+                                        ).toFixed(1) + '%'
                                       : 'N/A'}
                                   </span>
                                 </div>
                                 <div className="text-sm">
-                                  <span className="text-slate-500 dark:text-slate-400">Pace: </span>
-                                  <span className={`font-medium ${
-                                    previousRun?.pace && ((Number(previousRun.pace) - Number(activity.pace)) / Number(previousRun.pace) * 100) >= 0 
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}>
+                                  <span className="text-slate-500 dark:text-slate-400">
+                                    Pace:{' '}
+                                  </span>
+                                  <span
+                                    className={`font-medium ${
+                                      previousRun?.pace &&
+                                      ((Number(previousRun.pace) -
+                                        Number(activity.pace)) /
+                                        Number(previousRun.pace)) *
+                                        100 >=
+                                        0
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}
+                                  >
                                     {previousRun?.pace && activity.pace
-                                      ? ((Number(previousRun.pace) - Number(activity.pace)) / Number(previousRun.pace) * 100).toFixed(1) + '%'
+                                      ? (
+                                          ((Number(previousRun.pace) -
+                                            Number(activity.pace)) /
+                                            Number(previousRun.pace)) *
+                                          100
+                                        ).toFixed(1) + '%'
                                       : 'N/A'}
                                   </span>
                                 </div>
@@ -699,35 +811,57 @@ export const WorkoutCalendar = ({
                       ) : (
                         <div className="space-y-3 pl-4">
                           <div className="text-sm text-slate-600 dark:text-slate-400">
-                            {Object.keys(activity.exercise_log).length} exercises · {
-                              String((Object.values(activity.exercise_log) as { sets: any[] }[]).reduce((acc: number, curr: { sets: any[] }) => 
-                                acc + curr.sets.length, 0
-                              ))} total sets
+                            {Object.keys(activity.exercise_log).length}{' '}
+                            exercises ·{' '}
+                            {String(
+                              (
+                                Object.values(activity.exercise_log) as {
+                                  sets: any[];
+                                }[]
+                              ).reduce(
+                                (acc: number, curr: { sets: any[] }) =>
+                                  acc + curr.sets.length,
+                                0
+                              )
+                            )}{' '}
+                            total sets
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {Array.from(new Set(
-                              Object.keys(activity.exercise_log)
-                                .map(name => {
-                                  const exercise = findExerciseInLibrary(name);
-                                  return exercise?.primaryMuscle;
-                                })
-                                .filter(Boolean)
-                            )).map((muscle, index) => (
-                              <Link 
+                            {Array.from(
+                              new Set(
+                                Object.keys(activity.exercise_log)
+                                  .map((name) => {
+                                    const exercise =
+                                      findExerciseInLibrary(name);
+                                    return exercise?.primaryMuscle;
+                                  })
+                                  .filter(Boolean)
+                              )
+                            ).map((muscle, index) => (
+                              <Link
                                 key={index}
                                 href={`#${muscle}`}
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  const element = document.getElementById(muscle as string);
-                                  element?.scrollIntoView({ behavior: 'smooth' });
+                                  const element = document.getElementById(
+                                    muscle as string
+                                  );
+                                  element?.scrollIntoView({
+                                    behavior: 'smooth',
+                                  });
                                   if (onMuscleClick) {
                                     onMuscleClick(muscle as MuscleGroup);
                                   }
                                 }}
                                 className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
                               >
-                                {muscle?.split('_')
-                                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                {muscle
+                                  ?.split('_')
+                                  .map(
+                                    (word) =>
+                                      word.charAt(0).toUpperCase() +
+                                      word.slice(1)
+                                  )
                                   .join(' ')}
                               </Link>
                             ))}
@@ -736,29 +870,59 @@ export const WorkoutCalendar = ({
                           {previousSession && (
                             <div className="mt-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
                               <div className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                                Compared to last {formatGymType(activity.type)} workout ({Math.floor((new Date().getTime() - new Date(previousSession.date).getTime()) / (1000 * 60 * 60 * 24))} days ago):
+                                Compared to last {formatGymType(activity.type)}{' '}
+                                workout (
+                                {Math.floor(
+                                  (new Date().getTime() -
+                                    new Date(previousSession.date).getTime()) /
+                                    (1000 * 60 * 60 * 24)
+                                )}{' '}
+                                days ago):
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="text-sm">
-                                  <span className="text-slate-500 dark:text-slate-400">Total Volume: </span>
-                                  <span className={`font-medium ${
-                                    calculateVolumeChange(activity, previousSession).startsWith('+')
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}>
-                                    {calculateVolumeChange(activity, previousSession)}
+                                  <span className="text-slate-500 dark:text-slate-400">
+                                    Total Volume:{' '}
+                                  </span>
+                                  <span
+                                    className={`font-medium ${
+                                      calculateVolumeChange(
+                                        activity,
+                                        previousSession
+                                      ).startsWith('+')
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}
+                                  >
+                                    {calculateVolumeChange(
+                                      activity,
+                                      previousSession
+                                    )}
                                   </span>
                                 </div>
                                 <div className="text-sm">
-                                  <span className="text-slate-500 dark:text-slate-400">Exercise Count: </span>
-                                  <span className={`font-medium ${
-                                    compareExerciseCount(activity, previousSession).startsWith('+')
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : compareExerciseCount(activity, previousSession) === 'Same'
-                                      ? 'text-slate-600 dark:text-slate-400'
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}>
-                                    {compareExerciseCount(activity, previousSession)}
+                                  <span className="text-slate-500 dark:text-slate-400">
+                                    Exercise Count:{' '}
+                                  </span>
+                                  <span
+                                    className={`font-medium ${
+                                      compareExerciseCount(
+                                        activity,
+                                        previousSession
+                                      ).startsWith('+')
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : compareExerciseCount(
+                                            activity,
+                                            previousSession
+                                          ) === 'Same'
+                                        ? 'text-slate-600 dark:text-slate-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}
+                                  >
+                                    {compareExerciseCount(
+                                      activity,
+                                      previousSession
+                                    )}
                                   </span>
                                 </div>
                               </div>
@@ -811,7 +975,9 @@ export const WorkoutCalendar = ({
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
-                  {editingWorkout ? 'Edit Gym Session' : 'Add Gym Session'}
+                  {formState.editingWorkout
+                    ? 'Edit Gym Session'
+                    : 'Add Gym Session'}
                 </h3>
                 <Button
                   variant="ghost"
@@ -839,8 +1005,16 @@ export const WorkoutCalendar = ({
                   <input
                     type="date"
                     id="date"
-                    value={gymDate || new Date().toISOString().split('T')[0]}
-                    onChange={(e) => setGymDate(e.target.value)}
+                    value={
+                      formState.gymDate ||
+                      new Date().toISOString().split('T')[0]
+                    }
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        gymDate: e.target.value,
+                      }))
+                    }
                     className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                   />
                 </div>
@@ -852,9 +1026,12 @@ export const WorkoutCalendar = ({
                     Session Type
                   </label>
                   <Select
-                    value={sessionType}
+                    value={formState.sessionType}
                     onValueChange={(value) =>
-                      setSessionType(value as GymSessionType)
+                      setFormState((prev) => ({
+                        ...prev,
+                        sessionType: value as GymSessionType,
+                      }))
                     }
                   >
                     <SelectTrigger className="w-full">
@@ -905,19 +1082,22 @@ export const WorkoutCalendar = ({
                   {/* Exercise Search & Add */}
                   <div className="flex gap-2 mb-4">
                     <Select
-                      value={exerciseSearch}
+                      value={formState.exerciseSearch}
                       onValueChange={(value) => {
                         if (value) {
-                          setSelectedExercises([
-                            ...selectedExercises,
-                            {
-                              name: value,
-                              primaryMuscle:
-                                'shoulders_and_arms' as MuscleGroup, // Default value
-                              sets: [{ reps: 0, weight: 0 }],
-                            },
-                          ]);
-                          setExerciseSearch('');
+                          setFormState((prev) => ({
+                            ...prev,
+                            selectedExercises: [
+                              ...prev.selectedExercises,
+                              {
+                                name: value,
+                                primaryMuscle:
+                                  'shoulders_and_arms' as MuscleGroup, // Default value
+                                sets: [{ reps: 0, weight: 0 }],
+                              },
+                            ],
+                            exerciseSearch: '',
+                          }));
                         }
                       }}
                     >
@@ -925,7 +1105,7 @@ export const WorkoutCalendar = ({
                         <SelectValue placeholder="Select an exercise" />
                       </SelectTrigger>
                       <SelectContent>
-                        {EXERCISE_LIBRARY[sessionType]?.map(
+                        {EXERCISE_LIBRARY[formState.sessionType]?.map(
                           (exercise: Exercise) => (
                             <SelectItem
                               key={exercise.name}
@@ -941,7 +1121,7 @@ export const WorkoutCalendar = ({
 
                   {/* Selected Exercises List */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedExercises.map((exercise, index) => (
+                    {formState.selectedExercises.map((exercise, index) => (
                       <div
                         key={index}
                         className="border rounded-lg p-4 dark:border-slate-700"
@@ -979,10 +1159,15 @@ export const WorkoutCalendar = ({
                                   className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                                   value={set.reps || ''}
                                   onChange={(e) => {
-                                    const newExercises = [...selectedExercises];
+                                    const newExercises = [
+                                      ...formState.selectedExercises,
+                                    ];
                                     newExercises[index].sets[setIndex].reps =
                                       Number(e.target.value);
-                                    setSelectedExercises(newExercises);
+                                    setFormState((prev) => ({
+                                      ...prev,
+                                      selectedExercises: newExercises,
+                                    }));
                                   }}
                                 />
                                 <span className="text-sm text-slate-500">
@@ -994,10 +1179,15 @@ export const WorkoutCalendar = ({
                                   className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
                                   value={set.weight || ''}
                                   onChange={(e) => {
-                                    const newExercises = [...selectedExercises];
+                                    const newExercises = [
+                                      ...formState.selectedExercises,
+                                    ];
                                     newExercises[index].sets[setIndex].weight =
                                       Number(e.target.value);
-                                    setSelectedExercises(newExercises);
+                                    setFormState((prev) => ({
+                                      ...prev,
+                                      selectedExercises: newExercises,
+                                    }));
                                   }}
                                 />
                                 <span className="text-sm text-slate-500">
@@ -1007,12 +1197,17 @@ export const WorkoutCalendar = ({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    const newExercises = [...selectedExercises];
+                                    const newExercises = [
+                                      ...formState.selectedExercises,
+                                    ];
                                     newExercises[index].sets.splice(
                                       setIndex,
                                       1
                                     );
-                                    setSelectedExercises(newExercises);
+                                    setFormState((prev) => ({
+                                      ...prev,
+                                      selectedExercises: newExercises,
+                                    }));
                                   }}
                                 >
                                   <X className="h-4 w-4" />
@@ -1025,12 +1220,17 @@ export const WorkoutCalendar = ({
                               size="sm"
                               className="w-full mt-2"
                               onClick={() => {
-                                const newExercises = [...selectedExercises];
+                                const newExercises = [
+                                  ...formState.selectedExercises,
+                                ];
                                 newExercises[index].sets.push({
                                   reps: 0,
                                   weight: 0,
                                 });
-                                setSelectedExercises(newExercises);
+                                setFormState((prev) => ({
+                                  ...prev,
+                                  selectedExercises: newExercises,
+                                }));
                               }}
                             >
                               Add Set
@@ -1050,8 +1250,13 @@ export const WorkoutCalendar = ({
                   </label>
                   <Textarea
                     id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
+                    value={formState.notes}
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        notes: e.target.value,
+                      }))
+                    }
                     placeholder="Enter notes"
                     className="w-full"
                   />
@@ -1066,17 +1271,17 @@ export const WorkoutCalendar = ({
                   <Button
                     onClick={handleGymSubmit}
                     disabled={
-                      !sessionType ||
-                      selectedExercises.length === 0 ||
-                      isSubmittingGym
+                      !formState.sessionType ||
+                      formState.selectedExercises.length === 0 ||
+                      formState.isSubmittingGym
                     }
                   >
-                    {isSubmittingGym ? (
+                    {formState.isSubmittingGym ? (
                       <span className="flex items-center gap-2">
                         <LoadingSpinner size="sm" />
                         Saving...
                       </span>
-                    ) : editingWorkout ? (
+                    ) : formState.editingWorkout ? (
                       'Update Session'
                     ) : (
                       'Save Session'

@@ -3,8 +3,15 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { X, Pencil } from 'lucide-react';
+import { X, Pencil, Plus } from 'lucide-react';
 import { DayEntry } from '@/types/day-entry';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 interface ManualEntryFormProps {
   entries: DayEntry[];
@@ -28,6 +35,7 @@ export function ManualEntryForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const todayEntry = entries.find(
     (entry) => entry.date === new Date().toISOString().split('T')[0]
@@ -75,7 +83,8 @@ export function ManualEntryForm({
   };
 
   const handleSubmit = async () => {
-    if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime) return;
+    if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime)
+      return;
 
     setIsSubmitting(true);
     setSubmitSuccess(false);
@@ -101,7 +110,9 @@ export function ManualEntryForm({
           deepSleepPercentage: parseInt(deepSleep),
           remSleepPercentage: parseInt(remSleep),
           awakeTimeMinutes: parseInt(awakeTime),
-          restingHeartRate: restingHeartRate ? parseInt(restingHeartRate) : null,
+          restingHeartRate: restingHeartRate
+            ? parseInt(restingHeartRate)
+            : null,
           steps: steps ? parseInt(steps) : null,
           weight: weight ? parseFloat(weight) : null,
         }),
@@ -134,260 +145,73 @@ export function ManualEntryForm({
   };
 
   return (
-    <div className="mb-8 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
-      {todayEntry && hasMeaningfulSleepData ? (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex flex-wrap gap-3 flex-grow">
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md flex items-center gap-3">
-                <svg
-                  className="w-5 h-5 text-green-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span className="text-slate-600 dark:text-slate-400">
-                  Today&apos;s sleep data has been recorded:{' '}
-                  {todayEntry.totalSleepHours}h {todayEntry.totalSleepMinutes}m
-                </span>
-              </div>
-              {todayEntry.restingHeartRate ? (
-                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md flex items-center gap-3">
-                  <svg
-                    className="w-5 h-5 text-green-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  <span className="text-slate-600 dark:text-slate-400">
-                    RHR recorded: {todayEntry.restingHeartRate} bpm
-                  </span>
-                </div>
-              ) : (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md flex items-center gap-3">
-                  <svg
-                    className="w-5 h-5 text-yellow-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                  <span className="text-slate-600 dark:text-slate-400">
-                    RHR not yet recorded
-                  </span>
-                </div>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleEditClick}
-              className="whitespace-nowrap"
-            >
-              {showUpdateForm ? (
-                <>
-                  <X className="w-4 h-4 inline-block mr-1" />
-                  Cancel edit
-                </>
-              ) : (
-                <>
-                  <Pencil className="w-4 h-4 inline-block mr-1" />
-                  Edit entry
-                </>
-              )}
-            </Button>
-          </div>
-
-          {showUpdateForm && (
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-              <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">
-                Update Today's Sleep
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Sleep Time (24h)
-                  </label>
-                  <input
-                    type="time"
-                    value={sleepTime}
-                    onChange={(e) => setSleepTime(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                    required
-                    step="60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Wake Time (24h)
-                  </label>
-                  <input
-                    type="time"
-                    value={wakeTime}
-                    onChange={(e) => setWakeTime(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                    required
-                    step="60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Deep Sleep %
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={deepSleep}
-                    onChange={(e) => setDeepSleep(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    REM Sleep %
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={remSleep}
-                    onChange={(e) => setRemSleep(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Awake Time (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={awakeTime}
-                    onChange={(e) => setAwakeTime(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Resting Heart Rate (bpm) - Optional
-                  </label>
-                  <input
-                    type="number"
-                    min="30"
-                    max="200"
-                    value={restingHeartRate}
-                    onChange={(e) => setRestingHeartRate(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Steps
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={steps}
-                    onChange={(e) => setSteps(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600 dark:text-slate-400">
-                    Weight (kg) - Optional
-                  </label>
-                  <input
-                    type="number"
-                    min="30"
-                    max="200"
-                    step="0.1"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={
-                    !sleepTime ||
-                    !wakeTime ||
-                    !deepSleep ||
-                    !remSleep ||
-                    !awakeTime ||
-                    isSubmitting
-                  }
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <LoadingSpinner size="sm" />
-                      Saving...
-                    </span>
-                  ) : (
-                    'Update Sleep'
-                  )}
-                </Button>
-              </div>
-            </div>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          {todayEntry && hasMeaningfulSleepData ? (
+            <>
+              <Pencil className="h-4 w-4" />
+              Edit Daily Data
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4" />
+              Record Daily Data
+            </>
           )}
-        </div>
-      ) : (
-        <>
-          <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">
-            Record Today's Sleep
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px] dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold">
+            Record Today's Data <br />(
+            {new Date(todayEntry?.date ?? new Date()).toLocaleDateString(
+              'en-US',
+              {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              }
+            )}
+            )
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                Sleep Time (24h)
+              <label className="text-sm font-medium cursor-pointer">
+                Sleep Time (24h) <span className="text-red-500">*</span>
               </label>
               <input
                 type="time"
                 value={sleepTime}
                 onChange={(e) => setSleepTime(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 required
                 step="60"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                Wake Time (24h)
+              <label className="text-sm font-medium cursor-pointer">
+                Wake Time (24h) <span className="text-red-500">*</span>
               </label>
               <input
                 type="time"
                 value={wakeTime}
                 onChange={(e) => setWakeTime(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 required
                 step="60"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                Deep Sleep %
+              <label className="text-sm font-medium cursor-pointer">
+                Deep Sleep % <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -395,12 +219,12 @@ export function ManualEntryForm({
                 max="100"
                 value={deepSleep}
                 onChange={(e) => setDeepSleep(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                REM Sleep %
+              <label className="text-sm font-medium cursor-pointer">
+                REM Sleep % <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -408,36 +232,41 @@ export function ManualEntryForm({
                 max="100"
                 value={remSleep}
                 onChange={(e) => setRemSleep(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium cursor-pointer">
+              Awake Time (minutes) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={awakeTime}
+              onChange={(e) => setAwakeTime(e.target.value)}
+              className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium cursor-pointer">
+              Resting Heart Rate (bpm)
+            </label>
+            <input
+              type="number"
+              min="30"
+              max="200"
+              value={restingHeartRate}
+              onChange={(e) => setRestingHeartRate(e.target.value)}
+              className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                Awake Time (minutes)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={awakeTime}
-                onChange={(e) => setAwakeTime(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                Resting Heart Rate (bpm) - Optional
-              </label>
-              <input
-                type="number"
-                min="30"
-                max="200"
-                value={restingHeartRate}
-                onChange={(e) => setRestingHeartRate(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
+              <label className="text-sm font-medium cursor-pointer">
                 Steps
               </label>
               <input
@@ -445,12 +274,12 @@ export function ManualEntryForm({
                 min="0"
                 value={steps}
                 onChange={(e) => setSteps(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-slate-600 dark:text-slate-400">
-                Weight (kg) - Optional
+              <label className="text-sm font-medium cursor-pointer">
+                Weight (kg)
               </label>
               <input
                 type="number"
@@ -459,53 +288,39 @@ export function ManualEntryForm({
                 step="0.1"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               />
             </div>
           </div>
-          {/* Add the button below the grid of inputs */}
-          <div className="mt-6">
-            <Button
-              onClick={handleSubmit}
-              disabled={
-                !sleepTime ||
-                !wakeTime ||
-                !deepSleep ||
-                !remSleep ||
-                !awakeTime ||
-                isSubmitting
-              }
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <LoadingSpinner size="sm" />
-                  Saving...
-                </span>
-              ) : (
-                'Record Sleep'
-              )}
-            </Button>
-            {submitSuccess && (
-              <span className="ml-4 text-green-600 dark:text-green-400 flex items-center gap-2">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                Entry saved successfully!
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <Button
+            onClick={async () => {
+              await handleSubmit();
+              setIsOpen(false);
+            }}
+            disabled={
+              !sleepTime ||
+              !wakeTime ||
+              !deepSleep ||
+              !remSleep ||
+              !awakeTime ||
+              isSubmitting
+            }
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <LoadingSpinner size="sm" />
+                Saving...
               </span>
+            ) : (
+              'Save Data'
             )}
-          </div>
-        </>
-      )}
-    </div>
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

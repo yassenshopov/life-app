@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CheckSquare, RefreshCw } from 'lucide-react';
 import { Outfit } from 'next/font/google';
+import { ChartLoadingOverlay } from './ChartLoadingOverlay';
+import { LoadingSpinner } from './LoadingSpinner';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -75,25 +77,39 @@ export function Checklist({
         <Button
           variant="outline"
           size="icon"
-          onClick={() => {
-            setIsLoadingCharts(true);
-            fetch(
-              `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
-            )
-              .then((res) => res.json())
-              .then((data) => {
-                setEntries(data);
-              })
-              .finally(() => {
-                setIsLoadingCharts(false);
-              });
+          onClick={async () => {
+            try {
+              setIsLoadingCharts(true);
+              console.log('Setting loading to true');
+              
+              const response = await fetch(
+                `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
+              );
+              const data = await response.json();
+              setEntries(data);
+              
+            } catch (error) {
+              console.error('Error fetching data:', error);
+            } finally {
+              setIsLoadingCharts(false);
+              console.log('Setting loading to false');
+            }
           }}
           className="h-10 w-10"
         >
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
-      <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800 relative">
+      <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800 relative min-h-[200px]">
+        <div className="absolute top-2 right-2 text-xs">
+          Loading: {isLoadingCharts ? "true" : "false"}
+        </div>
+
+        {isLoadingCharts && (
+          <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center">
+            <LoadingSpinner color="purple" label="Loading data..." />
+          </div>
+        )}
         {isComplete && (
           <div className="mb-6 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-4 py-2 rounded-lg border border-green-200 dark:border-green-900 flex items-center gap-2">
             <CheckSquare className="h-4 w-4" />
@@ -101,15 +117,6 @@ export function Checklist({
               Great job! You've completed all your health tracking tasks for today!
               🎉
             </span>
-          </div>
-        )}
-        {isLoadingCharts && (
-          <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg flex items-center justify-center z-50">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full animate-pulse bg-purple-600"></div>
-              <div className="w-4 h-4 rounded-full animate-pulse bg-purple-600"></div>
-              <div className="w-4 h-4 rounded-full animate-pulse bg-purple-600"></div>
-            </div>
           </div>
         )}
         <div className="space-y-4">
