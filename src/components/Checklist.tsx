@@ -101,10 +101,6 @@ export function Checklist({
         </Button>
       </div>
       <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800 relative min-h-[200px]">
-        <div className="absolute top-2 right-2 text-xs">
-          Loading: {isLoadingCharts ? "true" : "false"}
-        </div>
-
         {isLoadingCharts && (
           <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center">
             <LoadingSpinner color="purple" label="Loading data..." />
