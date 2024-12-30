@@ -5,8 +5,6 @@ const notion = new Client({
   auth: process.env.NOTION_API_KEY,
 });
 
-const DATABASE_ID = process.env.NOTION_DATABASE_ID;
-
 interface NotionData {
   id: string;
   properties: {
@@ -18,10 +16,26 @@ interface NotionData {
 }
 
 export async function GET(request: Request) {
+  console.log('GET request received'); // Debug log at the very start
   try {
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') || new Date().toISOString();
-    const endDate = searchParams.get('endDate') || new Date().toISOString();
+    
+    // Get the database ID from the query params
+    const databaseId = searchParams.get('databaseId');
+    
+    // Default to last 7 days if no dates provided
+    const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
+    const startDate = searchParams.get('startDate') || 
+      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    console.log('Fetching entries with params:', { databaseId, startDate, endDate }); // Debug log
+
+    if (!databaseId) {
+      return NextResponse.json(
+        { error: 'Database ID is required' },
+        { status: 400 }
+      );
+    }
 
     let allResults: NotionData[] = [];
     let hasMore = true;
@@ -29,8 +43,10 @@ export async function GET(request: Request) {
 
     // Keep fetching pages while there are more results
     while (hasMore) {
+      console.log('Making Notion API request with cursor:', nextCursor); // Debug log
+      
       const response = await notion.databases.query({
-        database_id: DATABASE_ID!,
+        database_id: databaseId,
         filter: {
           and: [
             {
@@ -54,13 +70,17 @@ export async function GET(request: Request) {
           },
         ],
         start_cursor: nextCursor,
-        page_size: 100, // Maximum allowed by Notion
+        page_size: 100,
       });
+
+      console.log('Notion API response:', response); // Debug log
 
       allResults = [...allResults, ...(response.results as NotionData[])];
       hasMore = response.has_more;
       nextCursor = response.next_cursor || undefined;
     }
+
+    console.log(`Found ${allResults.length} entries`); // Debug log
 
     const entries = allResults.map((page: NotionData) => {
       const sleepH = page.properties.GoneToSleepH?.number || 0;
@@ -120,7 +140,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(entries);
   } catch (error) {
-    console.error('Failed to fetch Notion data:', error);
+    console.error('Error in GET handler:', error);
     return NextResponse.json(
       { error: 'Failed to fetch data' },
       { status: 500 }
@@ -144,7 +164,15 @@ export async function POST(request: Request) {
       restingHeartRate,
       steps,
       weight,
+      databaseId,
     } = body;
+
+    if (!databaseId) {
+      return NextResponse.json(
+        { error: 'Database ID is required' },
+        { status: 400 }
+      );
+    }
 
     const properties = {
       GoneToSleepH: {
@@ -191,7 +219,7 @@ export async function POST(request: Request) {
     // Check for existing entry with today's date
     const today = new Date().toISOString().split('T')[0];
     const existingEntries = await notion.databases.query({
-      database_id: DATABASE_ID!,
+      database_id: databaseId,
       filter: {
         property: 'Date',
         date: {
@@ -212,7 +240,7 @@ export async function POST(request: Request) {
 
     // If no existing entry found, create new one
     const response = await notion.pages.create({
-      parent: { database_id: DATABASE_ID! },
+      parent: { database_id: databaseId },
       properties: properties,
     });
     return NextResponse.json(response);

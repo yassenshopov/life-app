@@ -51,6 +51,7 @@ import { MuscleGroup } from '@/constants/muscle-groups';
 // Form Components
 import { ManualEntryForm } from '@/components/ManualEntryForm';
 import { Checklist } from '@/components/Checklist';
+import { NotionSetup } from '@/components/NotionSetup';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -102,14 +103,15 @@ export default function Dashboard() {
     loading: healthLoading,
   } = useHealthData(dateRange);
   const {
-    exerciseData,
     gymSessions,
     loading: gymLoading,
   } = useGymData(dateRange);
-
+  
   const isLoading = healthLoading || gymLoading;
 
   const prepareChartData = useMemo(() => {
+    if (!Array.isArray(entries)) return [];
+    
     return entries
       .filter((entry) => {
         const entryDate = new Date(entry.date);
@@ -142,6 +144,8 @@ export default function Dashboard() {
   }, [entries, dateRange]);
 
   const prepareSleepPatternData = useMemo(() => {
+    if (!Array.isArray(entries)) return [];
+    
     return entries
       .filter((entry) => {
         const entryDate = new Date(entry.date);
@@ -239,10 +243,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!entries.length) return;
-    
+
     const today = new Date().toISOString().split('T')[0];
-    const todayEntry = entries.find(entry => entry.date === today);
-    
+    const todayEntry = entries.find((entry) => entry.date === today);
+
     // If there's no entry at all for today, show the form
     if (!todayEntry) {
       setAutoOpenManualEntry(true);
@@ -293,6 +297,9 @@ export default function Dashboard() {
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
             <SectionHeader title="Sleep Analysis" />
+            <div className="mb-4 p-4 bg-white/50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800">
+              <NotionSetup/>
+            </div>
             <ManualEntryForm
               entries={entries}
               dateRange={dateRange}
@@ -321,7 +328,7 @@ export default function Dashboard() {
                 data={prepareChartData}
                 isLoadingCharts={isLoading}
               />
-              <SleepStats entries={entries} />
+              <SleepStats entries={entries} dateRange={dateRange} />
             </div>
 
             <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">

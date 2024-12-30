@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Moon } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -469,5 +469,55 @@ export const SleepAnalysisCard = ({
         )}
       </div>
     </div>
+  );
+};
+
+export const SleepAnalysis = () => {
+  const [entries, setEntries] = useState<DayEntry[]>([]);
+
+  useEffect(() => {
+    const fetchEntries = async () => {
+      console.log('Starting to fetch entries...'); // Debug log
+      try {
+        // Get the database ID from your notion credentials
+        console.log('Fetching notion credentials...'); // Debug log
+        const credResponse = await fetch('/api/user/notion-credentials');
+        const { notionDatabaseId } = await credResponse.json();
+        
+        console.log('Got database ID:', notionDatabaseId); // Debug log
+
+        if (!notionDatabaseId) {
+          console.error('No database ID found');
+          return;
+        }
+
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split('T')[0];
+
+        const url = `/api/notion/entries?databaseId=${notionDatabaseId}&startDate=${startDate}&endDate=${endDate}`;
+        console.log('Fetching from URL:', url); // Debug log
+
+        const response = await fetch(url);
+        console.log('Got response:', response.status); // Debug log
+        
+        const data = await response.json();
+        console.log('Parsed data:', data); // Debug log
+        
+        setEntries(data);
+      } catch (error) {
+        console.error('Error in fetchEntries:', error);
+      }
+    };
+
+    fetchEntries();
+  }, []);
+
+  return (
+    <SleepAnalysisCard
+      entry={entries[entries.length - 1]}
+      entries={entries}
+    />
   );
 };

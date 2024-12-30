@@ -40,9 +40,11 @@ export function ManualEntryForm({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const selectedEntry = entries.find(
-    (entry) => entry.date === selectedDate.toISOString().split('T')[0]
-  );
+  const selectedEntry = Array.isArray(entries) 
+    ? entries.find(
+        (entry) => entry.date === selectedDate.toISOString().split('T')[0]
+      )
+    : undefined;
 
   const hasMeaningfulSleepData =
     selectedEntry &&
@@ -89,9 +91,14 @@ export function ManualEntryForm({
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     setSelectedDate(newDate);
-    setFormValues(entries.find(
-      (entry) => entry.date === newDate.toISOString().split('T')[0]
-    ));
+    
+    if (Array.isArray(entries)) {
+      setFormValues(
+        entries.find(
+          (entry) => entry.date === newDate.toISOString().split('T')[0]
+        )
+      );
+    }
   };
 
   const handleSubmit = async () => {
@@ -164,12 +171,15 @@ export function ManualEntryForm({
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todayEntry = entries.find(entry => entry.date === today);
-    
+    const todayEntry = Array.isArray(entries) 
+      ? entries.find((entry) => entry.date === today)
+      : undefined;
+
     // Only auto-open if there's no meaningful sleep data for today AND autoOpen is true
-    const hasMeaningfulData = todayEntry && 
+    const hasMeaningfulData =
+      todayEntry &&
       (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
-    
+
     if (!hasMeaningfulData && autoOpen) {
       setIsOpen(true);
     }

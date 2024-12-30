@@ -1,17 +1,28 @@
 import { Outfit } from 'next/font/google';
 import { DayEntry } from '@/types/day-entry';
+import { useMemo } from 'react';
+import { DateRange } from 'react-day-picker';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
 interface SleepStatsProps {
   entries: DayEntry[];
+  dateRange: DateRange;
 }
 
-export function SleepStats({ entries }: SleepStatsProps) {
-  const calculateStats = (entries: DayEntry[]) => {
-    if (entries.length === 0) return null;
+export function SleepStats({ entries, dateRange }: SleepStatsProps) {
+  const calculateStats = (entries: DayEntry[], dateRange: DateRange) => {
+    if (!Array.isArray(entries)) return null;
 
-    const validEntries = entries.filter(
+    const filteredEntries = entries.filter((entry) => {
+      const entryDate = new Date(entry.date);
+      if (!dateRange.from || !dateRange.to) return false;
+      return entryDate >= dateRange.from && entryDate <= dateRange.to;
+    });
+
+    if (filteredEntries.length === 0) return null;
+
+    const validEntries = filteredEntries.filter(
       (entry) => entry.totalSleepHours + entry.totalSleepMinutes / 60 > 0
     );
 
@@ -77,6 +88,10 @@ export function SleepStats({ entries }: SleepStatsProps) {
     };
   };
 
+  const stats = useMemo(() => calculateStats(entries, dateRange), [entries, dateRange]);
+
+  if (!stats) return null;
+
   return (
     <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
       <h3
@@ -85,14 +100,6 @@ export function SleepStats({ entries }: SleepStatsProps) {
         Sleep Stats
       </h3>
       {(() => {
-        const stats = calculateStats(entries);
-        if (!stats)
-          return (
-            <p className="text-slate-600 dark:text-slate-400">
-              No data available
-            </p>
-          );
-
         return (
           <div className="space-y-4">
             <div>

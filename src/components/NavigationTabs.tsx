@@ -22,15 +22,19 @@ interface NavigationTabsProps {
   user?: any;
 }
 
-export const NavigationTabs = ({
+export function NavigationTabs({
   activeSection,
   setActiveSection,
   entries,
   user,
-}: NavigationTabsProps) => {
+}: NavigationTabsProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = createClientComponentClient();
+
+  const hasEntriesForToday = Array.isArray(entries) && entries.some(
+    (entry) => entry.date === new Date().toISOString().split('T')[0]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -65,17 +69,15 @@ export const NavigationTabs = ({
           const checklistItems = [
             {
               name: 'Daily Sleep',
-              done: entries.some(
-                (entry) => entry.date === new Date().toISOString().split('T')[0]
-              ),
+              done: hasEntriesForToday,
             },
             {
               name: 'Daily Weight',
-              done: entries.some((entry) => entry.weight !== null),
+              done: Array.isArray(entries) && entries.some((entry) => entry.weight !== null),
             },
             {
               name: 'RHR for Previous Day',
-              done: entries.some(
+              done: Array.isArray(entries) && entries.some(
                 (entry) =>
                   entry.date ===
                     new Date(Date.now() - 86400000)
@@ -85,7 +87,7 @@ export const NavigationTabs = ({
             },
             {
               name: 'Steps for Previous Day',
-              done: entries.some(
+              done: Array.isArray(entries) && entries.some(
                 (entry) =>
                   entry.date ===
                     new Date(Date.now() - 86400000)
@@ -174,4 +176,4 @@ export const NavigationTabs = ({
       </div>
     </div>
   );
-};
+}
