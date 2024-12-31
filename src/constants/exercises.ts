@@ -57,6 +57,7 @@ export const EXERCISE_LIBRARY: ExerciseLibrary = {
     { name: 'Close Grip Bench Press', primaryMuscle: 'triceps', secondaryMuscles: ['mid_chest'] },
     { name: 'Arnold Press', primaryMuscle: 'front_delts', secondaryMuscles: ['side_delts', 'rear_delts'] },
     { name: 'Reverse Pec Deck', primaryMuscle: 'rear_delts', secondaryMuscles: ['rhomboids'] },
+    { name: 'Behind-the-Neck Tricep Extension', primaryMuscle: 'triceps' },
   ],
   cardio: [
     { name: 'Treadmill', primaryMuscle: 'cardio' },

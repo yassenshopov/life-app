@@ -12,8 +12,8 @@ export const formatGymType = (type: string): string => {
   switch (type.toLowerCase()) {
     case 'back_and_chest':
       return 'Back & Chest';
-    case 'arms':
-      return 'Arms';
+    case 'shoulders_and_arms':
+      return 'Shoulders & Arms';
     case 'legs':
       return 'Legs';
     case 'full':

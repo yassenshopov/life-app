@@ -67,7 +67,7 @@ export const WorkoutCalendar = ({
   // Consolidate date-related state
   const [calendarState, setCalendarState] = useState({
     currentDate: new Date(),
-    selectedDate: new Date(),
+    selectedDate: new Date(new Date().setHours(0, 0, 0, 0)),
     gymDate: null as string | null,
   });
 
@@ -280,31 +280,47 @@ export const WorkoutCalendar = ({
 
   // Add function to handle editing a workout
   const handleEditWorkout = (workout: any) => {
+    // Add validation to ensure workout exists and has required data
+    if (!workout) {
+      console.warn('No workout data provided');
+      return;
+    }
+
+    // Ensure exercise_log exists and is an object
+    const exerciseLog = workout.exercise_log || {};
+    if (typeof exerciseLog !== 'object') {
+      console.error('Invalid exercise log format');
+      return;
+    }
+
     setFormState((prev) => ({
       ...prev,
       editingWorkout: workout,
-      sessionType: workout.type,
-      gymDate: workout.date,
+      sessionType: workout.type || '',
+      gymDate: workout.date || null,
       notes: workout.notes || '',
+      selectedExercises: Object.entries(exerciseLog).map(
+        ([name, data]: [string, any]) => {
+          // Validate exercise data
+          const exerciseData = data || {};
+          const sets = Array.isArray(exerciseData.sets) ? exerciseData.sets : [];
+          
+          return {
+            name: name
+              .split('_')
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' '),
+            primaryMuscle: (findExerciseInLibrary(name)?.primaryMuscle || 'full_body') as MuscleGroup,
+            sets: sets.map((set: any) => ({
+              reps: Number(set?.reps) || 0,
+              weight: Number(set?.weight) || 0,
+            })),
+          };
+        }
+      ),
     }));
 
-    // Transform exercise_log back into selectedExercises format
-    const exercises = Object.entries(workout.exercise_log).map(
-      ([name, data]: [string, any]) => ({
-        name: name
-          .split('_')
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' '),
-        primaryMuscle:
-          findExerciseInLibrary(name)?.primaryMuscle ||
-          ('full_body' as MuscleGroup),
-        sets: data.sets.map((set: any) => ({
-          reps: set.reps,
-          weight: set.weight,
-        })),
-      })
-    );
-    setFormState((prev) => ({ ...prev, selectedExercises: exercises }));
+    setShowGymForm(true);
   };
 
   const compareExerciseCount = (current: any, previous: any) => {
@@ -473,7 +489,26 @@ export const WorkoutCalendar = ({
                                   size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleEditWorkout(gymSessionsForDay[index]);
+                                    const formattedType = activity.title
+                                      .toLowerCase()
+                                      .replace(/\s*&\s*/g, '_and_')
+                                      .replace(/\s+/g, '_');
+                                    
+                                    console.log('Looking for session with type:', formattedType);
+                                    console.log('Available sessions:', gymSessionsForDay);
+                                    
+                                    let exerciseInfo: Exercise | undefined;
+                                    for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+                                      exerciseInfo = exercises.find((e: Exercise) => e.name === formattedType);
+                                      if (exerciseInfo) break;
+                                    }
+                                    
+                                    if (!exerciseInfo) {
+                                      console.warn(`No matching gym session found for type: ${formattedType}`);
+                                      return;
+                                    }
+                                    
+                                    handleEditWorkout(exerciseInfo);
                                   }}
                                   className="h-6 w-6"
                                 >
@@ -1078,16 +1113,30 @@ export const WorkoutCalendar = ({
                         <SelectValue placeholder="Select an exercise" />
                       </SelectTrigger>
                       <SelectContent>
-                        {EXERCISE_LIBRARY[formState.sessionType]?.map(
-                          (exercise: Exercise) => (
-                            <SelectItem
-                              key={exercise.name}
-                              value={exercise.name}
-                            >
-                              {exercise.name}
-                            </SelectItem>
-                          )
-                        )}
+                        {Object.entries(EXERCISE_LIBRARY).map(([type, exercises]) => (
+                          <div key={type} className="px-1 mb-2">
+                            <div className="text-sm font-medium text-slate-500 dark:text-slate-400 px-2 py-1.5">
+                              {formatGymType(type)}
+                            </div>
+                            {exercises.map((exercise: Exercise) => (
+                              <SelectItem
+                                key={exercise.name}
+                                value={exercise.name}
+                                className="flex items-center justify-between px-1 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md cursor-pointer"
+                              >
+                                <span className="text-sm text-slate-900 dark:text-slate-100 mr-0">
+                                  {exercise.name}
+                                </span>
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                                  {exercise.primaryMuscle
+                                    .split('_')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ')}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1103,9 +1152,9 @@ export const WorkoutCalendar = ({
                           className="flex items-center justify-between cursor-pointer"
                           onClick={() => toggleExercise(index)}
                         >
-                          <h3 className="text-lg font-medium">
-                            {exercise.name}
-                          </h3>
+                            <h3 className="text-lg font-medium">
+                              {exercise.name}
+                            </h3>
                           <Button variant="ghost" size="sm">
                             {collapsedExercises.has(index) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1212,6 +1261,67 @@ export const WorkoutCalendar = ({
                         )}
                       </div>
                     ))}
+                    
+                    {/* Add New+ card after the last exercise */}
+                    {formState.selectedExercises.length > 0 && (
+                      <div className="border border-dashed rounded-lg p-4 dark:border-slate-700 flex items-center justify-center">
+                        <Select
+                          value=""
+                          onValueChange={(value) => {
+                            if (value) {
+                              // Find exercise info by searching through all exercise types
+                              let exerciseInfo: Exercise | undefined;
+                              for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
+                                exerciseInfo = exercises.find((e: Exercise) => e.name === value);
+                                if (exerciseInfo) break;
+                              }
+                              
+                              setFormState((prev) => ({
+                                ...prev,
+                                selectedExercises: [
+                                  ...prev.selectedExercises,
+                                  {
+                                    name: value,
+                                    primaryMuscle: (exerciseInfo?.primaryMuscle || 'full_body') as MuscleGroup,
+                                    sets: [{ reps: 0, weight: 0 }],
+                                  },
+                                ],
+                              }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            New +
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(EXERCISE_LIBRARY).map(([type, exercises]) => (
+                              <div key={type} className="px-1 mb-2">
+                                <div className="text-sm font-medium text-slate-500 dark:text-slate-400 px-2 py-1.5">
+                                  {formatGymType(type)}
+                                </div>
+                                {exercises.map((exercise: Exercise) => (
+                                  <SelectItem
+                                    key={exercise.name}
+                                    value={exercise.name}
+                                    className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md cursor-pointer"
+                                  >
+                                    <span className="text-sm text-slate-900 dark:text-slate-100 mr-4">
+                                      {exercise.name}
+                                    </span>
+                                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                                      {exercise.primaryMuscle
+                                        .split('_')
+                                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                        .join(' ')}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
