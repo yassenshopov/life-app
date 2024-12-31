@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { X, Pencil, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -101,6 +101,17 @@ export function ManualEntryForm({
     }
   };
 
+  const fetchEntries = useCallback(async (databaseId: string) => {
+    const response = await fetch(
+      `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}&databaseId=${databaseId}`
+    );
+    if (!response.ok) {
+      throw new Error('Failed to fetch entries');
+    }
+    const data = await response.json();
+    setEntries(data);
+  }, [dateRange]);
+
   const handleSubmit = async () => {
     if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime)
       return;
@@ -108,54 +119,59 @@ export function ManualEntryForm({
     setIsSubmitting(true);
     setSubmitSuccess(false);
 
-    const [sleepHour, sleepMinute] = sleepTime.split(':');
-    const [wakeHour, wakeMinute] = wakeTime.split(':');
-
-    const entryDate = selectedDate.toISOString().split('T')[0];
-    const existingEntry = entries.find((entry) => entry.date === entryDate);
-
     try {
+      const credentialsResponse = await fetch('/api/user/notion-credentials');
+      if (!credentialsResponse.ok) {
+        throw new Error('Failed to fetch Notion credentials');
+      }
+      const credentials = await credentialsResponse.json();
+      
+      if (!credentials.notionDatabaseId) {
+        throw new Error('Notion database ID not found');
+      }
+
+      const [sleepHour, sleepMinute] = sleepTime.split(':');
+      const [wakeHour, wakeMinute] = wakeTime.split(':');
+
+      // Convert hour 24 to 0
+      const normalizedSleepHour = parseInt(sleepHour) === 24 ? 0 : parseInt(sleepHour);
+      
+      const entryDate = selectedDate.toISOString().split('T')[0];
+      const existingEntry = entries.find((entry) => entry.date === entryDate);
+
+      const payload = {
+        date: entryDate,
+        pageId: existingEntry?.id,
+        databaseId: credentials.notionDatabaseId,
+        GoneToSleepH: normalizedSleepHour,
+        GoneToSleepM: parseInt(sleepMinute),
+        AwokeH: parseInt(wakeHour),
+        AwokeM: parseInt(wakeMinute),
+        deepSleepPercentage: parseInt(deepSleep),
+        remSleepPercentage: parseInt(remSleep),
+        awakeTimeMinutes: parseInt(awakeTime),
+        restingHeartRate: restingHeartRate ? parseInt(restingHeartRate) : null,
+        steps: steps ? parseInt(steps) : null,
+        weight: weight ? parseFloat(weight) : null,
+      };
+
+      console.log('Submitting payload:', payload);
+
       const response = await fetch('/api/notion/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: entryDate,
-          pageId: existingEntry?.id,
-          GoneToSleepH: parseInt(sleepHour),
-          GoneToSleepM: parseInt(sleepMinute),
-          AwokeH: parseInt(wakeHour),
-          AwokeM: parseInt(wakeMinute),
-          deepSleepPercentage: parseInt(deepSleep),
-          remSleepPercentage: parseInt(remSleep),
-          awakeTimeMinutes: parseInt(awakeTime),
-          restingHeartRate: restingHeartRate
-            ? parseInt(restingHeartRate)
-            : null,
-          steps: steps ? parseInt(steps) : null,
-          weight: weight ? parseFloat(weight) : null,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Failed to save entry');
+      if (!response.ok) {
+        throw new Error('Failed to save entry');
+      }
 
-      // Clear form and show success
-      setSleepTime('');
-      setWakeTime('');
-      setDeepSleep('');
-      setRemSleep('');
-      setAwakeTime('');
-      setRestingHeartRate('');
-      setSteps('');
-      setWeight('');
       setSubmitSuccess(true);
-
-      // Refresh entries
-      const updatedEntries = await fetch(
-        `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}`
-      ).then((res) => res.json());
-      setEntries(updatedEntries);
+      await fetchEntries(credentials.notionDatabaseId);
     } catch (error) {
       console.error('Failed to save entry:', error);
+      setSubmitSuccess(false);
     } finally {
       setIsSubmitting(false);
       setTimeout(() => setSubmitSuccess(false), 3000);

@@ -77,8 +77,6 @@ export async function GET(request: Request) {
         page_size: 100,
       });
 
-      console.log('Notion API response:', response); // Debug log
-
       allResults = [...allResults, ...(response.results as NotionData[])];
       hasMore = response.has_more;
       nextCursor = response.next_cursor || undefined;
