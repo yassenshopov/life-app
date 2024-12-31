@@ -96,25 +96,10 @@ export const WorkoutCalendar = ({
 
   // Memoize data fetching
   const fetchWorkoutData = useCallback(async () => {
-    const startDate = new Date(
-      calendarState.currentDate.getFullYear(),
-      calendarState.currentDate.getMonth(),
-      1
-    );
-    const endDate = new Date(
-      calendarState.currentDate.getFullYear(),
-      calendarState.currentDate.getMonth() + 1,
-      0
-    );
-
     try {
       const [runsResponse, gymResponse] = await Promise.all([
-        fetch(
-          `/api/notion/running?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
-        ),
-        fetch(
-          `/api/supabase/exercises?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
-        ),
+        fetch(`/api/notion/running`),
+        fetch(`/api/supabase/exercises`),
       ]);
 
       const [runs, gymData] = await Promise.all([
@@ -123,18 +108,26 @@ export const WorkoutCalendar = ({
       ]);
 
       const formattedRuns = formatRunData(runs);
+      
+      // Ensure gymData is an array
+      const formattedGymData = Array.isArray(gymData) ? gymData : [];
 
       setWorkoutData((prev) => ({
         ...prev,
         workouts: formattedRuns,
-        gymSessions: gymData,
+        gymSessions: formattedGymData,
         isLoading: false,
       }));
     } catch (error) {
       console.error('Error fetching data:', error);
-      setWorkoutData((prev) => ({ ...prev, isLoading: false }));
+      setWorkoutData((prev) => ({ 
+        ...prev, 
+        workouts: [],
+        gymSessions: [],
+        isLoading: false 
+      }));
     }
-  }, [calendarState.currentDate]);
+  }, []);
 
   // Memoize exercise library lookup
   const findExerciseInLibrary = useCallback((name: string) => {
@@ -332,6 +325,7 @@ export const WorkoutCalendar = ({
   const formatRunData = (runs: any[]): WorkoutEvent[] =>
     runs.map((run) => ({
       id: run.id,
+      // Create date with timezone offset adjustment
       date: new Date(run.date + 'T00:00:00').toISOString().split('T')[0],
       type: 'run' as const,
       title: run.name,
@@ -616,53 +610,40 @@ export const WorkoutCalendar = ({
                 )}`}
           </h3>
           {workoutData.workouts.some(
-            (event) =>
-              new Date(event.date).toDateString() === new Date().toDateString()
+            (event) => {
+              const eventDate = new Date(event.date).toISOString().split('T')[0];
+              const selectedDate = calendarState.selectedDate.toISOString().split('T')[0];
+              return eventDate === selectedDate;
+            }
           ) ||
           workoutData.gymSessions.some(
-            (session) =>
-              new Date(session.date).toDateString() ===
-              new Date().toDateString()
+            (session) => {
+              const sessionDate = new Date(session.date + 'T00:00:00').toISOString().split('T')[0];
+              const selectedDate = calendarState.selectedDate.toISOString().split('T')[0];
+              return sessionDate === selectedDate;
+            }
           ) ? (
             <div className="space-y-6">
-              {/* Today's Activities List */}
+              {/* Activities List */}
               {[
-                ...workoutData.workouts.map((w) => {
-                  console.log('Processing workout:', w);
-                  return { ...w, activityType: 'run' };
-                }),
-                ...workoutData.gymSessions.map((g) => ({
-                  ...g,
-                  activityType: 'gym',
-                })),
+                ...workoutData.workouts.map((w) => ({ ...w, activityType: 'run' })),
+                ...workoutData.gymSessions.map((g) => ({ ...g, activityType: 'gym' })),
               ]
                 .filter((activity) => {
-                  const activityDate = new Date(activity.date + 'T00:00:00');
-                  if (activity.activityType === 'run') {
-                    activityDate.setDate(activityDate.getDate() + 1);
-                  }
-                  return (
-                    activityDate.toDateString() ===
-                    calendarState.selectedDate.toDateString()
-                  );
+                  const activityDate = activity.activityType === 'gym' 
+                    ? new Date(activity.date + 'T00:00:00').toISOString().split('T')[0]
+                    : new Date(activity.date).toISOString().split('T')[0];
+                  const selectedDate = calendarState.selectedDate.toISOString().split('T')[0];
+                  return activityDate === selectedDate;
                 })
                 .map((activity, index) => {
                   const isGymSession = activity.activityType === 'gym';
                   const isRun = activity.activityType === 'run';
 
-                  console.log('Activity:', {
-                    activity,
-                    isGymSession,
-                    isRun,
-                    date: new Date(activity.date).toDateString(),
-                    today: new Date().toDateString(),
-                  });
-
                   const previousSession = isGymSession
                     ? workoutData.gymSessions
                         .filter(
                           (s) =>
-                            // s.type === activity.type &&
                             new Date(s.date) < new Date(activity.date)
                         )
                         .sort(
@@ -672,16 +653,10 @@ export const WorkoutCalendar = ({
                         )[0]
                     : null;
 
-                  // Find previous run for comparison
-
-                  console.log('isRun:', isRun);
-                  console.log('workouts:', workoutData.workouts);
-                  console.log('activity:', activity);
                   const previousRun = isRun
                     ? workoutData.workouts
                         .filter(
                           (w) =>
-                            // w.type === 'run' &&
                             new Date(w.date) < new Date(activity.date)
                         )
                         .sort(
@@ -690,8 +665,6 @@ export const WorkoutCalendar = ({
                             new Date(a.date).getTime()
                         )[0]
                     : null;
-
-                  console.log('previousRun:', previousRun);
 
                   return (
                     <div
@@ -936,7 +909,7 @@ export const WorkoutCalendar = ({
             </div>
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              No activities recorded today
+              No activities recorded for this date
             </p>
           )}
         </div>

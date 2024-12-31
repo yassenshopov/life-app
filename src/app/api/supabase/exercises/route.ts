@@ -14,12 +14,19 @@ export async function GET(request: Request) {
   const endDate = searchParams.get('endDate');
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('training_sessions')
       .select('*')
-      .gte('date', startDate ? format(new Date(startDate), 'yyyy-MM-dd') : '')
-      .lte('date', endDate ? format(new Date(endDate), 'yyyy-MM-dd') : '')
       .order('date', { ascending: true });
+
+    // Only apply date filters if both dates are provided
+    if (startDate && endDate) {
+      query = query
+        .gte('date', format(new Date(startDate), 'yyyy-MM-dd'))
+        .lte('date', format(new Date(endDate), 'yyyy-MM-dd'));
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Supabase error:', error);
