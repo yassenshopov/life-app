@@ -10,7 +10,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Inter, Outfit } from 'next/font/google';
 import Link from 'next/link';
 import { ArrowLeft, LogOut, Github, Mail } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -44,9 +44,17 @@ const UserProfile = ({ user }: { user: User }) => (
   </div>
 );
 
-const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+const SettingsSection = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
   <section className="bg-white dark:bg-slate-900 rounded-lg p-6 shadow-sm border border-slate-200 dark:border-slate-800">
-    <h2 className={`text-lg font-semibold mb-4 text-slate-900 dark:text-white ${outfit.className}`}>
+    <h2
+      className={`text-lg font-semibold mb-4 text-slate-900 dark:text-white ${outfit.className}`}
+    >
       {title}
     </h2>
     {children}
@@ -73,7 +81,10 @@ export default function Settings() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
         if (error) throw error;
         if (!session) {
@@ -95,7 +106,9 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}>
+      <div
+        className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
+      >
         <LoadingSpinner size="lg" label="Authenticating..." />
       </div>
     );
@@ -103,7 +116,9 @@ export default function Settings() {
 
   if (error) {
     return (
-      <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}>
+      <div
+        className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
+      >
         <div className="text-red-500">{error}</div>
       </div>
     );
@@ -112,7 +127,9 @@ export default function Settings() {
   if (!user) return null;
 
   return (
-    <div className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}>
+    <div
+      className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
+    >
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <Link
@@ -124,7 +141,9 @@ export default function Settings() {
           </Link>
         </div>
 
-        <h1 className={`text-2xl font-bold mb-8 text-slate-900 dark:text-white ${outfit.className}`}>
+        <h1
+          className={`text-2xl font-bold mb-8 text-slate-900 dark:text-white ${outfit.className}`}
+        >
           Settings
         </h1>
 
@@ -162,4 +181,4 @@ export default function Settings() {
       </div>
     </div>
   );
-} 
+}
