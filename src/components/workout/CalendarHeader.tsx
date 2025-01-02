@@ -60,63 +60,65 @@ export const CalendarHeader = ({
   }, [setView]);
 
   return (
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+    <div className="flex flex-col items-center gap-3 mb-4 sm:mb-6 sm:flex-row sm:justify-between sm:gap-0">
+      <h3 className="text-base sm:text-lg font-medium text-slate-900 dark:text-slate-100 text-center sm:text-left">
         <span className={outfit.className}>
           {view === 'month'
             ? monthYear
             : `Week ${getWeekInfo(currentDate)}, ${currentDate.getFullYear()}`}
         </span>
       </h3>
-      <div className="flex gap-2">
-        <div className="flex mr-2 rounded-lg border border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-1.5 items-center sm:items-start">
+        <div className="flex gap-1.5">
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-800">
+            <Button
+              variant="ghost"
+              onClick={() => setView('month')}
+              className={`rounded-r-none h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm ${
+                view === 'month'
+                  ? 'bg-slate-100 dark:bg-slate-800'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              M
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setView('week')}
+              className={`rounded-l-none h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm ${
+                view === 'week'
+                  ? 'bg-slate-100 dark:bg-slate-800'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              W
+            </Button>
+          </div>
           <Button
-            variant="ghost"
-            onClick={() => setView('month')}
-            className={`rounded-r-none px-4 h-9 text-sm ${
-              view === 'month'
-                ? 'bg-slate-100 dark:bg-slate-800'
-                : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
+            variant="outline"
+            size="icon"
+            onClick={onTodayClick}
+            className="h-8 w-auto sm:h-9 px-3 sm:px-4 text-xs sm:text-sm border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
-            Month (M)
+            Today
           </Button>
           <Button
-            variant="ghost"
-            onClick={() => setView('week')}
-            className={`rounded-l-none px-4 h-9 text-sm ${
-              view === 'week'
-                ? 'bg-slate-100 dark:bg-slate-800'
-                : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
+            variant="outline"
+            size="icon"
+            onClick={onPreviousClick}
+            className="h-8 sm:h-9 w-8 sm:w-9 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
-            Week (W)
+            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onNextClick}
+            className="h-8 sm:h-9 w-8 sm:w-9 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onTodayClick}
-          className="w-auto border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 h-9 px-4"
-        >
-          Today
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onPreviousClick}
-          className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onNextClick}
-          className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );

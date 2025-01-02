@@ -8,7 +8,6 @@ const outfit = Outfit({ subsets: ['latin'] });
 
 export const SectionHeader = ({
   title,
-  className = '',
 }: SectionHeaderProps) => {
   return (
     <h2
