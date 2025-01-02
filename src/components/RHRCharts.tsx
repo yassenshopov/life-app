@@ -81,9 +81,11 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
         Resting Heart Rate
       </h3>
       <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={chartData} margin={{ bottom: 50 }}>
-            {/* ... existing chart configuration ... */}
+        <ResponsiveContainer width="100%" height={350}>
+          <AreaChart 
+            data={chartData} 
+            margin={{ bottom: 35, left: 5, right: 15, top: 5 }}
+          >
             <defs>
               <linearGradient id="rhrGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
@@ -97,12 +99,17 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
               textAnchor="end"
               height={60}
               interval={tickInterval}
-              tick={{ dy: 10, fontSize: 12 }}
+              tick={{ 
+                dy: 10, 
+                fontSize: '0.7rem',
+                fill: 'currentColor' 
+              }}
             />
             <YAxis
               domain={[minRHR - 2, maxRHR + 2]}
               tick={<CustomYAxisTick />}
               ticks={yAxisTicks}
+              width={35}
             />
             <Tooltip
               content={({ active, payload, label }) => {

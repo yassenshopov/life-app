@@ -34,14 +34,36 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
     ? Math.round(validSteps.reduce((acc, curr) => acc + curr, 0) / validSteps.length)
     : 0;
 
+  const CustomYAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    const value = Number(payload.value).toLocaleString();
+    
+    return (
+      <text
+        x={x}
+        y={y}
+        dy={4}
+        dx={-2}
+        textAnchor="end"
+        fill="currentColor"
+        fontSize="0.7rem"  // Match x-axis font size
+      >
+        {value}
+      </text>
+    );
+  };
+
   return (
     <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
       <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
         Daily Steps
       </h3>
       <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data} margin={{ bottom: 50 }}>
+        <ResponsiveContainer width="100%" height={350}>
+          <AreaChart 
+            data={data} 
+            margin={{ bottom: 35, left: 5, right: 15, top: 5 }}
+          >
             <defs>
               <linearGradient id="stepsGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#eab308" stopOpacity={0.8} />
@@ -55,9 +77,17 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
               textAnchor="end"
               height={60}
               interval={tickInterval}
-              tick={{ dy: 10, fontSize: 12 }}
+              tick={{ 
+                dy: 10, 
+                fontSize: '0.7rem',
+                fill: 'currentColor' 
+              }}
             />
-            <YAxis />
+            <YAxis
+              width={50}  // Slightly wider to ensure no cutoff
+              tick={<CustomYAxisTick />}
+              tickFormatter={(value) => value.toLocaleString()}
+            />
             <Tooltip
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {

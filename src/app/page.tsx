@@ -88,7 +88,7 @@ export default function Dashboard() {
   }));
 
   const [activeTab, setActiveTab] = useState<string | null>('30D');
-  const [activeSection, setActiveSection] = useState<DisplaySection>('all');
+  const [activeSection, setActiveSection] = useState<DisplaySection>('sleep');
   const [showAwakeTime, setShowAwakeTime] = useState(true);
   const [showGymForm, setShowGymForm] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);

@@ -37,15 +37,25 @@ interface WeightChartProps {
   tickInterval: number;
 }
 
-export const WeightChart = ({ data, isLoadingCharts, tickInterval }: WeightChartProps) => {
+export const WeightChart = ({
+  data,
+  isLoadingCharts,
+  tickInterval,
+}: WeightChartProps) => {
   // Calculate average weight for the period
   const validWeights = data
     .filter((entry) => entry.weight !== null)
     .map((entry) => entry.weight as number);
-  
-  const averageWeight = validWeights.length > 0
-    ? Number((validWeights.reduce((acc, curr) => acc + curr, 0) / validWeights.length).toFixed(1))
-    : 0;
+
+  const averageWeight =
+    validWeights.length > 0
+      ? Number(
+          (
+            validWeights.reduce((acc, curr) => acc + curr, 0) /
+            validWeights.length
+          ).toFixed(1)
+        )
+      : 0;
 
   // Custom tick formatter for Y-axis
   const CustomYAxisTick = (props: any) => {
@@ -73,12 +83,18 @@ export const WeightChart = ({ data, isLoadingCharts, tickInterval }: WeightChart
 
   return (
     <div className="lg:col-span-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-      <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <h3
+        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+      >
         Weight History
       </h3>
-      <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data} margin={{ bottom: 50 }}>
+      <div
+        className={`transition-opacity duration-200 ${
+          isLoadingCharts ? 'opacity-50' : 'opacity-100'
+        }`}
+      >
+        <ResponsiveContainer width="100%" height={350}>
+          <AreaChart data={data} margin={{ bottom:15, left: 5, right: 15, top: 5 }}>
             <defs>
               <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8} />
@@ -92,12 +108,17 @@ export const WeightChart = ({ data, isLoadingCharts, tickInterval }: WeightChart
               textAnchor="end"
               height={60}
               interval={tickInterval}
-              tick={{ dy: 10, fontSize: 12 }}
+              tick={{ 
+                dy: 10, 
+                fontSize: '0.7rem',  // Smaller font size for mobile
+                fill: 'currentColor' 
+              }}
             />
             <YAxis
               domain={[minWeight - 0.5, maxWeight + 0.5]}
               tick={<CustomYAxisTick />}
               ticks={yAxisTicks}
+              width={35}  // Fixed width for Y-axis
             />
             <Tooltip
               content={({ active, payload, label }) => {
@@ -108,9 +129,11 @@ export const WeightChart = ({ data, isLoadingCharts, tickInterval }: WeightChart
                         {label}
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Weight: {typeof payload[0].value === 'number'
+                        Weight:{' '}
+                        {typeof payload[0].value === 'number'
                           ? payload[0].value.toFixed(1)
-                          : payload[0].value} kg
+                          : payload[0].value}{' '}
+                        kg
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         Average: {averageWeight} kg
@@ -164,7 +187,9 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
   if (validData.length === 0) {
     return (
       <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Weight Analytics
         </h3>
         <p className="text-slate-600 dark:text-slate-400">
@@ -174,7 +199,8 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
     );
   }
 
-  const average = validData.reduce((acc, curr) => acc + curr.weight, 0) / validData.length;
+  const average =
+    validData.reduce((acc, curr) => acc + curr.weight, 0) / validData.length;
   const min = Math.min(...validData.map((d) => d.weight));
   const max = Math.max(...validData.map((d) => d.weight));
   const firstReading = validData[validData.length - 1].weight;
@@ -183,13 +209,16 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
 
   return (
     <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-      <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <h3
+        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+      >
         Weight Analytics
       </h3>
       <div className="space-y-4">
         <div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            {average.toFixed(1)} <span className="text-sm font-normal text-slate-500">kg</span>
+            {average.toFixed(1)}{' '}
+            <span className="text-sm font-normal text-slate-500">kg</span>
           </div>
           <div className="text-sm text-slate-600 dark:text-slate-400">
             Average Weight
@@ -199,7 +228,8 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {min.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span>
+              {min.toFixed(1)}{' '}
+              <span className="text-xs font-normal text-slate-500">kg</span>
             </div>
             <div className="text-sm text-slate-600 dark:text-slate-400">
               Lowest
@@ -207,7 +237,8 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
           </div>
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {max.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span>
+              {max.toFixed(1)}{' '}
+              <span className="text-xs font-normal text-slate-500">kg</span>
             </div>
             <div className="text-sm text-slate-600 dark:text-slate-400">
               Highest
@@ -220,9 +251,15 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
             <span className="text-sm text-slate-600 dark:text-slate-400">
               Period Trend
             </span>
-            <div className={`flex items-center gap-1 text-sm ${
-              trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-500'
-            }`}>
+            <div
+              className={`flex items-center gap-1 text-sm ${
+                trend > 0
+                  ? 'text-red-500'
+                  : trend < 0
+                  ? 'text-green-500'
+                  : 'text-slate-500'
+              }`}
+            >
               {trend !== 0 && (
                 <svg
                   className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`}
@@ -245,4 +282,4 @@ export const WeightAnalytics = ({ data }: WeightAnalyticsProps) => {
       </div>
     </div>
   );
-}; 
+};
