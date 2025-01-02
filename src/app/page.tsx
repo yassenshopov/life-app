@@ -295,7 +295,7 @@ export default function Dashboard() {
 
       {activeSection === 'all' && <FloatingToc sections={sections} />}
 
-      <main className="max-w-7xl mx-auto pt-32">
+      <main className="max-w-7xl mx-auto pt-16">
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
             <SectionHeader title="Sleep Analysis" />

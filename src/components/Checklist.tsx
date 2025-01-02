@@ -67,7 +67,7 @@ export function Checklist({
   ];
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
+    <div className="space-y-8 max-w-2xl mx-auto pt-16">
       <div className="flex items-center justify-between mb-8">
         <h2
           className={`text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text ${outfit.className}`}

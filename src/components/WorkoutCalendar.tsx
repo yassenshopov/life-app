@@ -37,6 +37,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import Link from 'next/link';
+import { Outfit } from 'next/font/google';
+
+const outfit = Outfit({ subsets: ['latin'] });
 
 interface WorkoutCalendarProps {
   onLoadingChange: (loading: boolean) => void;
@@ -190,6 +193,30 @@ export const WorkoutCalendar = ({
     return day === 0 ? 6 : day - 1;
   };
 
+  const getPreviousMonthDays = (date: Date) => {
+    const firstDay = getFirstDayOfMonth(date);
+    if (firstDay === 0) return [];
+    
+    const previousMonth = new Date(date.getFullYear(), date.getMonth() - 1);
+    const daysInPreviousMonth = getDaysInMonth(previousMonth);
+    
+    return Array.from({ length: firstDay }, (_, i) => ({
+      day: daysInPreviousMonth - firstDay + i + 1,
+      month: 'previous'
+    }));
+  };
+
+  const getNextMonthDays = (date: Date) => {
+    const daysInMonth = getDaysInMonth(date);
+    const firstDay = getFirstDayOfMonth(date);
+    const remainingDays = 42 - (firstDay + daysInMonth); // 42 = 6 rows * 7 days
+    
+    return Array.from({ length: remainingDays }, (_, i) => ({
+      day: i + 1,
+      month: 'next'
+    }));
+  };
+
   const handlePreviousMonth = () => {
     setCalendarState((prev) => ({
       ...prev,
@@ -207,6 +234,15 @@ export const WorkoutCalendar = ({
         prev.currentDate.getFullYear(),
         prev.currentDate.getMonth() + 1
       ),
+    }));
+  };
+
+  const handleTodayClick = () => {
+    const today = new Date();
+    setCalendarState((prev) => ({
+      ...prev,
+      currentDate: today,
+      selectedDate: new Date(today.setHours(0, 0, 0, 0)),
     }));
   };
 
@@ -357,10 +393,18 @@ export const WorkoutCalendar = ({
       <div className="lg:col-span-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
-            {monthYear}
+            <span className={outfit.className}>{monthYear}</span>
           </h3>
           {/* Calendar Navigation Buttons */}
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleTodayClick}
+              className="w-auto border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 h-9 px-4"
+            >
+              Today
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -382,7 +426,7 @@ export const WorkoutCalendar = ({
 
         {/* Calendar Grid */}
         <div className="grid grid-cols-7 gap-1">
-          {/* Day Headers - Now starting with Monday */}
+          {/* Day Headers */}
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
             <div
               key={day}
@@ -392,12 +436,60 @@ export const WorkoutCalendar = ({
             </div>
           ))}
 
-          {/* Empty cells for days before the first day of the month */}
-          {Array.from({ length: firstDayOfMonth }, (_, i) => (
-            <div key={`empty-${i}`} className="aspect-square p-2" />
-          ))}
+          {/* Previous Month Days */}
+          {getPreviousMonthDays(calendarState.currentDate).map(({ day }) => {
+            const previousMonthDate = new Date(
+              calendarState.currentDate.getFullYear(),
+              calendarState.currentDate.getMonth() - 1,
+              day
+            );
+            const dateString = previousMonthDate.toISOString().split('T')[0];
+            const workoutsForDay = workoutData.workouts.filter(
+              (event) => event.date === dateString
+            );
+            const gymSessionsForDay = workoutData.gymSessions.filter(
+              (session) => {
+                const sessionDate = new Date(session.date + 'T00:00:00')
+                  .toISOString()
+                  .split('T')[0];
+                return sessionDate === dateString;
+              }
+            );
 
-          {/* Calendar Days */}
+            return (
+              <div
+                key={`prev-${day}`}
+                onClick={() => handleDayClick(previousMonthDate)}
+                className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative opacity-40 cursor-pointer hover:opacity-60 transition-opacity ${
+                  previousMonthDate.toDateString() === calendarState.selectedDate.toDateString()
+                    ? 'ring-2 ring-purple-500 dark:ring-purple-400'
+                    : ''
+                }`}
+              >
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  {day}
+                </span>
+                {(workoutsForDay.length > 0 || gymSessionsForDay.length > 0) && (
+                  <div className="absolute bottom-1 right-1 flex gap-1">
+                    {workoutsForDay.map((_, index) => (
+                      <div
+                        key={index}
+                        className="w-2 h-2 rounded-full bg-orange-500"
+                      />
+                    ))}
+                    {gymSessionsForDay.map((_, index) => (
+                      <div
+                        key={index}
+                        className="w-2 h-2 rounded-full bg-purple-500"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Current Month Days */}
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
             const currentMonthDate = new Date(
               calendarState.currentDate.getFullYear(),
@@ -623,6 +715,59 @@ export const WorkoutCalendar = ({
                   )}
                 </TooltipUI>
               </TooltipProvider>
+            );
+          })}
+
+          {/* Next Month Days */}
+          {getNextMonthDays(calendarState.currentDate).map(({ day }) => {
+            const nextMonthDate = new Date(
+              calendarState.currentDate.getFullYear(),
+              calendarState.currentDate.getMonth() + 1,
+              day
+            );
+            const dateString = nextMonthDate.toISOString().split('T')[0];
+            const workoutsForDay = workoutData.workouts.filter(
+              (event) => event.date === dateString
+            );
+            const gymSessionsForDay = workoutData.gymSessions.filter(
+              (session) => {
+                const sessionDate = new Date(session.date + 'T00:00:00')
+                  .toISOString()
+                  .split('T')[0];
+                return sessionDate === dateString;
+              }
+            );
+
+            return (
+              <div
+                key={`next-${day}`}
+                onClick={() => handleDayClick(nextMonthDate)}
+                className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative opacity-40 cursor-pointer hover:opacity-60 transition-opacity ${
+                  nextMonthDate.toDateString() === calendarState.selectedDate.toDateString()
+                    ? 'ring-2 ring-purple-500 dark:ring-purple-400'
+                    : ''
+                }`}
+              >
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  {day}
+                </span>
+                {(workoutsForDay.length > 0 || gymSessionsForDay.length > 0) && (
+                  <div className="absolute bottom-1 right-1 flex gap-1">
+                    {workoutsForDay.map((_, index) => (
+                      <div
+                        key={index}
+                        className="w-2 h-2 rounded-full bg-orange-500"
+                      />
+                    ))}
+                    {gymSessionsForDay.map((_, index) => (
+                      <div
+                        key={index}
+                        className="w-2 h-2 rounded-full bg-purple-500"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
