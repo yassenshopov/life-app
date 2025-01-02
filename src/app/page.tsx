@@ -5,7 +5,7 @@ import { Inter, Outfit } from 'next/font/google';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from '@vercel/analytics/react';
 
 // Icons
 import {
@@ -52,6 +52,7 @@ import { MuscleGroup } from '@/constants/muscle-groups';
 // Form Components
 import { ManualEntryForm } from '@/components/ManualEntryForm';
 import { Checklist } from '@/components/Checklist';
+import { SevenDayReport } from '@/components/SevenDayReport';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -101,18 +102,15 @@ export default function Dashboard() {
     entries,
     setEntries,
     isLoading: healthLoading,
-    error
+    error,
   } = useHealthData();
-  const {
-    gymSessions,
-    loading: gymLoading,
-  } = useGymData(dateRange);
-  
+  const { gymSessions, loading: gymLoading } = useGymData(dateRange);
+
   const isLoading = healthLoading || gymLoading;
 
   const prepareChartData = useMemo(() => {
     if (!Array.isArray(entries)) return [];
-    
+
     return entries
       .filter((entry) => {
         const entryDate = new Date(entry.date);
@@ -146,7 +144,7 @@ export default function Dashboard() {
 
   const prepareSleepPatternData = useMemo(() => {
     if (!Array.isArray(entries)) return [];
-    
+
     return entries
       .filter((entry) => {
         const entryDate = new Date(entry.date);
@@ -296,6 +294,12 @@ export default function Dashboard() {
       {activeSection === 'all' && <FloatingToc sections={sections} />}
 
       <main className="max-w-7xl mx-auto pt-16">
+        {activeSection === 'all' && (
+          <div className="mb-8">
+            <SevenDayReport entries={entries} gymSessions={gymSessions} />
+          </div>
+        )}
+
         {(activeSection === 'all' || activeSection === 'sleep') && (
           <>
             <SectionHeader title="Sleep Analysis" />
