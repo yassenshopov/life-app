@@ -13,9 +13,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   X,
-  Pencil,
-  ChevronLeft,
-  ChevronRight,
   Calendar,
   BarChart2,
   Dumbbell as DumbbellIcon,
@@ -32,6 +29,8 @@ import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import { ActivityComparison } from '@/components/workout/ActivityComparison';
 import { ExerciseFormSection } from '@/components/workout/ExerciseFormSection';
+import { CalendarHeader } from '@/components/workout/CalendarHeader';
+import { CalendarDay } from '@/components/workout/CalendarDay';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -429,93 +428,17 @@ export const WorkoutCalendar = ({
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
       {/* Calendar Section - Left Side */}
       <div className="lg:col-span-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
-            <span className={outfit.className}>
-              {calendarState.view === 'month'
-                ? monthYear
-                : `Week ${
-                    getWeekInfo(calendarState.currentDate).weekNumber
-                  }, ${calendarState.currentDate.getFullYear()}`}
-            </span>
-          </h3>
-          {/* Calendar Navigation Buttons */}
-          <div className="flex gap-2">
-            <div className="flex mr-2 rounded-lg border border-slate-200 dark:border-slate-800">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setCalendarState((prev) => ({ ...prev, view: 'month' }))
-                }
-                className={`rounded-r-none px-3 ${
-                  calendarState.view === 'month'
-                    ? 'bg-slate-100 dark:bg-slate-800'
-                    : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                Month
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setCalendarState((prev) => ({ ...prev, view: 'week' }))
-                }
-                className={`rounded-l-none px-3 ${
-                  calendarState.view === 'week'
-                    ? 'bg-slate-100 dark:bg-slate-800'
-                    : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                Week
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleTodayClick}
-              className="w-auto border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 h-9 px-4"
-            >
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handlePreviousMonth}
-              className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleNextMonth}
-              className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <CalendarHeader
+          view={calendarState.view}
+          currentDate={calendarState.currentDate}
+          setView={(view) => setCalendarState((prev) => ({ ...prev, view }))}
+          onTodayClick={handleTodayClick}
+          onPreviousClick={handlePreviousMonth}
+          onNextClick={handleNextMonth}
+        />
 
-        {/* Calendar Grid */}
         <div className="grid grid-cols-7 gap-1">
-          {calendarState.view === 'week' && (
-            <div className="col-span-7 grid grid-cols-7 gap-1 mb-1">
-              {getWeekDays(calendarState.currentDate).map((date) => (
-                <div
-                  key={date.toISOString()}
-                  className="text-center text-sm text-slate-600 dark:text-slate-400"
-                >
-                  {date.toLocaleDateString('default', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Existing day headers */}
+          {/* Day headers remain the same */}
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
             <div
               key={day}
@@ -525,77 +448,26 @@ export const WorkoutCalendar = ({
             </div>
           ))}
 
+          {/* Replace the calendar days with CalendarDay components */}
           {calendarState.view === 'month' ? (
             <>
-              {getPreviousMonthDays(calendarState.currentDate).map(
-                ({ day }) => {
-                  const previousMonthDate = new Date(
+              {getPreviousMonthDays(calendarState.currentDate).map(({ day }) => (
+                <CalendarDay
+                  key={`prev-${day}`}
+                  day={day}
+                  month="previous"
+                  date={new Date(
                     calendarState.currentDate.getFullYear(),
                     calendarState.currentDate.getMonth() - 1,
                     day
-                  );
-                  const dateString = previousMonthDate
-                    .toISOString()
-                    .split('T')[0];
-                  const workoutsForDay = workoutData.workouts.filter(
-                    (event) => event.date === dateString
-                  );
-                  const gymSessionsForDay = workoutData.gymSessions.filter(
-                    (session) => {
-                      const sessionDate = new Date(session.date);
-                      sessionDate.setDate(sessionDate.getDate() - 1);
-                      return (
-                        sessionDate.toISOString().split('T')[0] === dateString
-                      );
-                    }
-                  );
-
-                  return (
-                    <div
-                      key={`prev-${day}`}
-                      onClick={() => handleDayClick(previousMonthDate)}
-                      className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative opacity-40 cursor-pointer hover:opacity-60 transition-opacity ${
-                        previousMonthDate.toDateString() ===
-                        calendarState.selectedDate.toDateString()
-                          ? 'ring-2 ring-purple-500 dark:ring-purple-400'
-                          : ''
-                      }`}
-                    >
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {day}
-                      </span>
-                      {gymSessionsForDay.length > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditWorkout(gymSessionsForDay[0]);
-                          }}
-                          className="absolute top-1 right-1 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      )}
-                      {(workoutsForDay.length > 0 ||
-                        gymSessionsForDay.length > 0) && (
-                        <div className="absolute bottom-1 right-1 flex gap-1">
-                          {workoutsForDay.map((_, index) => (
-                            <div
-                              key={index}
-                              className="w-2 h-2 rounded-full bg-orange-500"
-                            />
-                          ))}
-                          {gymSessionsForDay.map((_, index) => (
-                            <div
-                              key={index}
-                              className="w-2 h-2 rounded-full bg-purple-500"
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-              )}
+                  )}
+                  selectedDate={calendarState.selectedDate}
+                  workouts={workoutData.workouts}
+                  gymSessions={workoutData.gymSessions}
+                  onDayClick={handleDayClick}
+                  onEditGymSession={handleEditWorkout}
+                />
+              ))}
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(
                 (day) => {
                   const currentMonthDate = new Date(
@@ -645,59 +517,18 @@ export const WorkoutCalendar = ({
                   ];
 
                   return (
-                    <div
+                    <CalendarDay
                       key={day}
-                      onClick={() => handleDayClick(currentMonthDate)}
-                      className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative ${
-                        isToday
-                          ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
-                          : ''
-                      } ${
-                        currentMonthDate.toDateString() ===
-                        calendarState.selectedDate.toDateString()
-                          ? 'ring-2 ring-purple-500 dark:ring-purple-400'
-                          : ''
-                      } cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}
-                    >
-                      <span
-                        className={`text-sm ${
-                          isToday
-                            ? 'font-medium text-purple-600 dark:text-purple-400'
-                            : 'text-slate-600 dark:text-slate-400'
-                        }`}
-                      >
-                        {day}
-                      </span>
-                      {gymSessionsForDay.length > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditWorkout(gymSessionsForDay[0]);
-                          }}
-                          className="absolute top-1 right-1 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      )}
-                      {/* Activity indicators */}
-                      {(workoutsForDay.length > 0 ||
-                        gymSessionsForDay.length > 0) && (
-                        <div className="absolute bottom-1 right-1 flex gap-1">
-                          {workoutsForDay.map((_, index) => (
-                            <div
-                              key={index}
-                              className="w-2 h-2 rounded-full bg-orange-500"
-                            />
-                          ))}
-                          {gymSessionsForDay.map((_, index) => (
-                            <div
-                              key={index}
-                              className="w-2 h-2 rounded-full bg-purple-500"
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                      day={day}
+                      month="current"
+                      date={currentMonthDate}
+                      selectedDate={calendarState.selectedDate}
+                      workouts={workoutData.workouts}
+                      gymSessions={workoutData.gymSessions}
+                      onDayClick={handleDayClick}
+                      onEditGymSession={handleEditWorkout}
+                      isToday={isToday}
+                    />
                   );
                 }
               )}
@@ -722,131 +553,36 @@ export const WorkoutCalendar = ({
                 );
 
                 return (
-                  <div
+                  <CalendarDay
                     key={`next-${day}`}
-                    onClick={() => handleDayClick(nextMonthDate)}
-                    className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative opacity-40 cursor-pointer hover:opacity-60 transition-opacity ${
-                      nextMonthDate.toDateString() ===
-                      calendarState.selectedDate.toDateString()
-                        ? 'ring-2 ring-purple-500 dark:ring-purple-400'
-                        : ''
-                    }`}
-                  >
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      {day}
-                    </span>
-                    {gymSessionsForDay.length > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditWorkout(gymSessionsForDay[0]);
-                        }}
-                        className="absolute top-1 right-1 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    )}
-                    {(workoutsForDay.length > 0 ||
-                      gymSessionsForDay.length > 0) && (
-                      <div className="absolute bottom-1 right-1 flex gap-1">
-                        {workoutsForDay.map((_, index) => (
-                          <div
-                            key={index}
-                            className="w-2 h-2 rounded-full bg-orange-500"
-                          />
-                        ))}
-                        {gymSessionsForDay.map((_, index) => (
-                          <div
-                            key={index}
-                            className="w-2 h-2 rounded-full bg-purple-500"
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                    day={day}
+                    month="next"
+                    date={nextMonthDate}
+                    selectedDate={calendarState.selectedDate}
+                    workouts={workoutData.workouts}
+                    gymSessions={workoutData.gymSessions}
+                    onDayClick={handleDayClick}
+                    onEditGymSession={handleEditWorkout}
+                  />
                 );
               })}
             </>
           ) : (
             // Weekly view
-            <>
-              {getWeekDays(calendarState.currentDate).map((date) => {
-                const dateString = date.toISOString().split('T')[0];
-
-                const workoutsForDay = workoutData.workouts.filter(
-                  (event) => event.date === dateString
-                );
-                const gymSessionsForDay = workoutData.gymSessions.filter(
-                  (session) => {
-                    const sessionDate = new Date(session.date);
-                    sessionDate.setDate(sessionDate.getDate() - 1);
-                    return (
-                      sessionDate.toISOString().split('T')[0] === dateString
-                    );
-                  }
-                );
-
-                const isToday =
-                  date.toDateString() === new Date().toDateString();
-
-                return (
-                  <div
-                    key={date.toISOString()}
-                    onClick={() => handleDayClick(date)}
-                    className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative ${
-                      isToday
-                        ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
-                        : ''
-                    } ${
-                      date.toDateString() ===
-                      calendarState.selectedDate.toDateString()
-                        ? 'ring-2 ring-purple-500 dark:ring-purple-400'
-                        : ''
-                    } cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}
-                  >
-                    <span
-                      className={`text-sm ${
-                        isToday
-                          ? 'font-medium text-purple-600 dark:text-purple-400'
-                          : 'text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      {date.getDate()}
-                    </span>
-                    {/* Activity indicators */}
-                    {(workoutsForDay.length > 0 ||
-                      gymSessionsForDay.length > 0) && (
-                      <div className="absolute bottom-1 right-1 flex gap-1">
-                        {workoutsForDay.map((_, index) => (
-                          <div
-                            key={index}
-                            className="w-2 h-2 rounded-full bg-orange-500"
-                          />
-                        ))}
-                        {gymSessionsForDay.map((_, index) => (
-                          <div
-                            key={index}
-                            className="w-2 h-2 rounded-full bg-purple-500"
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {/* Edit icon - only for gym sessions */}
-                    {gymSessionsForDay.length > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditWorkout(gymSessionsForDay[0]);
-                        }}
-                        className="absolute top-1 right-1 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </>
+            getWeekDays(calendarState.currentDate).map((date) => (
+              <CalendarDay
+                key={date.toISOString()}
+                day={date.getDate()}
+                month="current"
+                date={date}
+                selectedDate={calendarState.selectedDate}
+                workouts={workoutData.workouts}
+                gymSessions={workoutData.gymSessions}
+                onDayClick={handleDayClick}
+                onEditGymSession={handleEditWorkout}
+                isToday={date.toDateString() === new Date().toDateString()}
+              />
+            ))
           )}
         </div>
       </div>
