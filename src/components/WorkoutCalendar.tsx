@@ -11,12 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import {
-  X,
-  Calendar,
-  BarChart2,
-  Dumbbell as DumbbellIcon,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import {
   EXERCISE_LIBRARY,
   GymSessionType,
@@ -25,8 +20,6 @@ import {
 import { MuscleGroup } from '@/constants/muscle-groups';
 import { WorkoutEvent, WorkoutExercise } from '@/types/workout';
 import { formatGymType } from '@/lib/utils';
-import Link from 'next/link';
-import { ActivityComparison } from '@/components/workout/ActivityComparison';
 import { ExerciseFormSection } from '@/components/workout/ExerciseFormSection';
 import { CalendarHeader } from '@/components/workout/CalendarHeader';
 import { CalendarDay } from '@/components/workout/CalendarDay';
@@ -409,23 +402,27 @@ export const WorkoutCalendar = ({
           {/* Replace the calendar days with CalendarDay components */}
           {calendarState.view === 'month' ? (
             <>
-              {getPreviousMonthDays(calendarState.currentDate).map(({ day }) => (
-                <CalendarDay
-                  key={`prev-${day}`}
-                  day={day}
-                  month="previous"
-                  date={new Date(
-                    calendarState.currentDate.getFullYear(),
-                    calendarState.currentDate.getMonth() - 1,
-                    day
-                  )}
-                  selectedDate={calendarState.selectedDate}
-                  workouts={workoutData.workouts}
-                  gymSessions={workoutData.gymSessions}
-                  onDayClick={handleDayClick}
-                  onEditGymSession={handleEditWorkout}
-                />
-              ))}
+              {getPreviousMonthDays(calendarState.currentDate).map(
+                ({ day }) => (
+                  <CalendarDay
+                    key={`prev-${day}`}
+                    day={day}
+                    month="previous"
+                    date={
+                      new Date(
+                        calendarState.currentDate.getFullYear(),
+                        calendarState.currentDate.getMonth() - 1,
+                        day
+                      )
+                    }
+                    selectedDate={calendarState.selectedDate}
+                    workouts={workoutData.workouts}
+                    gymSessions={workoutData.gymSessions}
+                    onDayClick={handleDayClick}
+                    onEditGymSession={handleEditWorkout}
+                  />
+                )
+              )}
               {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(
                 (day) => {
                   const currentMonthDate = new Date(
@@ -436,43 +433,10 @@ export const WorkoutCalendar = ({
                   const dateString = currentMonthDate
                     .toISOString()
                     .split('T')[0];
-                  const workoutsForDay = workoutData.workouts.filter(
-                    (event) => event.date === dateString
-                  );
-                  const gymSessionsForDay = workoutData.gymSessions.filter(
-                    (session) => {
-                      const sessionDate = new Date(session.date);
-                      sessionDate.setDate(sessionDate.getDate() - 1);
-                      return (
-                        sessionDate.toISOString().split('T')[0] === dateString
-                      );
-                    }
-                  );
+
                   const isToday =
                     currentMonthDate.toDateString() ===
                     new Date().toDateString();
-
-                  // Combine both types of activities
-                  const activitiesForDay = [
-                    ...workoutsForDay.map((workout) => ({
-                      type: workout.type,
-                      title: workout.title,
-                      details: {
-                        distance: workout.distance,
-                        duration: workout.duration,
-                        pace: workout.pace,
-                        notes: workout.notes,
-                      },
-                    })),
-                    ...gymSessionsForDay.map((session) => ({
-                      type: 'gym',
-                      title: formatGymType(session.type) || 'Gym Session',
-                      details: {
-                        exercises: session.exercise_log,
-                        notes: session.notes,
-                      },
-                    })),
-                  ];
 
                   return (
                     <CalendarDay
@@ -497,18 +461,6 @@ export const WorkoutCalendar = ({
                   day
                 );
                 const dateString = nextMonthDate.toISOString().split('T')[0];
-                const workoutsForDay = workoutData.workouts.filter(
-                  (event) => event.date === dateString
-                );
-                const gymSessionsForDay = workoutData.gymSessions.filter(
-                  (session) => {
-                    const sessionDate = new Date(session.date);
-                    sessionDate.setDate(sessionDate.getDate() - 1);
-                    return (
-                      sessionDate.toISOString().split('T')[0] === dateString
-                    );
-                  }
-                );
 
                 return (
                   <CalendarDay
