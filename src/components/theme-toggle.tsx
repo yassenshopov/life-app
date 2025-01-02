@@ -12,6 +12,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+// Add a custom hook to handle theme toggling
+export function useThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark')
+  }
+
+  return { theme, toggleTheme }
+}
+
 export function ThemeToggle() {
   const { setTheme } = useTheme()
 

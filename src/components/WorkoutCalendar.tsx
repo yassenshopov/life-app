@@ -462,7 +462,6 @@ export const WorkoutCalendar = ({
                   calendarState.currentDate.getMonth() + 1,
                   day
                 );
-                const dateString = nextMonthDate.toISOString().split('T')[0];
 
                 return (
                   <CalendarDay

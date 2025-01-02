@@ -5,6 +5,7 @@ import { SupabaseProvider } from '@/components/providers/SupabaseProvider';
 import { Inter } from 'next/font/google';
 import { defaultMetadata } from './metadata';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { GlobalThemeToggle } from '@/components/GlobalThemeToggle';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -34,6 +35,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <GlobalThemeToggle />
             {children}
             <SpeedInsights />
           </ThemeProvider>
