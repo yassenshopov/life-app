@@ -378,7 +378,7 @@ export const WorkoutCalendar = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
       {/* Calendar Section - Left Side */}
-      <div className="lg:col-span-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800">
+      <div className="lg:col-span-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-2 sm:p-6 border border-slate-200 dark:border-slate-800">
         <CalendarHeader
           view={calendarState.view}
           currentDate={calendarState.currentDate}
@@ -388,18 +388,20 @@ export const WorkoutCalendar = ({
           onNextClick={handleNextMonth}
         />
 
-        <div className="grid grid-cols-7 gap-1">
-          {/* Day headers remain the same */}
+        <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+          {/* Day headers with responsive text */}
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
             <div
               key={day}
-              className="text-center text-sm font-medium text-slate-600 dark:text-slate-400 p-2"
+              className="text-center text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 p-1 sm:p-2"
             >
-              {day}
+              {/* Show shorter version on mobile */}
+              <span className="sm:hidden">{day.slice(0, 1)}</span>
+              <span className="hidden sm:inline">{day}</span>
             </div>
           ))}
 
-          {/* Replace the calendar days with CalendarDay components */}
+          {/* Calendar days with adjusted padding and text sizes */}
           {calendarState.view === 'month' ? (
             <>
               {getPreviousMonthDays(calendarState.currentDate).map(
@@ -478,7 +480,7 @@ export const WorkoutCalendar = ({
               })}
             </>
           ) : (
-            // Weekly view
+            // Weekly view with same responsive adjustments
             getWeekDays(calendarState.currentDate).map((date) => (
               <CalendarDay
                 key={date.toISOString()}

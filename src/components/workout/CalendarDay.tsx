@@ -1,5 +1,6 @@
 import { Pencil } from 'lucide-react';
 import { WorkoutEvent } from '@/types/workout';
+import { cn } from '@/lib/utils';
 
 interface CalendarDayProps {
   day: number;
@@ -38,30 +39,24 @@ export const CalendarDay = ({
   return (
     <div
       onClick={() => onDayClick(date)}
-      className={`aspect-square p-2 border border-slate-200 dark:border-slate-700 rounded-lg relative 
-        ${
-          isToday
-            ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
-            : ''
+      className={cn(
+        'min-h-[60px] sm:min-h-[80px] p-1 sm:p-2 relative cursor-pointer',
+        {
+          'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800': isToday,
+          'ring-2 ring-purple-500 dark:ring-purple-400': isSelected,
+          'opacity-40 cursor-pointer hover:opacity-60': isPreviousOrNext,
+          'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50': !isPreviousOrNext,
         }
-        ${
-          isSelected
-            ? 'ring-2 ring-purple-500 dark:ring-purple-400'
-            : ''
-        }
-        ${
-          isPreviousOrNext
-            ? 'opacity-40 cursor-pointer hover:opacity-60'
-            : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50'
-        }
-        transition-colors`}
+      )}
     >
       <span
-        className={`text-sm ${
-          isToday
-            ? 'font-medium text-purple-600 dark:text-purple-400'
-            : 'text-slate-600 dark:text-slate-400'
-        }`}
+        className={cn(
+          'text-xs sm:text-sm font-medium',
+          {
+            'text-purple-600 dark:text-purple-400': isToday,
+            'text-slate-600 dark:text-slate-400': !isToday,
+          }
+        )}
       >
         {day}
       </span>
@@ -77,7 +72,7 @@ export const CalendarDay = ({
         </button>
       )}
       {(workoutsForDay.length > 0 || gymSessionsForDay.length > 0) && (
-        <div className="absolute bottom-1 right-1 flex gap-1">
+        <div className="absolute bottom-1 left-1 right-1 flex flex-col gap-0.5 sm:gap-1">
           {workoutsForDay.map((_, index) => (
             <div
               key={index}
