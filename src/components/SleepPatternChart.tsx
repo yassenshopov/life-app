@@ -1,113 +1,88 @@
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { format } from 'date-fns';
 
-interface SleepPatternChartProps {
-  data: Array<{
-    date: string;
-    fullDate: string;
-    sleepStart: number;
-    sleepEnd: number;
-    duration: number;
-  }>;
+interface SleepPatternData {
+  date: string;
+  fullDate: string;
+  sleepStart: number;
+  sleepEnd: number;
+  duration: number;
 }
 
-export const SleepPatternChart = ({ data }: SleepPatternChartProps) => {
-  const getTickInterval = (dataLength: number) => {
-    if (dataLength <= 7) return 0;
-    if (dataLength <= 14) return 1;
-    if (dataLength <= 31) return 2;
-    return Math.floor(dataLength / 15);
-  };
+interface SleepPatternChartProps {
+  data: SleepPatternData[];
+}
 
-  const tickInterval = getTickInterval(data.length);
+export function SleepPatternChart({ data }: SleepPatternChartProps) {
+  // Transform data to show bars from sleep start to end
+  const chartData = data.map(entry => ({
+    date: format(new Date(entry.fullDate), 'MMM dd'),
+    duration: entry.duration || 0,
+    fullData: entry
+  }));
 
-  const formatTime = (decimal: number) => {
-    const adjustedHour = Math.floor((decimal + 18) % 24);
-    const minute = Math.floor((decimal % 1) * 60);
-    const period = adjustedHour >= 12 ? 'PM' : 'AM';
-    const displayHour = adjustedHour % 12 || 12;
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.[0]) return null;
+
+    const data = payload[0].payload.fullData;
+    const formatTime = (time: number) => {
+      // Handle negative hours by adding 24
+      const adjustedHour = Math.floor(((time + 24) % 24));
+      // Get minutes and ensure they're positive
+      const minutes = Math.abs(time % 1 * 60);
+      return `${adjustedHour}:${minutes.toFixed(0).padStart(2, '0')}`;
+    };
+
+    const sleepStart = formatTime(data.sleepStart);
+    const sleepEnd = formatTime(data.sleepEnd);
+
+    console.log(sleepStart, sleepEnd);
+
+    return (
+      <div className="bg-white dark:bg-slate-800 p-2 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+        <p className="font-medium">{format(new Date(data.fullDate), 'MMMM d, yyyy')}</p>
+        <p>Sleep time: {sleepStart}</p>
+        <p>Wake time: {sleepEnd}</p>
+        <p>Duration: {data.duration.toFixed(1)} hours</p>
+      </div>
+    );
   };
 
   return (
-    <ResponsiveContainer width="100%" height={400}>
-      <LineChart
-        data={data}
-        margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          dataKey="date"
-          scale="point"
-          padding={{ left: 20, right: 20 }}
-          tick={{ dy: 10, fontSize: 12 }}
-          interval={tickInterval}
-          angle={-45}
-          textAnchor="end"
-          height={60}
-        />
-        <YAxis
-          domain={[16, 0]}
-          ticks={[0, 2, 4, 6, 8, 10, 12, 14, 16]}
-          tickFormatter={(value) => {
-            const hour = (value + 14) % 24;
-            return hour.toString().padStart(2, '0') + ':00';
-          }}
-          label={{
-            value: 'Time of Day',
-            angle: -90,
-            position: 'insideLeft',
-          }}
-          reversed={true}
-        />
-        <Tooltip
-          content={({ active, payload }) => {
-            if (active && payload?.[0]?.payload) {
-              const data = payload[0].payload;
-              
-              return (
-                <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                  <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">
-                    {data.date}
-                  </p>
-                  <div className="space-y-1">
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Sleep: {formatTime(data.sleepStart)}
-                    </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Wake: {formatTime(data.sleepEnd)}
-                    </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Duration: {data.duration.toFixed(1)}h
-                    </p>
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          }}
-        />
-
-        {data.map((entry, index) => {
-          const xPercent = (index * (82 / (data.length - 1))) + 9;
-          const yStart = (entry.sleepStart * (400 / 16));
-          const yEnd = (entry.sleepEnd * (400 / 16));
-          
-          return (
-            <line
-              key={index}
-              x1={`${xPercent}%`}
-              x2={`${xPercent}%`}
-              y1={yStart}
-              y2={yEnd}
-              strokeWidth="16"
-              stroke="#a855f7"
-              strokeOpacity={0.9}
-              strokeLinecap="round"
-              className="transition-opacity hover:opacity-100"
-            />
-          );
-        })}
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="w-full h-[400px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ top: 20, right: 30, left: 40, bottom: 5 }}
+          stackOffset="wiggle"
+        >
+          <XAxis
+            type="number"
+            domain={[-6, 12]}
+            ticks={[-6, -3, 0, 3, 6, 9, 12]}
+            tickFormatter={(value) => {
+              const hour = ((value + 24) % 24);
+              return `${hour}:00`;
+            }}
+          />
+          <YAxis
+            dataKey="date"
+            type="category"
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar
+            dataKey="duration"
+            fill="#8884d8"
+            radius={[4, 4, 4, 4]}
+            stackId="sleep"
+            minPointSize={0}
+            background={{ fill: 'transparent' }}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
-}; 
+} 
