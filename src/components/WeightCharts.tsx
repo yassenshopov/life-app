@@ -110,9 +110,11 @@ export const WeightChart = ({
               interval={tickInterval}
               tick={{ 
                 dy: 10, 
-                fontSize: '0.7rem',  // Smaller font size for mobile
+                fontSize: '0.7rem',
                 fill: 'currentColor' 
               }}
+              scale="point"
+              padding={{ left: 10, right: 10 }}
             />
             <YAxis
               domain={[minWeight - 0.5, maxWeight + 0.5]}
@@ -157,10 +159,13 @@ export const WeightChart = ({
               stroke="#14b8a6"
               strokeDasharray="3 3"
               label={{
-                value: `Avg: ${averageWeight} kg`,
-                position: 'right',
+                value: `Average`,
+                position: 'insideRight',
                 fill: '#14b8a6',
-                fontSize: 12,
+                fontSize: 16,
+                offset: -10,
+                fontWeight: 600,
+                opacity: 0.8,
               }}
             />
           </AreaChart>

@@ -84,7 +84,7 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
         <ResponsiveContainer width="100%" height={350}>
           <AreaChart 
             data={chartData} 
-            margin={{ bottom: 35, left: 5, right: 15, top: 5 }}
+            margin={{ bottom: 15, left: 5, right: 15, top: 5 }}
           >
             <defs>
               <linearGradient id="rhrGradient" x1="0" y1="0" x2="0" y2="1">
@@ -104,6 +104,8 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
                 fontSize: '0.7rem',
                 fill: 'currentColor' 
               }}
+              scale="point"
+              padding={{ left: 10, right: 10 }}
             />
             <YAxis
               domain={[minRHR - 2, maxRHR + 2]}
@@ -142,10 +144,13 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
               stroke="#ef4444"
               strokeDasharray="3 3"
               label={{
-                value: `Avg: ${averageRHR} bpm`,
-                position: 'right',
+                value: `Average`,
+                position: 'insideRight',
                 fill: '#ef4444',
-                fontSize: 12,
+                fontSize: 16,
+                offset: -10,
+                fontWeight: 600,
+                opacity: 0.8,
               }}
             />
           </AreaChart>
