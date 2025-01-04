@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -375,6 +375,9 @@ export const WorkoutCalendar = ({
     });
   };
 
+  // Add useRef at the top with other hooks
+  const modalRef = useRef<HTMLDivElement>(null);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
       {/* Calendar Section - Left Side */}
@@ -511,8 +514,15 @@ export const WorkoutCalendar = ({
 
       {/* Keep the gym form modal */}
       {showGymForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setShowGymForm(false)} // Close on overlay click
+        >
+          <div 
+            ref={modalRef}
+            className="bg-white dark:bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
+          >
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">

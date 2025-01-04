@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Calendar, BarChart2, Dumbbell as DumbbellIcon } from 'lucide-react';
+import { Calendar, BarChart2, Pencil, DumbbellIcon } from 'lucide-react';
 import Link from 'next/link';
 import { ActivityComparison } from '@/components/workout/ActivityComparison';
 import { MuscleGroup } from '@/constants/muscle-groups';
@@ -13,10 +13,12 @@ interface WorkoutDetailsProps {
     gymSessions: any[];
     isLoading: boolean;
   };
-  findExerciseInLibrary: (name: string) => { 
-    primaryMuscle: MuscleGroup;
-    secondaryMuscles: MuscleGroup[] | undefined;
-  } | undefined;
+  findExerciseInLibrary: (name: string) =>
+    | {
+        primaryMuscle: MuscleGroup;
+        secondaryMuscles: MuscleGroup[] | undefined;
+      }
+    | undefined;
   calculateVolumeChange: (current: any, previous: any) => string;
   compareExerciseCount: (current: any, previous: any) => string;
   onMuscleClick?: (muscle: MuscleGroup) => void;
@@ -86,9 +88,7 @@ export const WorkoutDetails = ({
 
                 const previousSession = isGymSession
                   ? workoutData.gymSessions
-                      .filter(
-                        (s) => new Date(s.date) < new Date(activity.date)
-                      )
+                      .filter((s) => new Date(s.date) < new Date(activity.date))
                       .sort(
                         (a, b) =>
                           new Date(b.date).getTime() -
@@ -98,9 +98,7 @@ export const WorkoutDetails = ({
 
                 const previousRun = isRun
                   ? workoutData.workouts
-                      .filter(
-                        (w) => new Date(w.date) < new Date(activity.date)
-                      )
+                      .filter((w) => new Date(w.date) < new Date(activity.date))
                       .sort(
                         (a, b) =>
                           new Date(b.date).getTime() -
@@ -226,8 +224,8 @@ export const WorkoutDetails = ({
                     ) : (
                       <div className="space-y-3 pl-4">
                         <div className="text-sm text-slate-600 dark:text-slate-400">
-                          {Object.keys(activity.exercise_log).length}{' '}
-                          exercises ·{' '}
+                          {Object.keys(activity.exercise_log).length} exercises
+                          ·{' '}
                           {String(
                             (
                               Object.values(activity.exercise_log) as {
@@ -273,8 +271,7 @@ export const WorkoutDetails = ({
                                 ?.split('_')
                                 .map(
                                   (word) =>
-                                    word.charAt(0).toUpperCase() +
-                                    word.slice(1)
+                                    word.charAt(0).toUpperCase() + word.slice(1)
                                 )
                                 .join(' ')}
                             </Link>
@@ -312,28 +309,61 @@ export const WorkoutDetails = ({
         <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">
           Quick Actions
         </h3>
-        <div className="space-y-2">
+        <div className="flex flex-col space-y-2">
           <Button
             variant="outline"
             className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
             onClick={() => setShowGymForm(true)}
           >
-            <DumbbellIcon className="mr-2 h-4 w-4" /> Add Gym Session
+            {workoutData.gymSessions.some((session) => {
+              const sessionDate = new Date(session.date + 'T00:00:00')
+                .toISOString()
+                .split('T')[0];
+              const selectedDateStr = selectedDate.toISOString().split('T')[0];
+              return sessionDate === selectedDateStr;
+            }) ? (
+              <Pencil className="mr-2 h-4 w-4" />
+            ) : (
+              <DumbbellIcon className="mr-2 h-4 w-4" />
+            )}
+            {workoutData.gymSessions.some((session) => {
+              const sessionDate = new Date(session.date + 'T00:00:00')
+                .toISOString()
+                .split('T')[0];
+              const selectedDateStr = selectedDate.toISOString().split('T')[0];
+              return sessionDate === selectedDateStr;
+            })
+              ? 'Edit Gym Session'
+              : 'Add Gym Session'}
           </Button>
           <Button
             variant="outline"
             className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            disabled
+            onClick={() => {
+              const tomorrow = new Date(selectedDate);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              // Add logic to schedule next workout
+            }}
           >
-            <Calendar className="mr-2 h-4 w-4" /> View Schedule
+            <Calendar className="mr-2 h-4 w-4" /> Schedule Next Workout
           </Button>
           <Button
             variant="outline"
             className="w-full justify-start border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+            disabled
+            onClick={() => {
+              // Add logic to export workout data
+              const workouts = workoutData.workouts.concat(
+                workoutData.gymSessions
+              );
+              // Implement export functionality
+            }}
           >
-            <BarChart2 className="mr-2 h-4 w-4" /> Progress Stats
+            <BarChart2 className="mr-2 h-4 w-4" /> Export Workout Data
           </Button>
         </div>
       </div>
     </div>
   );
-}; 
+};

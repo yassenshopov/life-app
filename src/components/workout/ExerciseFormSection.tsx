@@ -21,10 +21,10 @@ export const ExerciseFormSection = ({
       {selectedExercises.map((exercise, index) => (
         <div
           key={index}
-          className="border rounded-lg p-4 dark:border-slate-700"
+          className="border rounded-lg p-4 dark:border-slate-700 bg-slate-50/50 dark:bg-transparent shadow-sm"
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">{exercise.name}</h3>
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">{exercise.name}</h3>
             <div className="flex gap-1">
               <Button
                 variant="ghost"
@@ -59,13 +59,13 @@ export const ExerciseFormSection = ({
             <div className="mt-4">
               {exercise.sets.map((set, setIndex) => (
                 <div key={setIndex} className="flex items-center gap-2 mb-2">
-                  <span className="text-sm text-slate-500 w-10">
+                  <span className="text-sm text-slate-600 dark:text-slate-500 w-10">
                     Set {setIndex + 1}
                   </span>
                   <input
                     type="number"
                     placeholder="Reps"
-                    className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                    className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/50 p-2 shadow-sm focus:border-slate-300 focus:ring-1 focus:ring-slate-300 focus:bg-white"
                     value={set.reps || ''}
                     onChange={(e) => {
                       const newExercises = [...selectedExercises];
@@ -78,11 +78,11 @@ export const ExerciseFormSection = ({
                       }));
                     }}
                   />
-                  <span className="text-sm text-slate-500">×</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-500">×</span>
                   <input
                     type="number"
                     placeholder="Weight"
-                    className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-800/50 p-2"
+                    className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/50 p-2 shadow-sm focus:border-slate-300 focus:ring-1 focus:ring-slate-300 focus:bg-white"
                     value={set.weight || ''}
                     onChange={(e) => {
                       const newExercises = [...selectedExercises];
@@ -95,7 +95,7 @@ export const ExerciseFormSection = ({
                       }));
                     }}
                   />
-                  <span className="text-sm text-slate-500">kg</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-500">kg</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -116,7 +116,7 @@ export const ExerciseFormSection = ({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full mt-2"
+                className="w-full mt-2 border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent"
                 onClick={() => {
                   const newExercises = [...selectedExercises];
                   newExercises[index].sets.push({
