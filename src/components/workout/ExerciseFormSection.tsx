@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { X, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { WorkoutExercise } from '@/types/workout';
 import { Dispatch, SetStateAction } from 'react';
 
@@ -23,24 +23,42 @@ export const ExerciseFormSection = ({
           key={index}
           className="border rounded-lg p-4 dark:border-slate-700"
         >
-          <div
-            className="flex items-center justify-between cursor-pointer"
-            onClick={() => toggleExercise(index)}
-          >
+          <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium">{exercise.name}</h3>
-            <Button variant="ghost" size="sm">
-              {collapsedExercises.has(index) ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newExercises = [...selectedExercises];
+                  newExercises.splice(index, 1);
+                  setFormState((prev: any) => ({
+                    ...prev,
+                    selectedExercises: newExercises,
+                  }));
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => toggleExercise(index)}
+              >
+                {collapsedExercises.has(index) ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
 
           {!collapsedExercises.has(index) && (
             <div className="mt-4">
               {exercise.sets.map((set, setIndex) => (
-                <div key={setIndex} className="flex items-center gap-2">
+                <div key={setIndex} className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-slate-500 w-10">
                     Set {setIndex + 1}
                   </span>
