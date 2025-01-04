@@ -19,7 +19,7 @@ export default function Login() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
-        router.push('/');
+        router.push('/dashboard');
       }
     });
 
