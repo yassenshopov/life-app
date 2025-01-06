@@ -119,9 +119,10 @@ export const ExerciseFormSection = ({
                 className="w-full mt-2 border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent"
                 onClick={() => {
                   const newExercises = [...selectedExercises];
+                  const lastSet = newExercises[index].sets[newExercises[index].sets.length - 1];
                   newExercises[index].sets.push({
-                    reps: 0,
-                    weight: 0,
+                    reps: lastSet?.reps || 0,
+                    weight: lastSet?.weight || 0,
                   });
                   setFormState((prev: any) => ({
                     ...prev,

@@ -16,7 +16,7 @@ const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
 
 const UserProfile = ({ user }: { user: User }) => (
-  <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm text-slate-600 dark:text-slate-400 w-full">
     {user.user_metadata?.avatar_url ? (
       <img
         src={user.user_metadata.avatar_url}
@@ -28,8 +28,8 @@ const UserProfile = ({ user }: { user: User }) => (
         {user.email?.[0].toUpperCase()}
       </div>
     )}
-    <div>
-      <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+    <div className="w-full">
+      <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2 break-all">
         {user.email}
         {user.app_metadata?.provider === 'github' ? (
           <Github className="w-4 h-4 text-slate-500" />
@@ -51,9 +51,9 @@ const SettingsSection = ({
   title: string;
   children: React.ReactNode;
 }) => (
-  <section className="bg-white dark:bg-slate-900 rounded-lg p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+  <section className="bg-white dark:bg-slate-900 rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200 dark:border-slate-800">
     <h2
-      className={`text-lg font-semibold mb-4 text-slate-900 dark:text-white ${outfit.className}`}
+      className={`text-lg font-semibold mb-3 sm:mb-4 text-slate-900 dark:text-white ${outfit.className}`}
     >
       {title}
     </h2>
@@ -128,12 +128,12 @@ export default function Settings() {
 
   return (
     <div
-      className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
+      className={`min-h-screen p-3 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
     >
       <div className="max-w-3xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -142,12 +142,12 @@ export default function Settings() {
         </div>
 
         <h1
-          className={`text-2xl font-bold mb-8 text-slate-900 dark:text-white ${outfit.className}`}
+          className={`text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-slate-900 dark:text-white ${outfit.className}`}
         >
           Settings
         </h1>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <SettingsSection title="Appearance">
             <div className="flex items-center justify-between">
               <div className="text-sm text-slate-600 dark:text-slate-400">
@@ -162,16 +162,16 @@ export default function Settings() {
           </SettingsSection>
 
           <SettingsSection title="Account">
-            <div className="space-y-4 flex items-center justify-between">
+            <div className="space-y-4 sm:space-y-0 flex flex-col sm:flex-row sm:items-center justify-between">
               <UserProfile user={user} />
-              <div className="flex justify-end">
+              <div className="flex justify-start sm:justify-end">
                 <Button
                   onClick={handleSignOut}
                   variant="outline"
                   size="default"
-                  className="text-base"
+                  className="text-base w-full sm:w-auto"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 mr-2" />
                   Sign out
                 </Button>
               </div>
