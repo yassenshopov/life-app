@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const { data, error } = await supabase
       .from('notion_credentials')
-      .select('notion_database_id')
+      .select('notion_database_daily_tracking_id')
       .eq('user_id', user.id)
       .single();
 
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      notionDatabaseId: data.notion_database_id,
+      notionDatabaseId: data.notion_database_daily_tracking_id,
     });
   } catch (error) {
     console.error('Error fetching notion credentials:', error);
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       // Update existing entry
       ({ error } = await supabase
         .from('notion_credentials')
-        .update({ notion_database_id: notionDatabaseId })
+        .update({ notion_database_daily_tracking_id: notionDatabaseId })
         .eq('user_id', user.id));
     } else {
       // Insert new entry
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         .from('notion_credentials')
         .insert({
           user_id: user.id,
-          notion_database_id: notionDatabaseId,
+          notion_database_daily_tracking_id: notionDatabaseId,
         }));
     }
 
