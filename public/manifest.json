@@ -1,8 +1,8 @@
 {
-  "name": "Health Dashboard",
-  "short_name": "Health",
-  "description": "Personal health and fitness tracking dashboard",
-  "start_url": "/",
+  "name": "Frameworked",
+  "short_name": "Frameworked",
+  "description": "Enhanced productivity framework built on top of Notion",
+  "start_url": "https://frameworked.io",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#a855f7",

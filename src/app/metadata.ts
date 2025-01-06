@@ -1,13 +1,13 @@
 import { Metadata } from 'next'
 
 export const defaultMetadata: Metadata = {
-  title: 'LifeMetrics | Personal Analytics Dashboard',
-  description: 'Track and visualize your daily activities, habits, and personal metrics. Get insights into your sleep, productivity, fitness, and more.',
-  keywords: 'life tracking, personal analytics, habit tracking, productivity metrics, health dashboard, personal data',
-  authors: [{ name: 'LifeMetrics Team' }],
+  title: 'Frameworked | Supercharge your Notion workspace',
+  description: 'Supercharge your Notion workspace with powerful visualizations, integrations, and enhanced workflows. Build custom dashboards, track metrics, and optimize your productivity.',
+  keywords: 'notion enhancement, notion framework, productivity tools, notion dashboard, data visualization, notion integration, workflow automation',
+  authors: [{ name: 'Yassen Shopov' }],
   openGraph: {
-    title: 'LifeMetrics | Personal Analytics Dashboard',
-    description: 'Track and visualize your daily activities, habits, and personal metrics.',
+    title: 'Frameworked | Supercharge your Notion workspace',
+    description: 'Supercharge your Notion workspace with powerful visualizations and enhanced workflows.',
     type: 'website',
     locale: 'en_US',
     images: [
@@ -15,14 +15,14 @@ export const defaultMetadata: Metadata = {
         url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'LifeMetrics Dashboard Preview',
+        alt: 'Frameworked Dashboard Preview',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LifeMetrics | Personal Analytics Dashboard',
-    description: 'Track and visualize your daily activities, habits, and personal metrics.',
+    title: 'Frameworked | Supercharge your Notion workspace',
+    description: 'Supercharge your Notion workspace with powerful visualizations and enhanced workflows.',
     images: ['/og-image.jpg'],
   },
   viewport: 'width=device-width, initial-scale=1',
