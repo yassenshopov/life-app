@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { X, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Trash2, Scale } from 'lucide-react';
 import { WorkoutExercise } from '@/types/workout';
 import { Dispatch, SetStateAction } from 'react';
 
@@ -8,13 +8,17 @@ interface ExerciseFormSectionProps {
   setFormState: Dispatch<SetStateAction<any>>;
   collapsedExercises: Set<number>;
   toggleExercise: (index: number) => void;
+  userWeight?: number;
 }
+
+const BODYWEIGHT_EXERCISES = new Set(['Pull-ups', 'Push-ups', 'Dips']);
 
 export const ExerciseFormSection = ({
   selectedExercises,
   setFormState,
   collapsedExercises,
   toggleExercise,
+  userWeight = 75,
 }: ExerciseFormSectionProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -79,22 +83,40 @@ export const ExerciseFormSection = ({
                     }}
                   />
                   <span className="text-sm text-slate-600 dark:text-slate-500">×</span>
-                  <input
-                    type="number"
-                    placeholder="Weight"
-                    className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/50 p-2 shadow-sm focus:border-slate-300 focus:ring-1 focus:ring-slate-300 focus:bg-white"
-                    value={set.weight || ''}
-                    onChange={(e) => {
-                      const newExercises = [...selectedExercises];
-                      newExercises[index].sets[setIndex].weight = Number(
-                        e.target.value
-                      );
-                      setFormState((prev: any) => ({
-                        ...prev,
-                        selectedExercises: newExercises,
-                      }));
-                    }}
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      type="number"
+                      placeholder="Weight"
+                      className="w-20 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/50 p-2 shadow-sm focus:border-slate-300 focus:ring-1 focus:ring-slate-300 focus:bg-white"
+                      value={set.weight || ''}
+                      onChange={(e) => {
+                        const newExercises = [...selectedExercises];
+                        newExercises[index].sets[setIndex].weight = Number(
+                          e.target.value
+                        );
+                        setFormState((prev: any) => ({
+                          ...prev,
+                          selectedExercises: newExercises,
+                        }));
+                      }}
+                    />
+                    {BODYWEIGHT_EXERCISES.has(exercise.name) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newExercises = [...selectedExercises];
+                          newExercises[index].sets[setIndex].weight = userWeight;
+                          setFormState((prev: any) => ({
+                            ...prev,
+                            selectedExercises: newExercises,
+                          }));
+                        }}
+                      >
+                        <Scale className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                   <span className="text-sm text-slate-600 dark:text-slate-500">kg</span>
                   <Button
                     variant="ghost"

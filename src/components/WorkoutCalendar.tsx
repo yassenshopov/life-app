@@ -68,6 +68,9 @@ export const WorkoutCalendar = ({
     new Set()
   );
 
+  // Add near other state declarations
+  const [userWeight, setUserWeight] = useState<number>(75); // Default to 75kg
+
   // Memoize data fetching
   const fetchWorkoutData = useCallback(async () => {
     try {
@@ -344,6 +347,14 @@ export const WorkoutCalendar = ({
     const standardizedDate = new Date(date);
     standardizedDate.setHours(0, 0, 0, 0);
     setCalendarState((prev) => ({ ...prev, selectedDate: standardizedDate }));
+    
+    // If the gym form is shown, update the date
+    if (showGymForm) {
+      setFormState((prev) => ({
+        ...prev,
+        gymDate: standardizedDate.toISOString().split('T')[0],
+      }));
+    }
   };
 
   // Helper function to format run data
@@ -558,7 +569,7 @@ export const WorkoutCalendar = ({
                     id="date"
                     value={
                       formState.gymDate ||
-                      new Date().toISOString().split('T')[0]
+                      calendarState.selectedDate.toISOString().split('T')[0]
                     }
                     onChange={(e) =>
                       setFormState((prev) => ({
@@ -696,6 +707,7 @@ export const WorkoutCalendar = ({
                     setFormState={setFormState}
                     collapsedExercises={collapsedExercises}
                     toggleExercise={toggleExercise}
+                    userWeight={userWeight}
                   />
                 </div>
                 <div>
