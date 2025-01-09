@@ -359,16 +359,39 @@ export const WorkoutCalendar = ({
 
   // Helper function to format run data
   const formatRunData = (runs: any[]): WorkoutEvent[] =>
-    runs.map((run) => ({
-      id: run.id,
-      date: new Date(run.date + 'T00:00:00').toISOString().split('T')[0],
-      type: 'run' as const,
-      title: run.name,
-      distance: run.distance,
-      duration: run.duration,
-      pace: run.pace,
-      notes: run.notes,
-    }));
+    runs
+      .map((run): WorkoutEvent | null => {
+        try {
+          // Ensure the date is valid before creating a new Date object
+          const dateStr = run.date?.trim();
+          if (!dateStr) {
+            console.warn(`Invalid date for run: ${run.id}`);
+            return null;
+          }
+
+          // Create date object and validate
+          const date = new Date(`${dateStr}T00:00:00`);
+          if (isNaN(date.getTime())) {
+            console.warn(`Invalid date format for run: ${run.id}, date: ${dateStr}`);
+            return null;
+          }
+
+          return {
+            id: run.id,
+            date: date.toISOString().split('T')[0],
+            type: 'run' as const,
+            title: run.name,
+            distance: run.distance,
+            duration: run.duration,
+            pace: run.pace,
+            notes: run.notes,
+          };
+        } catch (error) {
+          console.warn(`Error processing run: ${run.id}`, error);
+          return null;
+        }
+      })
+      .filter((run): run is WorkoutEvent => run !== null);
 
   const getWeekDays = (date: Date) => {
     const curr = new Date(date);
