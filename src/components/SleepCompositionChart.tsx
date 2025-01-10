@@ -78,13 +78,13 @@ export function SleepCompositionChart({
                       </p>
                       <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Light Sleep: {100 - entry.deepSleep - entry.remSleep}%
+                          Light Sleep: {((100 - entry.deepSleep - entry.remSleep).toFixed(1)).replace('.0', '')}%
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          Deep Sleep: {entry.deepSleep}%
+                          Deep Sleep: {entry.deepSleep.toFixed(1).replace('.0', '')}%
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          REM Sleep: {entry.remSleep}%
+                          REM Sleep: {entry.remSleep.toFixed(1).replace('.0', '')}%
                         </p>
                       </div>
                     </div>
