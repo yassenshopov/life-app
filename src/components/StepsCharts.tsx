@@ -58,84 +58,88 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
       <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
         Daily Steps
       </h3>
-      <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
-        <ResponsiveContainer width="100%" height={350}>
-          <AreaChart 
-            data={data} 
-            margin={{ bottom: 15, left: 5, right: 15, top: 5 }}
-          >
-            <defs>
-              <linearGradient id="stepsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#eab308" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              angle={-45}
-              textAnchor="end"
-              height={60}
-              interval={tickInterval}
-              tick={{ 
-                dy: 10, 
-                fontSize: '0.7rem',
-                fill: 'currentColor' 
-              }}
-              scale="point"
-              padding={{ left: 10, right: 10 }}
-            />
-            <YAxis
-              width={50}  // Slightly wider to ensure no cutoff
-              tick={<CustomYAxisTick />}
-              tickFormatter={(value) => value.toLocaleString()}
-            />
-            <Tooltip
-              content={({ active, payload, label }) => {
-                if (active && payload && payload.length) {
-                  return (
-                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                      <p className="font-medium text-slate-900 dark:text-slate-100">
-                        {label}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Steps: {payload[0].value?.toLocaleString()}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Average: {averageSteps.toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="steps"
-              stroke="#eab308"
-              fill="url(#stepsGradient)"
-              name="Steps"
-              strokeWidth={3}
-            />
-            <ReferenceLine
-              y={averageSteps}
-              stroke="#eab308"
-              strokeDasharray="3 3"
-              label={{
-                value: `Average`,
-                position: 'insideRight',
-                fill: '#eab308',
-                fontSize: 16,
-                offset: -10,
-                fontWeight: 600,
-                opacity: 0.8,
-              }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div className="relative">
+        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+          <ResponsiveContainer width="100%" height={350}>
+            <AreaChart 
+              data={data} 
+              margin={{ bottom: 15, left: 5, right: 15, top: 5 }}
+            >
+              <defs>
+                <linearGradient id="stepsGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#eab308" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval={tickInterval}
+                tick={{ 
+                  dy: 10, 
+                  fontSize: '0.7rem',
+                  fill: 'currentColor' 
+                }}
+                scale="point"
+                padding={{ left: 10, right: 10 }}
+              />
+              <YAxis
+                width={50}  // Slightly wider to ensure no cutoff
+                tick={<CustomYAxisTick />}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">
+                          {label}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Steps: {payload[0].value?.toLocaleString()}
+                        </p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Average: {averageSteps.toLocaleString()}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="steps"
+                stroke="#eab308"
+                fill="url(#stepsGradient)"
+                name="Steps"
+                strokeWidth={3}
+              />
+              {averageSteps > 0 && (
+                <ReferenceLine
+                  y={averageSteps}
+                  stroke="#eab308"
+                  strokeDasharray="3 3"
+                  label={{
+                    value: `Average`,
+                    position: 'insideRight',
+                    fill: '#eab308',
+                    fontSize: 16,
+                    offset: -10,
+                    fontWeight: 600,
+                    opacity: 0.8,
+                  }}
+                />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        {isLoadingCharts && <ChartLoadingOverlay color="yellow" />}
       </div>
-      {isLoadingCharts && <ChartLoadingOverlay color="yellow" />}
     </div>
   );
 };

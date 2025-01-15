@@ -21,34 +21,7 @@ export const DateRangeFilter = ({
 
   const handlePeriodClick = (period: string) => {
     setActiveTab(period);
-    const now = new Date();
-    const to = new Date(now);
-    let from = new Date(now);
-
-    switch (period) {
-      case '90D':
-        from.setDate(now.getDate() - 90);
-        break;
-      case '1Y':
-        from.setFullYear(now.getFullYear() - 1);
-        break;
-      case 'YTD':
-        from = new Date(now.getFullYear(), 0, 1); // January 1st of current year
-        break;
-      default:
-        const days = parseInt(period);
-        if (!isNaN(days)) {
-          from = new Date(now);
-          from.setDate(now.getDate() - days);
-        }
-    }
-    
-    // Ensure we're working with the start of the day for 'from' and end of the day for 'to'
-    from.setHours(0, 0, 0, 0);
-    to.setHours(23, 59, 59, 999);
-    
-    console.log('Setting date range:', { from, to });
-    setDateRange({ from, to });
+    handleDateRangeFilter(period === 'YTD' ? period : period.replace('D', ''));
   };
 
   return (
@@ -57,7 +30,7 @@ export const DateRangeFilter = ({
         {/* Desktop view */}
         <div className="hidden sm:flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {['3D', '7D', '30D', '90D', '1Y', 'YTD'].map((period) => (
+            {['3D', '7D', '30D', '90D', '365D', 'YTD'].map((period) => (
               <button
                 key={period}
                 onClick={() => handlePeriodClick(period)}

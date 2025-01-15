@@ -58,6 +58,8 @@ const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
 
 export default function Dashboard() {
+  const [isChartLoading, setIsChartLoading] = useState(false);
+
   const sections = [
     {
       id: 'sleep-analysis',
@@ -103,7 +105,7 @@ export default function Dashboard() {
     setEntries,
     isLoading: healthLoading,
     error,
-  } = useHealthData();
+  } = useHealthData(dateRange);
   const { gymSessions, loading: gymLoading } = useGymData(dateRange);
 
   const isLoading = healthLoading || gymLoading;
@@ -114,7 +116,12 @@ export default function Dashboard() {
     return entries
       .filter((entry) => {
         const entryDate = new Date(entry.date);
-        return entryDate >= dateRange.from && entryDate <= dateRange.to;
+        const fromDate = new Date(dateRange.from);
+        fromDate.setHours(0, 0, 0, 0);
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        
+        return entryDate >= fromDate && entryDate <= toDate;
       })
       .reverse()
       .map((entry) => ({
@@ -172,23 +179,43 @@ export default function Dashboard() {
   }, [entries, dateRange]);
 
   const handleDateRangeFilter = (days: number | string) => {
-    const to = new Date();
-    const from = new Date();
+    setIsChartLoading(true);
+    
+    const now = new Date();
+    const to = new Date(now);
+    let from = new Date(now);
 
-    if (days === '1Y') {
-      from.setFullYear(from.getFullYear() - 1);
+    // Set end of day for 'to'
+    to.setHours(23, 59, 59, 999);
+
+    if (days === 'YTD') {
+      from = new Date(now.getFullYear(), 0, 1);
     } else {
       from.setDate(from.getDate() - Number(days));
     }
 
+    // Set start of day for 'from'
+    from.setHours(0, 0, 0, 0);
+
     setDateRange({ from, to });
+    
+    // Adjust timeout based on date range
+    const timeout = 
+      days === 'YTD' || Number(days) >= 365 ? 1500 :
+      Number(days) >= 90 ? 1000 :
+      500;
+
+    setTimeout(() => {
+      setIsChartLoading(false);
+    }, timeout);
   };
 
   const getTickInterval = (dataLength: number) => {
     if (dataLength <= 7) return 0;
     if (dataLength <= 14) return 1;
     if (dataLength <= 31) return 2;
-    return Math.floor(dataLength / 15);
+    if (dataLength <= 90) return 7;
+    return Math.floor(dataLength / 12); // Show roughly monthly ticks for yearly view
   };
 
   const handleMuscleClick = (muscle: MuscleGroup) => {
@@ -329,7 +356,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
               <SleepDurationChart
                 data={prepareChartData}
-                isLoadingCharts={isLoading}
+                isLoadingCharts={isChartLoading}
               />
               <SleepStats entries={entries} dateRange={dateRange} />
             </div>
@@ -342,7 +369,7 @@ export default function Dashboard() {
               </h3>
               <div
                 className={`transition-opacity duration-200 ${
-                  isLoading ? 'opacity-50' : 'opacity-100'
+                  isChartLoading ? 'opacity-50' : 'opacity-100'
                 }`}
               >
                 <SleepPatternChart
@@ -353,7 +380,7 @@ export default function Dashboard() {
 
             <SleepCompositionChart
               data={prepareChartData}
-              isLoadingCharts={isLoading}
+              isLoadingCharts={isChartLoading}
               showAwakeTime={showAwakeTime}
               setShowAwakeTime={setShowAwakeTime}
             />
@@ -370,7 +397,7 @@ export default function Dashboard() {
               <div className="lg:col-span-3 relative">
                 <RHRChart
                   data={prepareChartData}
-                  isLoadingCharts={isLoading}
+                  isLoadingCharts={isChartLoading}
                   tickInterval={getTickInterval(prepareChartData.length)}
                 />
               </div>
@@ -389,8 +416,8 @@ export default function Dashboard() {
               <div className="lg:col-span-3 relative">
                 <StepsChart
                   data={prepareChartData}
-                  isLoadingCharts={isLoading}
-                  tickInterval={getTickInterval(entries.length)}
+                  isLoadingCharts={isChartLoading}
+                  tickInterval={getTickInterval(prepareChartData.length)}
                 />
               </div>
               <StepsAnalytics data={prepareChartData} />
@@ -408,7 +435,7 @@ export default function Dashboard() {
               <WeightAnalytics data={prepareChartData} />
               <WeightChart
                 data={prepareChartData}
-                isLoadingCharts={isLoading}
+                isLoadingCharts={isChartLoading}
                 tickInterval={getTickInterval(prepareChartData.length)}
               />
             </div>
@@ -447,7 +474,7 @@ export default function Dashboard() {
               <div className="relative">
                 <div
                   className={`transition-opacity duration-200 ${
-                    isLoading || isCalendarLoading
+                    isChartLoading || isCalendarLoading
                       ? 'opacity-50'
                       : 'opacity-100'
                   }`}
@@ -491,7 +518,7 @@ export default function Dashboard() {
           <Checklist
             entries={entries}
             dateRange={dateRange}
-            isLoadingCharts={isLoading}
+            isLoadingCharts={isChartLoading}
             setIsLoadingCharts={() => {}}
             setEntries={setEntries}
           />

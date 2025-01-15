@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DayEntry } from '@/types/day-entry';
 
-export function useHealthData() {
+export function useHealthData(dateRange?: { from: Date; to: Date }) {
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -9,7 +9,6 @@ export function useHealthData() {
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        // First, fetch the database ID
         const credResponse = await fetch('/api/user/notion-credentials');
         const { notionDatabaseId } = await credResponse.json();
 
@@ -17,19 +16,20 @@ export function useHealthData() {
           throw new Error('No Notion database ID found');
         }
 
-        // Calculate date range
-        const endDate = new Date().toISOString();
-        const startDate = new Date();
-        startDate.setMonth(startDate.getMonth() - 1); // Last 30 days
+        // Use provided date range or default to last 30 days
+        const startDate = dateRange?.from || (() => {
+          const date = new Date();
+          date.setMonth(date.getMonth() - 1);
+          return date;
+        })();
         
-        // Build the URL with all required parameters
+        const endDate = dateRange?.to || new Date();
+        
         const url = `/api/notion/entries?` + new URLSearchParams({
           databaseId: notionDatabaseId,
           startDate: startDate.toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0]
+          endDate: endDate.toISOString().split('T')[0]
         });
-
-        console.log('Fetching from:', url); // Debug log
 
         const response = await fetch(url);
         
@@ -48,7 +48,7 @@ export function useHealthData() {
     };
 
     fetchEntries();
-  }, []);
+  }, [dateRange]); // Add dateRange to dependencies
 
   return { entries, setEntries, isLoading, error };
 } 
