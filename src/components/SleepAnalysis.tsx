@@ -384,19 +384,26 @@ export const CardHeader = ({
   wakeTime: string;
   quality: string;
   score: number;
-}) => (
-  <div className="flex items-center justify-between mb-6">
-    <div className="flex flex-col">
-      <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 opacity-50 mb-2">
-        Today's Sleep Analysis ({format(new Date(date), 'MMM do yyyy')})
-      </h2>
-      <p className="text-2xl font-medium text-slate-900 dark:text-slate-100">
-        {sleepTime} - {wakeTime}
-      </p>
+}) => {
+  // Format sleep time to use 00 instead of 24
+  const formattedSleepTime = sleepTime.startsWith('24:') 
+    ? `00:${sleepTime.slice(3)}` 
+    : sleepTime;
+
+  return (
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col">
+        <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 opacity-50 mb-2">
+          Today's Sleep Analysis ({format(new Date(date), 'MMM do yyyy')})
+        </h2>
+        <p className="text-2xl font-medium text-slate-900 dark:text-slate-100">
+          {formattedSleepTime} - {wakeTime}
+        </p>
+      </div>
+      <QualityBadge quality={quality} score={score} />
     </div>
-    <QualityBadge quality={quality} score={score} />
-  </div>
-);
+  );
+};
 
 export const SleepAnalysisCard = ({
   entry,
