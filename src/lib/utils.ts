@@ -87,3 +87,10 @@ export const calculateExerciseStats = (gymSessions: any[]): ExerciseStats[] => {
     return a.name.localeCompare(b.name);
   });
 };
+
+export const calculateORM = (weight: number, reps: number): number => {
+  // Using Brzycki Formula: 1RM = weight × (36 / (37 - reps))
+  if (reps === 0 || weight === 0) return 0;
+  const orm = weight * (36 / (37 - reps));
+  return Math.round(orm);
+};

@@ -33,7 +33,7 @@ export function SleepDurationChart({ data, isLoadingCharts }: SleepDurationChart
               angle={-45}
               textAnchor="end"
               height={60}
-              interval={0}
+              interval="preserveStartEnd"
               tick={{ dy: 10 }}
             />
             <YAxis

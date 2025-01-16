@@ -1,7 +1,15 @@
 import { Button } from '@/components/ui/button';
-import { X, ChevronDown, ChevronUp, Trash2, Scale } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Trash2, Scale, Info } from 'lucide-react';
 import { WorkoutExercise } from '@/types/workout';
 import { Dispatch, SetStateAction } from 'react';
+import { format } from 'date-fns';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { calculateORM } from '@/lib/utils';
 
 interface ExerciseFormSectionProps {
   selectedExercises: WorkoutExercise[];
@@ -9,6 +17,10 @@ interface ExerciseFormSectionProps {
   collapsedExercises: Set<number>;
   toggleExercise: (index: number) => void;
   userWeight?: number;
+  exerciseHistory?: Record<string, {
+    date: Date;
+    sets: { reps: number; weight: number; }[];
+  }>;
 }
 
 const BODYWEIGHT_EXERCISES = new Set(['Pull-ups', 'Push-ups', 'Dips']);
@@ -19,6 +31,7 @@ export const ExerciseFormSection = ({
   collapsedExercises,
   toggleExercise,
   userWeight = 75,
+  exerciseHistory = {},
 }: ExerciseFormSectionProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -28,7 +41,39 @@ export const ExerciseFormSection = ({
           className="border rounded-lg p-4 dark:border-slate-700 bg-slate-50/50 dark:bg-transparent shadow-sm"
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">{exercise.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">
+                {exercise.name}
+              </h3>
+              {exerciseHistory[exercise.name] && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-slate-500" />
+                    </TooltipTrigger>
+                    <TooltipContent className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-800 dark:text-slate-200">
+                            Last session: {format(exerciseHistory[exercise.name].date, 'MMM d')}
+                          </span>
+                        </div>
+                        {exerciseHistory[exercise.name].sets.map((set, i) => (
+                          <div key={i} className="text-sm text-slate-500 dark:text-slate-400">
+                            Set {i + 1}: {set.reps}×{set.weight}kg
+                          </div>
+                        ))}
+                        <span className="text-sm text-slate-500 dark:text-slate-400 font-bold">
+                            Best est. 1RM: {Math.max(...exerciseHistory[exercise.name].sets.map(set => 
+                              calculateORM(set.weight, set.reps)
+                            ))}kg
+                          </span>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <div className="flex gap-1">
               <Button
                 variant="ghost"

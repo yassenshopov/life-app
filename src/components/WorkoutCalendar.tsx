@@ -70,6 +70,45 @@ export const WorkoutCalendar = ({
 
   // Add near other state declarations
   const [userWeight, setUserWeight] = useState<number>(75); // Default to 75kg
+  const [exerciseHistory, setExerciseHistory] = useState<Record<string, {
+    date: Date;
+    sets: { reps: number; weight: number; }[];
+  }>>({});
+
+  // Add processExerciseHistory before fetchWorkoutData
+  const processExerciseHistory = useCallback((gymSessions: any[]) => {
+    const history: Record<string, { date: Date; sets: { reps: number; weight: number; }[] }> = {};
+    
+    // Get today's date at midnight for comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const sortedSessions = [...gymSessions]
+      .filter(session => new Date(session.date) < today) // Filter out today's sessions
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    sortedSessions.forEach(session => {
+      Object.entries(session.exercise_log || {}).forEach(([exerciseName, data]: [string, any]) => {
+        const formattedName = exerciseName
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+
+        // Only store if we haven't seen this exercise yet (first occurrence will be most recent)
+        if (!history[formattedName]) {
+          history[formattedName] = {
+            date: new Date(session.date),
+            sets: data.sets.map((set: any) => ({
+              reps: Number(set.reps),
+              weight: Number(set.weight)
+            }))
+          };
+        }
+      });
+    });
+
+    return history;
+  }, []);
 
   // Memoize data fetching
   const fetchWorkoutData = useCallback(async () => {
@@ -85,9 +124,11 @@ export const WorkoutCalendar = ({
       ]);
 
       const formattedRuns = formatRunData(runs);
-
-      // Ensure gymData is an array
       const formattedGymData = Array.isArray(gymData) ? gymData : [];
+      
+      // Add this line to process exercise history
+      const history = processExerciseHistory(formattedGymData);
+      setExerciseHistory(history);
 
       setWorkoutData((prev) => ({
         ...prev,
@@ -104,7 +145,7 @@ export const WorkoutCalendar = ({
         isLoading: false,
       }));
     }
-  }, []);
+  }, [processExerciseHistory]);
 
   // Memoize exercise library lookup
   const findExerciseInLibrary = useCallback((name: string) => {
@@ -731,6 +772,7 @@ export const WorkoutCalendar = ({
                     collapsedExercises={collapsedExercises}
                     toggleExercise={toggleExercise}
                     userWeight={userWeight}
+                    exerciseHistory={exerciseHistory}
                   />
                 </div>
                 <div>
