@@ -81,7 +81,7 @@ export const DateRangeFilter = ({
         <div className="sm:hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 overflow-x-auto scrollbar-hide">
-              {['3D', '7D', '30D', '90D', '1Y', 'YTD'].map((period) => (
+              {['3D', '7D', '30D', '90D', '365D', 'YTD'].map((period) => (
                 <button
                   key={period}
                   onClick={() => handlePeriodClick(period)}
