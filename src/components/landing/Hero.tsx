@@ -2,7 +2,7 @@ import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import Image from 'next/image';
 
-export function Hero({ outfit }: { outfit: any }) {
+export function Hero({ outfit, hideAction }: { outfit: any; hideAction?: boolean }) {
   return (
     <div className="relative px-6 lg:px-8 py-24 sm:py-32">
       <div className="mx-auto max-w-2xl text-center">
@@ -15,7 +15,7 @@ export function Hero({ outfit }: { outfit: any }) {
         </p>
         <div className="mt-10 flex items-center justify-center gap-x-6">
           <Link
-            href="/auth"
+            href="/login"
             className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           >
             Get Started
