@@ -8,7 +8,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from '@/components/ui/tooltip';
 import { calculateORM } from '@/lib/utils';
 
 interface ExerciseFormSectionProps {
@@ -17,10 +17,13 @@ interface ExerciseFormSectionProps {
   collapsedExercises: Set<number>;
   toggleExercise: (index: number) => void;
   userWeight?: number;
-  exerciseHistory?: Record<string, {
-    date: Date;
-    sets: { reps: number; weight: number; }[];
-  }>;
+  exerciseHistory?: Record<
+    string,
+    {
+      date: Date;
+      sets: { reps: number; weight: number }[];
+    }
+  >;
 }
 
 const BODYWEIGHT_EXERCISES = new Set(['Pull-ups', 'Push-ups', 'Dips']);
@@ -55,19 +58,30 @@ export const ExerciseFormSection = ({
                       <div className="space-y-0.5">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-slate-800 dark:text-slate-200">
-                            Last session: {format(exerciseHistory[exercise.name].date, 'MMM d')}
+                            Last session:{' '}
+                            {format(
+                              exerciseHistory[exercise.name].date,
+                              'MMM d'
+                            )}
                           </span>
                         </div>
                         {exerciseHistory[exercise.name].sets.map((set, i) => (
-                          <div key={i} className="text-sm text-slate-500 dark:text-slate-400">
+                          <div
+                            key={i}
+                            className="text-sm text-slate-500 dark:text-slate-400"
+                          >
                             Set {i + 1}: {set.reps}×{set.weight}kg
                           </div>
                         ))}
                         <span className="text-sm text-slate-500 dark:text-slate-400 font-bold">
-                            Best est. 1RM: {Math.max(...exerciseHistory[exercise.name].sets.map(set => 
+                          Best est. 1RM:{' '}
+                          {Math.max(
+                            ...exerciseHistory[exercise.name].sets.map((set) =>
                               calculateORM(set.weight, set.reps)
-                            ))}kg
-                          </span>
+                            )
+                          )}
+                          kg
+                        </span>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -127,7 +141,9 @@ export const ExerciseFormSection = ({
                       }));
                     }}
                   />
-                  <span className="text-sm text-slate-600 dark:text-slate-500">×</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-500">
+                    ×
+                  </span>
                   <div className="flex gap-1">
                     <input
                       type="number"
@@ -151,7 +167,8 @@ export const ExerciseFormSection = ({
                         size="sm"
                         onClick={() => {
                           const newExercises = [...selectedExercises];
-                          newExercises[index].sets[setIndex].weight = userWeight;
+                          newExercises[index].sets[setIndex].weight =
+                            userWeight;
                           setFormState((prev: any) => ({
                             ...prev,
                             selectedExercises: newExercises,
@@ -162,7 +179,9 @@ export const ExerciseFormSection = ({
                       </Button>
                     )}
                   </div>
-                  <span className="text-sm text-slate-600 dark:text-slate-500">kg</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-500">
+                    kg
+                  </span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -186,7 +205,10 @@ export const ExerciseFormSection = ({
                 className="w-full mt-2 border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent"
                 onClick={() => {
                   const newExercises = [...selectedExercises];
-                  const lastSet = newExercises[index].sets[newExercises[index].sets.length - 1];
+                  const lastSet =
+                    newExercises[index].sets[
+                      newExercises[index].sets.length - 1
+                    ];
                   newExercises[index].sets.push({
                     reps: lastSet?.reps || 0,
                     weight: lastSet?.weight || 0,
@@ -205,4 +227,4 @@ export const ExerciseFormSection = ({
       ))}
     </div>
   );
-}; 
+};
