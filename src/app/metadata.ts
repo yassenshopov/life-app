@@ -25,12 +25,10 @@ export const defaultMetadata: Metadata = {
     description: 'Supercharge your Notion workspace with powerful visualizations and enhanced workflows.',
     images: ['/og-image.jpg'],
   },
-  viewport: 'width=device-width, initial-scale=1',
   robots: {
     index: true,
     follow: true,
   },
-  themeColor: '#8b5cf6',
   manifest: '/manifest.json',
 };
 

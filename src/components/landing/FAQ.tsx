@@ -1,80 +1,74 @@
 'use client';
 
-import { useState } from 'react';
+import { Disclosure } from '@headlessui/react';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
-interface FAQItem {
-  question: string;
-  answer: string;
-}
-
-const faqItems: FAQItem[] = [
+const faqs = [
   {
-    question: "What is your product?",
-    answer: "Our product is a comprehensive solution that helps businesses streamline their operations and improve efficiency."
+    question: 'How does Frameworked work with my existing Notion setup?',
+    answer: 'Frameworked seamlessly integrates with your existing Notion workspace, using it as the source of truth while providing enhanced features and interfaces. There\'s no need to change your current Notion structure.',
   },
   {
-    question: "How does pricing work?",
-    answer: "We offer flexible pricing plans starting from free tier up to enterprise solutions. Choose the plan that best fits your needs."
+    question: 'What kind of modules are available?',
+    answer: 'We offer modules for financial tracking, fitness planning, task management, and more. Each module is designed to enhance specific aspects of your Notion workspace with specialized features and visualizations.',
   },
   {
-    question: "Do you offer support?",
-    answer: "Yes, we provide customer support for all our plans. Enterprise customers get access to 24/7 dedicated support."
+    question: 'Is my Notion data secure?',
+    answer: 'Yes, absolutely. We use Notion\'s official API and industry-standard encryption. We never store your sensitive data, and all communications are encrypted.',
   },
   {
-    question: "Can I cancel my subscription?",
-    answer: "Yes, you can cancel your subscription at any time. There are no long-term contracts or cancellation fees."
-  }
+    question: 'Can I use Frameworked on mobile?',
+    answer: 'Yes! We offer a mobile-optimized interface that makes it easy to input data and manage tasks on the go, providing a faster experience than the native Notion mobile app.',
+  },
+  {
+    question: 'Do you offer custom solutions for teams?',
+    answer: 'Yes, our Enterprise plan includes custom module development, dedicated support, and specialized team collaboration features. Contact our sales team to learn more.',
+  },
+  {
+    question: 'Can I switch between different modules?',
+    answer: 'Yes, depending on your plan, you can activate or deactivate modules as needed. The Pro plan gives you access to all available modules.',
+  },
 ];
 
-export function FAQ() {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-
+export function FAQ({ outfit }: { outfit: any }) {
   return (
-    <section className="py-24 bg-gray-50 dark:bg-slate-900">
-      <div className="container px-4 mx-auto">
-        <div className="max-w-2xl mx-auto mb-16 text-center">
-          <h2 className="mb-4 text-4xl font-bold text-gray-900 dark:text-white">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            Have questions? We're here to help.
+    <div className="py-24 sm:py-32">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl lg:text-center">
+          <h2 className={`${outfit.className} text-base font-semibold leading-7 text-indigo-600`}>FAQ</h2>
+          <p className={`${outfit.className} mt-2 text-3xl font-bold tracking-tight sm:text-4xl`}>
+            Common questions
+          </p>
+          <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
+            Everything you need to know about Frameworked and how it works with Notion.
           </p>
         </div>
-        <div className="max-w-3xl mx-auto">
-          {faqItems.map((item, index) => (
-            <div key={index} className="mb-4">
-              <button
-                className="flex items-center justify-between w-full px-4 py-4 text-left bg-white dark:bg-slate-800 rounded-lg focus:outline-none"
-                onClick={() => setOpenIndex(openIndex === index ? null : index)}
-              >
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {item.question}
-                </span>
-                <svg
-                  className={`w-5 h-5 text-gray-500 transform ${
-                    openIndex === index ? 'rotate-180' : ''
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
-              {openIndex === index && (
-                <div className="px-4 py-3 mt-2 bg-white dark:bg-slate-800 rounded-lg">
-                  <p className="text-gray-600 dark:text-gray-400">{item.answer}</p>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="mx-auto mt-16 max-w-2xl">
+          <dl className="space-y-4">
+            {faqs.map((faq) => (
+              <Disclosure as="div" key={faq.question} className="pt-4">
+                {({ open }) => (
+                  <>
+                    <dt>
+                      <Disclosure.Button className="flex w-full items-start justify-between text-left">
+                        <span className={`${outfit.className} text-base font-semibold leading-7`}>{faq.question}</span>
+                        <span className="ml-6 flex h-7 items-center">
+                          <ChevronDownIcon
+                            className={`h-6 w-6 ${open ? '-rotate-180' : 'rotate-0'} transform transition-transform duration-200`}
+                          />
+                        </span>
+                      </Disclosure.Button>
+                    </dt>
+                    <Disclosure.Panel as="dd" className="mt-2 pr-12">
+                      <p className="text-base leading-7 text-gray-600 dark:text-gray-300">{faq.answer}</p>
+                    </Disclosure.Panel>
+                  </>
+                )}
+              </Disclosure>
+            ))}
+          </dl>
         </div>
       </div>
-    </section>
+    </div>
   );
 } 

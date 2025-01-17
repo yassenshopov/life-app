@@ -1,33 +1,30 @@
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { Outfit } from 'next/font/google';
-import { LucideCreditCard } from 'lucide-react';
+import Image from 'next/image';
 
-const outfit = Outfit({ subsets: ['latin'] });
-
-export function Hero() {
+export function Hero({ outfit }: { outfit: any }) {
   return (
-    <section className="py-20 px-4 sm:px-8 max-w-7xl mx-auto">
-      <div className="text-center">
-        <h1
-          className={`text-4xl sm:text-6xl font-bold text-slate-900 dark:text-white mb-6 ${outfit.className}`}
-        >
-          Supercharge Your Notion Workflow
+    <div className="relative px-6 lg:px-8 py-24 sm:py-32">
+      <div className="mx-auto max-w-2xl text-center">
+        <h1 className={`${outfit.className} text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent`}>
+          Supercharge your Notion workspace
         </h1>
-        <p className="text-lg sm:text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-xl mx-auto">
-          Effortlessly visualize, manage, and enhance your data with powerful
-          features you can't get in Notion.
+        <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
+          Transform your Notion into a powerful command center. Add beautiful dashboards, 
+          real-time data sync, and enhanced mobile experience while keeping Notion as your source of truth.
         </p>
-        <Link
-          href="/login"
-          className="inline-block bg-purple-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-200ms"
-        >
-          Get Started for Free
-        </Link>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
-          No credit card required
-          <LucideCreditCard className="w-4 h-4 inline-block ml-2" />
-        </p>
+        <div className="mt-10 flex items-center justify-center gap-x-6">
+          <Link
+            href="/auth"
+            className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          >
+            Get Started
+          </Link>
+          <Link href="#features" className="flex items-center text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
+            Learn more <ArrowRightIcon className="ml-1 h-4 w-4" />
+          </Link>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
