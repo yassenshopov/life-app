@@ -53,6 +53,7 @@ import { MuscleGroup } from '@/constants/muscle-groups';
 import { ManualEntryForm } from '@/components/ManualEntryForm';
 import { Checklist } from '@/components/Checklist';
 import { SevenDayReport } from '@/components/SevenDayReport';
+import { FinancialOverview } from '@/components/FinancialOverview';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -511,6 +512,13 @@ export default function Dashboard() {
                 onMuscleClick={handleMuscleClick}
               />
             </div>
+          </>
+        )}
+
+        {activeSection === 'finances' && (
+          <>
+            <SectionHeader title="Financial Overview" />
+            <FinancialOverview />
           </>
         )}
 

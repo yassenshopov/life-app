@@ -107,7 +107,7 @@ export function NavigationTabs({
       ),
     },
     { name: 'Gym', icon: <DumbbellIcon className="w-4 h-4" /> },
-    { name: 'Money', icon: <DollarSign className="w-4 h-4" /> },
+    { name: 'Finances', icon: <DollarSign className="w-4 h-4" /> },
   ];
 
   return (
