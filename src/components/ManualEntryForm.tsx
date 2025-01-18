@@ -343,10 +343,12 @@ export function ManualEntryForm({
                 Steps
               </label>
               <input
-                type="number"
-                min="0"
-                value={steps}
-                onChange={(e) => setSteps(e.target.value)}
+                type="text"
+                value={steps ? Number(steps).toLocaleString() : ''}
+                onChange={(e) => {
+                  const rawValue = e.target.value.replace(/[^\d]/g, '');
+                  setSteps(rawValue);
+                }}
                 className="w-full rounded-md border border-gray-200 bg-white dark:bg-gray-950 dark:border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               />
             </div>
