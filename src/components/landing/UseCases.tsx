@@ -11,7 +11,10 @@ const useCases = [
       'Expense categorization',
       'Financial goal tracking'
     ],
-    imageSrc: '/financial-dashboard.png',
+    imageSrc: {
+      light: '/financial-dashboard.png',
+      dark: '/financial-dashboard-dark.png'
+    },
     imageAlt: 'Financial dashboard preview'
   },
   {
@@ -23,7 +26,10 @@ const useCases = [
       'Workout planning',
       'Progress visualization'
     ],
-    imageSrc: '/fitness-dashboard.png',
+    imageSrc: {
+      light: '/fitness-dashboard.png',
+      dark: '/fitness-dashboard-dark.png'
+    },
     imageAlt: 'Fitness dashboard preview'
   },
   {
@@ -35,7 +41,10 @@ const useCases = [
       'Quick mobile input',
       'Progress tracking'
     ],
-    imageSrc: '/tasks-dashboard.png',
+    imageSrc: {
+      light: '/tasks-dashboard.png',
+      dark: '/tasks-dashboard-dark.png'
+    },
     imageAlt: 'Task management dashboard preview'
   }
 ];
@@ -60,8 +69,21 @@ export function UseCases({ outfit }: { outfit: any }) {
               index % 2 === 1 ? 'lg:flex-row-reverse' : ''
             } lg:gap-x-8`}>
               <div className="lg:w-1/2">
-                <div className="aspect-[3/2] overflow-hidden rounded-xl bg-gray-900/5 dark:bg-gray-100/5">
-                  <Image src={useCase.imageSrc} alt={useCase.imageAlt} width={960} height={640} className="object-cover" />
+                <div className="aspect-[16/9] overflow-hidden rounded-xl bg-gray-900/5 dark:bg-gray-100/5">
+                  <Image 
+                    src={useCase.imageSrc.light}
+                    alt={useCase.imageAlt} 
+                    width={1920}
+                    height={1080}
+                    className="w-full h-full object-cover object-center dark:hidden" 
+                  />
+                  <Image 
+                    src={useCase.imageSrc.dark}
+                    alt={useCase.imageAlt} 
+                    width={1920}
+                    height={1080}
+                    className="hidden w-full h-full object-cover object-center dark:block" 
+                  />
                 </div>
               </div>
               <div className="lg:w-1/2">

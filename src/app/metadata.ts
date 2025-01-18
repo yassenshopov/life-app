@@ -12,7 +12,7 @@ export const defaultMetadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/og-image.jpg',
+        url: '/og-image.webp',
         width: 1200,
         height: 630,
         alt: 'Frameworked Dashboard Preview',
@@ -23,7 +23,7 @@ export const defaultMetadata: Metadata = {
     card: 'summary_large_image',
     title: 'Frameworked | Supercharge your Notion workspace',
     description: 'Supercharge your Notion workspace with powerful visualizations and enhanced workflows.',
-    images: ['/og-image.jpg'],
+    images: ['/og-image.webp'],
   },
   robots: {
     index: true,
