@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Menu as MenuIcon, Info, DollarSign, HelpCircle, ArrowRight } from 'lucide-react';
