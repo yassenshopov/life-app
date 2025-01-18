@@ -20,7 +20,17 @@ export function Hero({ outfit, hideAction }: { outfit: any; hideAction?: boolean
           >
             Get Started
           </Link>
-          <Link href="#features" className="flex items-center text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
+          <Link
+            href="#features"
+            className="flex items-center text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100"
+            onClick={(e) => {
+              e.preventDefault();
+              const section = document.getElementById('features');
+              if (section) {
+                section.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+          >
             Learn more <ArrowRightIcon className="ml-1 h-4 w-4" />
           </Link>
         </div>
