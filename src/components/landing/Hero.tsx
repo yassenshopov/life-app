@@ -4,7 +4,7 @@ import Image from 'next/image';
 
 export function Hero({ outfit, hideAction }: { outfit: any; hideAction?: boolean }) {
   return (
-    <div className="relative px-6 lg:px-8 py-24 sm:py-32">
+    <div className="relative px-6 lg:px-8 py-24 sm:py-32 mt-10 sm:mt-16">
       <div className="mx-auto max-w-2xl text-center">
         <h1 className={`${outfit.className} text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent`}>
           Supercharge your Notion workspace
