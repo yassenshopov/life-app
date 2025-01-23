@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, AlertCircle, Calendar, CircleDot, History, Ban, PencilIcon } from 'lucide-react';
 import { LoadingSpinner } from './LoadingSpinner';
-import { DateRangeFilter } from './DateRangeFilter';
 import { StatusFilter } from './StatusFilter';
 import { StatusBadge } from './StatusBadge';
 import { HabitLoadingOverlay } from './HabitLoadingOverlay';
-import { ColorPicker } from './ColorPicker';
 
 interface Habit {
   id: string;
@@ -20,15 +18,16 @@ interface HeatmapDay {
   isCompleted: boolean;
 }
 
-export function HabitsOverview() {
+interface Props {
+  dateRange: { from: Date; to: Date };
+  activeTab: string | null;
+  handleDateRangeFilter: (days: number | string) => void;
+}
+
+export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: Props) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dateRange, setDateRange] = useState({
-    from: new Date(new Date().setDate(new Date().getDate() - 90)), // Default to 90 days
-    to: new Date(),
-  });
-  const [activeTab, setActiveTab] = useState<string | null>('90D');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Active', 'Unplanned', 'Discontinued']);
   const [showNewHabitModal, setShowNewHabitModal] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
@@ -128,19 +127,6 @@ export function HabitsOverview() {
       default:
         return <History className="w-4 h-4 text-purple-500" />;
     }
-  };
-
-  const handleDateRangeFilter = (days: number | string) => {
-    const to = new Date();
-    let from = new Date();
-
-    if (days === 'YTD') {
-      from = new Date(new Date().getFullYear(), 0, 1); // January 1st of current year
-    } else {
-      from.setDate(to.getDate() - Number(days));
-    }
-
-    setDateRange({ from, to });
   };
 
   const getDaysBetweenDates = (startDate: Date, endDate: Date) => {
@@ -331,14 +317,6 @@ export function HabitsOverview() {
 
   return (
     <div className="space-y-6">
-      <DateRangeFilter
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        handleDateRangeFilter={handleDateRangeFilter}
-      />
-
       <StatusFilter 
         selectedStatuses={selectedStatuses}
         setSelectedStatuses={setSelectedStatuses}

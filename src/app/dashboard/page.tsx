@@ -539,6 +539,7 @@ export default function Dashboard() {
             <HabitsOverview 
               dateRange={dateRange}
               activeTab={activeTab}
+              handleDateRangeFilter={handleDateRangeFilter}
             />
           </>
         )}
