@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, AlertCircle, Calendar, CircleDot, History, Ban, PencilIcon } from 'lucide-react';
+import { CircleDot, History, Ban, PencilIcon } from 'lucide-react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { StatusFilter } from './StatusFilter';
 import { StatusBadge } from './StatusBadge';
@@ -27,7 +27,6 @@ interface Props {
 export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: Props) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Active', 'Unplanned', 'Discontinued']);
   const [showNewHabitModal, setShowNewHabitModal] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
@@ -140,14 +139,6 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
     return days;
   };
 
-  const getIntensityClass = (completedCount: number) => {
-    if (completedCount === 0) return 'bg-slate-100 dark:bg-slate-800';
-    if (completedCount === 1) return 'bg-green-200 dark:bg-green-900';
-    if (completedCount === 2) return 'bg-green-300 dark:bg-green-800';
-    if (completedCount === 3) return 'bg-green-400 dark:bg-green-700';
-    return 'bg-green-500 dark:bg-green-600';
-  };
-
   const renderHeatmap = (habit: Habit) => {
     const allDays = getDaysBetweenDates(dateRange.from, dateRange.to);
     const weeks: HeatmapDay[][] = [];
@@ -156,7 +147,6 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
 
     // Create color variations
     const baseColor = habit.colorCode;
-    const lightColor = `${baseColor}33`; // 20% opacity
     const darkColor = `${baseColor}CC`;  // 80% opacity
 
     allDays.forEach((date) => {
