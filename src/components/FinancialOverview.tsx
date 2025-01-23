@@ -59,7 +59,7 @@ export function FinancialOverview() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <LoadingSpinner size="md" color="teal" label='Loading assets...' />
+        <LoadingSpinner size="md" color="green" label='Loading assets...' />
       </div>
     );
   }
@@ -190,11 +190,12 @@ export function FinancialOverview() {
 
   // Define consistent colors for assets
   const getAssetColor = (index: number, total: number) => {
-    const hues = [210, 240, 280, 320]; // Different base hues
-    const hue = hues[index % hues.length];
-    const saturation = 70;
-    const lightness = 55;
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    // Create an array of green-based HSL colors
+    const baseHue = 145; // Green hue
+    const saturation = 55;
+    // Vary the lightness to create different shades
+    const lightness = 35 + (index * 20); // Start darker, get lighter
+    return `hsl(${baseHue}, ${saturation}%, ${Math.min(lightness, 65)}%)`;
   };
 
   // Prepare data for pie chart

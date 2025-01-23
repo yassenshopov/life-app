@@ -6,4 +6,5 @@ export type DisplaySection =
   | 'weight'
   | 'checklist'
   | 'finances'
-  | 'gym'; 
+  | 'gym'
+  | 'habits';

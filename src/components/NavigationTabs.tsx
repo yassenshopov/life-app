@@ -12,6 +12,7 @@ import {
   LogOut,
   Settings,
   Menu as MenuIcon,
+  ListChecks,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -108,6 +109,7 @@ export function NavigationTabs({
     },
     { name: 'Gym', icon: <DumbbellIcon className="w-4 h-4" /> },
     { name: 'Finances', icon: <DollarSign className="w-4 h-4" /> },
+    { name: 'Habits', icon: <ListChecks className="w-4 h-4" /> },
   ];
 
   return (

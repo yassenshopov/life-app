@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg";
-  color?: "purple" | "yellow" | "red" | "teal" | "orange" | "white";
+  color?: "purple" | "yellow" | "red" | "teal" | "orange" | "white" | "green";
   className?: string;
   label?: string;
 }
@@ -26,6 +26,7 @@ export const LoadingSpinner = ({
     teal: "border-teal-200/30 border-t-teal-500",
     orange: "border-orange-200/30 border-t-orange-500",
     white: "border-gray-400 border-t-gray-600 dark:border-white/20 dark:border-t-white",
+    green: "border-green-200/30 border-t-green-500",
   };
 
   return (

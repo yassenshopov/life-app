@@ -54,6 +54,7 @@ import { ManualEntryForm } from '@/components/ManualEntryForm';
 import { Checklist } from '@/components/Checklist';
 import { SevenDayReport } from '@/components/SevenDayReport';
 import { FinancialOverview } from '@/components/FinancialOverview';
+import { HabitsOverview } from '@/components/HabitsOverview';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -530,6 +531,16 @@ export default function Dashboard() {
             setIsLoadingCharts={() => {}}
             setEntries={setEntries}
           />
+        )}
+
+        {activeSection === 'habits' && (
+          <>
+            <SectionHeader title="Habits Tracker" />
+            <HabitsOverview 
+              dateRange={dateRange}
+              activeTab={activeTab}
+            />
+          </>
         )}
       </main>
     </div>
