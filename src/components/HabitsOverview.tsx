@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CircleDot, History, Ban, PencilIcon } from 'lucide-react';
+import { CircleDot, History, Ban, PencilIcon, LayoutGrid, List } from 'lucide-react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { StatusFilter } from './StatusFilter';
 import { StatusBadge } from './StatusBadge';
@@ -35,6 +35,7 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
   const [showEditHabitModal, setShowEditHabitModal] = useState(false);
   const [editingHabit, setEditingHabit] = useState<{id: string, name: string, status: string, colorCode: string} | null>(null);
   const [loadingHabits, setLoadingHabits] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     fetchHabits();
@@ -297,27 +298,16 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
     setShowNewHabitModal(true);
   };
 
-  if (isLoading) {
+  const renderListView = (habits: Habit[]) => {
     return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="lg" color="white" label='Loading habits...' />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <StatusFilter 
-        selectedStatuses={selectedStatuses}
-        setSelectedStatuses={setSelectedStatuses}
-      />
-
-      {/* Habits List with Heatmap */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="space-y-2">
         {habits
           .filter(habit => selectedStatuses.includes(habit.status))
           .map((habit) => (
-            <div key={habit.id} className="relative bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+            <div 
+              key={habit.id} 
+              className="relative bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {getStatusIcon(habit.status)}
@@ -330,10 +320,12 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
                   />
                 </div>
                 
-                <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    Completed {habit.days.length} times
+                  </div>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setEditingHabit({
                         id: habit.id,
                         name: habit.name,
@@ -348,29 +340,129 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
                   </button>
                 </div>
               </div>
-
-              {/* Heatmap */}
-              {renderHeatmap(habit)}
-
-              <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Completed {habit.days.length} times
-              </div>
-
               {loadingHabits.has(habit.id) && <HabitLoadingOverlay />}
             </div>
           ))}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" color="white" label='Loading habits...' />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <StatusFilter 
+          selectedStatuses={selectedStatuses}
+          setSelectedStatuses={setSelectedStatuses}
+        />
         
-        {/* New Habit Button Card */}
-        <div
-          onClick={handleNewHabitClick}
-          className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800 flex items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-        >
-          <div className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-            <span className="text-2xl">+</span>
-            <span>New Habit</span>
-          </div>
+        <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition-colors ${
+              viewMode === 'grid' 
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200' 
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Grid
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition-colors ${
+              viewMode === 'list' 
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200' 
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            <List className="w-4 h-4" />
+            List
+          </button>
         </div>
       </div>
+
+      {/* Conditional rendering based on view mode */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {habits
+            .filter(habit => selectedStatuses.includes(habit.status))
+            .map((habit) => (
+              <div key={habit.id} className="relative bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(habit.status)}
+                    <h3 className="font-medium text-slate-900 dark:text-white">
+                      {habit.name}
+                    </h3>
+                    <StatusBadge
+                      currentStatus={habit.status}
+                      onStatusChange={(status) => updateHabitStatus(habit.id, status)}
+                    />
+                  </div>
+                  
+                  <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingHabit({
+                          id: habit.id,
+                          name: habit.name,
+                          status: habit.status,
+                          colorCode: habit.colorCode
+                        });
+                        setShowEditHabitModal(true);
+                      }}
+                      className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <PencilIcon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Heatmap */}
+                {renderHeatmap(habit)}
+
+                <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Completed {habit.days.length} times
+                </div>
+
+                {loadingHabits.has(habit.id) && <HabitLoadingOverlay />}
+              </div>
+            ))}
+          
+          {/* New Habit Button Card */}
+          <div
+            onClick={handleNewHabitClick}
+            className="bg-white/5 dark:bg-slate-900/20 rounded-lg p-4 border border-slate-200/10 dark:border-slate-800/50 flex items-center justify-center cursor-pointer hover:bg-slate-50/10 dark:hover:bg-slate-800/30 transition-colors"
+          >
+            <div className="text-slate-500/75 dark:text-slate-400/75 flex items-center gap-2">
+              <span className="text-2xl">+</span>
+              <span>New Habit</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {renderListView(habits)}
+          <button
+            onClick={handleNewHabitClick}
+            className="w-full bg-white/5 dark:bg-slate-900/20 rounded-lg p-4 border border-slate-200/10 dark:border-slate-800/50 flex items-center justify-center cursor-pointer hover:bg-slate-50/10 dark:hover:bg-slate-800/30 transition-colors"
+          >
+            <div className="text-slate-500/75 dark:text-slate-400/75 flex items-center gap-2">
+              <span className="text-2xl">+</span>
+              <span>New Habit</span>
+            </div>
+          </button>
+        </>
+      )}
 
       {/* Edit Habit Modal */}
       {showEditHabitModal && editingHabit && (

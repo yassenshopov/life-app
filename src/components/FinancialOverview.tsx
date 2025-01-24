@@ -59,7 +59,7 @@ export function FinancialOverview() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <LoadingSpinner size="md" color="green" label='Loading assets...' />
+        <LoadingSpinner size="lg" color="green" label='Loading assets...' />
       </div>
     );
   }
