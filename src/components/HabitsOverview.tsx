@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { CircleDot, History, Ban, PencilIcon, LayoutGrid, List } from 'lucide-react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { StatusFilter } from './StatusFilter';
 import { StatusBadge } from './StatusBadge';
 import { HabitLoadingOverlay } from './HabitLoadingOverlay';
+import { Checkbox } from "@/components/ui/checkbox";
+import ReactCanvasConfetti from 'react-canvas-confetti';
 
 interface Habit {
   id: string;
@@ -24,6 +26,8 @@ interface Props {
   handleDateRangeFilter: (days: number | string) => void;
 }
 
+const confetti = ReactCanvasConfetti as unknown as (options: any) => void;
+
 export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: Props) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +39,9 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
   const [showEditHabitModal, setShowEditHabitModal] = useState(false);
   const [editingHabit, setEditingHabit] = useState<{id: string, name: string, status: string, colorCode: string} | null>(null);
   const [loadingHabits, setLoadingHabits] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'checklist'>('grid');
+  const checkboxSound = new Audio('/sounds/long-pop.wav'); // Using the actual filename you added
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
 
   useEffect(() => {
     fetchHabits();
@@ -118,10 +124,10 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, colorCode: string) => {
     switch (status) {
       case 'Active':
-        return <CircleDot className="w-4 h-4 text-green-500" />;
+        return <CircleDot className="w-4 h-4" style={{ color: colorCode }} />;
       case 'Discontinued':
         return <Ban className="w-4 h-4 text-slate-500" />;
       default:
@@ -164,42 +170,30 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
       weeks.push(currentWeek);
     }
 
-    const toggleHabitForDate = async (date: string, isCompleted: boolean) => {
-      setHabitLoading(habit.id, true);
+    const toggleHabitForDate = async (habitId: string, date: string, isCompleted: boolean) => {
+      if (!isCompleted) {
+        playCheckSound();
+      }
+      
+      setHabitLoading(habitId, true);
       try {
-        // Optimistically update UI
-        setHabits(currentHabits => 
-          currentHabits.map(h => 
-            h.id === habit.id
-              ? {
-                  ...h,
-                  days: !isCompleted 
-                    ? [...h.days, { id: 'temp', date }]
-                    : h.days.filter(d => d.date !== date)
-                }
-              : h
-          )
-        );
-
         const response = await fetch('/api/notion/habits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            habitId: habit.id,
-            date: date,
+            habitId,
+            date,
             completed: !isCompleted,
           }),
         });
 
-        if (!response.ok) {
-          // Revert on error
+        if (response.ok) {
           fetchHabits();
         }
       } catch (error) {
         console.error('Error toggling habit:', error);
-        fetchHabits(); // Revert on error
       } finally {
-        setHabitLoading(habit.id, false);
+        setHabitLoading(habitId, false);
       }
     };
 
@@ -230,7 +224,7 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
                   month: 'long',
                   day: 'numeric'
                 })}${day.isCompleted ? ' - Completed' : ''}`}
-                onClick={() => toggleHabitForDate(day.date, day.isCompleted)}
+                onClick={() => toggleHabitForDate(habit.id, day.date, day.isCompleted)}
               />
             ))}
           </div>
@@ -298,54 +292,180 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
     setShowNewHabitModal(true);
   };
 
+  const isHabitCompletedToday = (habit: Habit) => {
+    const today = new Date().toISOString().split('T')[0];
+    return habit.days.some(day => day.date === today);
+  };
+
+  const calculateStreak = (habit: Habit) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Sort days by date in descending order
+    const sortedDays = [...habit.days]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    let streak = 0;
+    let currentDate = today;
+
+    // Check each day starting from today going backwards
+    while (true) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      const isCompleted = sortedDays.some(day => day.date === dateString);
+      
+      if (!isCompleted) break;
+      streak++;
+      
+      // Move to previous day
+      currentDate.setDate(currentDate.getDate() - 1);
+    }
+
+    return streak;
+  };
+
   const renderListView = (habits: Habit[]) => {
+    const today = new Date().toISOString().split('T')[0];
+    
     return (
       <div className="space-y-2">
         {habits
           .filter(habit => selectedStatuses.includes(habit.status))
-          .map((habit) => (
-            <div 
-              key={habit.id} 
-              className="relative bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(habit.status)}
-                  <h3 className="font-medium text-slate-900 dark:text-white">
-                    {habit.name}
-                  </h3>
-                  <StatusBadge
-                    currentStatus={habit.status}
-                    onStatusChange={(status) => updateHabitStatus(habit.id, status)}
-                  />
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-slate-500 dark:text-slate-400">
-                    Completed {habit.days.length} times
+          .sort((a, b) => {
+            const aCompleted = isHabitCompletedToday(a);
+            const bCompleted = isHabitCompletedToday(b);
+            if (aCompleted === bCompleted) return 0;
+            return aCompleted ? 1 : -1;
+          })
+          .map((habit) => {
+            const isCompleted = isHabitCompletedToday(habit);
+            const streak = calculateStreak(habit);
+            return (
+              <div 
+                key={habit.id} 
+                style={{ 
+                  backgroundColor: isCompleted ? undefined : `${habit.colorCode}10`
+                }}
+                className={`relative rounded-lg p-4 border transition-all ${
+                  isCompleted 
+                    ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-50' 
+                    : 'border-slate-200 dark:border-slate-800 dark:bg-opacity-[0.06]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Checkbox
+                      checked={isCompleted}
+                      onCheckedChange={() => handleToggleHabit(habit.id, today, isCompleted)}
+                      className="w-5 h-5 transition-all data-[state=checked]:bg-slate-900 dark:data-[state=checked]:bg-slate-50 data-[state=checked]:text-slate-50 dark:data-[state=checked]:text-slate-900"
+                    />
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(habit.status, habit.colorCode)}
+                      <h3 className={`font-medium transition-all ${
+                        isCompleted 
+                          ? 'text-slate-900 dark:text-white line-through decoration-2 decoration-slate-200 dark:decoration-slate-700' 
+                          : 'text-slate-900 dark:text-white'
+                      }`}>
+                        {habit.name}
+                      </h3>
+                      <StatusBadge
+                        currentStatus={habit.status}
+                        onStatusChange={(status) => updateHabitStatus(habit.id, status)}
+                      />
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setEditingHabit({
-                        id: habit.id,
-                        name: habit.name,
-                        status: habit.status,
-                        colorCode: habit.colorCode
-                      });
-                      setShowEditHabitModal(true);
-                    }}
-                    className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    <PencilIcon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                  </button>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {isCompleted 
+                        ? 'Completed today!' 
+                        : streak > 0 
+                          ? `${streak} day streak!` 
+                          : 'Start your streak today!'
+                      }
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingHabit({
+                          id: habit.id,
+                          name: habit.name,
+                          status: habit.status,
+                          colorCode: habit.colorCode
+                        });
+                        setShowEditHabitModal(true);
+                      }}
+                      className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <PencilIcon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
-              {loadingHabits.has(habit.id) && <HabitLoadingOverlay />}
-            </div>
-          ))}
+            );
+          })}
       </div>
     );
   };
+
+  const playCheckSound = () => {
+    checkboxSound.currentTime = 0; // Reset sound to start
+    checkboxSound.play().catch(e => console.log('Error playing sound:', e));
+  };
+
+  const checkAllHabitsCompleted = (updatedHabits: Habit[]) => {
+    const activeHabits = updatedHabits.filter(h => h.status === 'Active');
+    const allCompleted = activeHabits.every(habit => isHabitCompletedToday(habit));
+    
+    if (allCompleted && activeHabits.length > 0) {
+      setShowCompletionMessage(true);
+      fire();
+      setTimeout(() => setShowCompletionMessage(false), 5000); // Hide after 5 seconds
+    }
+  };
+
+  const handleToggleHabit = async (habitId: string, date: string, isCompleted: boolean) => {
+    if (!isCompleted) {
+      playCheckSound();
+    }
+    
+    // Optimistically update UI
+    const updatedHabits = habits.map(habit => 
+      habit.id === habitId
+        ? {
+            ...habit,
+            days: !isCompleted 
+              ? [...habit.days, { id: 'temp', date }]
+              : habit.days.filter(d => d.date !== date)
+          }
+        : habit
+    );
+    setHabits(updatedHabits);
+    
+    // Check completion after update
+    checkAllHabitsCompleted(updatedHabits);
+
+    try {
+      const response = await fetch('/api/notion/habits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ habitId, date, completed: !isCompleted }),
+      });
+      if (!response.ok) {
+        fetchHabits();
+      }
+    } catch (error) {
+      console.error('Error toggling habit:', error);
+      fetchHabits();
+    }
+  };
+
+  // Move fire inside component
+  const fire = useCallback(() => {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -357,6 +477,12 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
 
   return (
     <div className="space-y-6">
+      {showCompletionMessage && (
+        <div className="bg-green-500/10 dark:bg-green-500/20 border border-green-500/20 text-green-700 dark:text-green-300 p-4 rounded-lg text-center animate-fade-in">
+          🎉 Amazing! All habits completed for today! 🎉
+        </div>
+      )}
+      
       <div className="flex justify-between items-center">
         <StatusFilter 
           selectedStatuses={selectedStatuses}
@@ -398,7 +524,7 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
               <div key={habit.id} className="relative bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {getStatusIcon(habit.status)}
+                    {getStatusIcon(habit.status, habit.colorCode)}
                     <h3 className="font-medium text-slate-900 dark:text-white">
                       {habit.name}
                     </h3>
@@ -450,18 +576,7 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
           </div>
         </div>
       ) : (
-        <>
-          {renderListView(habits)}
-          <button
-            onClick={handleNewHabitClick}
-            className="w-full bg-white/5 dark:bg-slate-900/20 rounded-lg p-4 border border-slate-200/10 dark:border-slate-800/50 flex items-center justify-center cursor-pointer hover:bg-slate-50/10 dark:hover:bg-slate-800/30 transition-colors"
-          >
-            <div className="text-slate-500/75 dark:text-slate-400/75 flex items-center gap-2">
-              <span className="text-2xl">+</span>
-              <span>New Habit</span>
-            </div>
-          </button>
-        </>
+        renderListView(habits)
       )}
 
       {/* Edit Habit Modal */}
@@ -656,6 +771,18 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
           </div>
         </div>
       )}
+
+      <ReactCanvasConfetti
+        style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          width: '100%',
+          height: '100%',
+          top: 0,
+          left: 0,
+          zIndex: 50
+        }}
+      />
     </div>
   );
 } 
