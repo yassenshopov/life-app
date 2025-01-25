@@ -1,5 +1,7 @@
 import { Client } from '@notionhq/client';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY,
@@ -18,9 +20,31 @@ type Relation = { id: string };
 export async function GET() {
   try {
     const habitsDbId = process.env.NOTION_HABITS_DB_ID;
-    const runningDbId = process.env.NOTION_RUNNING_DATABASE_ID;
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (!habitsDbId || !runningDbId) {
+    // Fetch user's Notion database ID
+    const { data, error } = await supabase
+      .from('notion_credentials')
+      .select('notion_database_daily_tracking_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !data?.notion_database_daily_tracking_id) {
+      return NextResponse.json(
+        { error: 'Notion database not configured' },
+        { status: 400 }
+      );
+    }
+
+    const dailyTrackingDbId = data.notion_database_daily_tracking_id;
+
+    if (!habitsDbId || !dailyTrackingDbId) {
       return NextResponse.json(
         { error: 'Database IDs are required' },
         { status: 400 }
@@ -82,12 +106,37 @@ export async function POST(request: Request) {
   console.log('POST request received for habit toggle');
   try {
     const { habitId, date, completed } = await request.json();
-    const runningDbId = process.env.NOTION_RUNNING_DATABASE_ID;
+    console.log('Request params:', { habitId, date, completed });
+    
+    // Get user's database ID from Supabase
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    console.log('Request params:', { habitId, date, completed, runningDbId });
+    const { data, error } = await supabase
+      .from('notion_credentials')
+      .select('notion_database_daily_tracking_id')
+      .eq('user_id', user.id)
+      .single();
 
-    if (!habitId || !date || !runningDbId) {
-      console.error('Missing required fields:', { habitId, date, runningDbId });
+    if (error || !data?.notion_database_daily_tracking_id) {
+      console.error('Database error:', error);
+      return NextResponse.json(
+        { error: 'Notion database not configured' },
+        { status: 400 }
+      );
+    }
+
+    const dailyTrackingDbId = data.notion_database_daily_tracking_id;
+    console.log('Found dailyTrackingDbId:', dailyTrackingDbId);
+
+    if (!habitId || !date || !dailyTrackingDbId) {
+      console.error('Missing required fields:', { habitId, date, dailyTrackingDbId });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -97,7 +146,7 @@ export async function POST(request: Request) {
     // Find or create the daily entry
     console.log('Querying for existing entry with date:', date);
     const existingEntries = await notion.databases.query({
-      database_id: runningDbId,
+      database_id: dailyTrackingDbId,
       filter: {
         property: 'Date',
         date: {
@@ -113,7 +162,7 @@ export async function POST(request: Request) {
     } else {
       console.log('Creating new day entry for date:', date);
       const newDayPage = await notion.pages.create({
-        parent: { database_id: runningDbId },
+        parent: { database_id: dailyTrackingDbId },
         properties: {
           Date: {
             date: {
@@ -132,22 +181,21 @@ export async function POST(request: Request) {
     const currentRelations = (habitPage as any).properties.Days?.relation || [];
     console.log('Current relations structure:', JSON.stringify(currentRelations, null, 2));
 
-    // Create new relation array
+    // Create new relation array based on completed status
     const newRelations = !completed
-      ? [{ id: dayPageId }]  // Just add the new day directly
-      : [];  // Remove all relations
+      ? currentRelations.filter((rel: Relation) => rel.id !== dayPageId) // Remove if uncompleting
+      : [...currentRelations, { id: dayPageId }];  // Add if completing
 
-    // Log before update to verify
     console.log('dayPageId to add/remove:', dayPageId);
     console.log('New relations structure:', JSON.stringify(newRelations, null, 2));
 
-    // Update the habit with explicit logging
+    // Update the habit
     try {
       const updateResponse = await notion.pages.update({
         page_id: habitId,
         properties: {
           Days: {
-            relation: [{ id: dayPageId }]  // Direct relation update
+            relation: newRelations
           }
         }
       });
