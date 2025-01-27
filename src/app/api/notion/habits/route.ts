@@ -51,20 +51,32 @@ export async function GET() {
       );
     }
 
-    // Fetch all habits
-    const habitsResponse = await notion.databases.query({
-      database_id: habitsDbId,
-      sorts: [
-        {
-          property: 'Status',
-          direction: 'ascending',
-        },
-      ],
-    });
+    // Fetch all habits with pagination
+    let allHabitResults: any[] = [];
+    let hasMore = true;
+    let startCursor: string | undefined = undefined;
+
+    while (hasMore) {
+      const habitsResponse = await notion.databases.query({
+        database_id: habitsDbId,
+        sorts: [
+          {
+            property: 'Status',
+            direction: 'ascending',
+          },
+        ],
+        start_cursor: startCursor,
+        page_size: 100,
+      });
+
+      allHabitResults = [...allHabitResults, ...habitsResponse.results];
+      hasMore = habitsResponse.has_more;
+      startCursor = habitsResponse.next_cursor || undefined;
+    }
 
     // Process habits and their related days
     const habits = await Promise.all(
-      habitsResponse.results.map(async (habit: any) => {
+      allHabitResults.map(async (habit: any) => {
         const daysRelation = habit.properties.Days?.relation || [];
         
         // Fetch related days if there are any
@@ -74,9 +86,14 @@ export async function GET() {
                 const pageResponse = await notion.pages.retrieve({
                   page_id: relation.id,
                 });
+                const date = (pageResponse as any).properties.Date?.date?.start;
+                
+                // Convert the date to user's local timezone
+                const localDate = new Date(date);
+                const userTimezoneDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000);
                 return {
                   id: relation.id,
-                  date: (pageResponse as any).properties.Date?.date?.start,
+                  date: userTimezoneDate.toISOString().split('T')[0],
                 };
               })
             )

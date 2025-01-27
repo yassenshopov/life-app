@@ -147,7 +147,16 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
   };
 
   const renderHeatmap = (habit: Habit) => {
-    const allDays = getDaysBetweenDates(dateRange.from, dateRange.to);
+    // Get today's date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Ensure the date range includes today
+    const startDate = new Date(Math.min(dateRange.from.getTime(), today.getTime()));
+    const endDate = new Date(Math.max(dateRange.to.getTime(), today.getTime()));
+    
+    // Get all days using the adjusted date range
+    const allDays = getDaysBetweenDates(startDate, endDate);
     const weeks: HeatmapDay[][] = [];
     let currentWeek: HeatmapDay[] = [];
     const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
