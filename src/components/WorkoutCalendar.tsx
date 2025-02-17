@@ -453,6 +453,34 @@ export const WorkoutCalendar = ({
   // Add useRef at the top with other hooks
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Add this function near other helper functions
+  const findPreviousSessionExercises = useCallback((type: GymSessionType, currentDate: string) => {
+    if (!workoutData.gymSessions?.length) return null;
+
+    // Find the most recent session of the same type before the current date
+    const previousSession = [...workoutData.gymSessions]
+      .filter(session => 
+        session.type === type && 
+        session.date < currentDate
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (!previousSession?.exercise_log) return null;
+
+    // Transform the exercise log back into our WorkoutExercise format
+    return Object.entries(previousSession.exercise_log).map(([name, data]: [string, any]) => ({
+      name: name
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' '),
+      primaryMuscle: (findExerciseInLibrary(name)?.primaryMuscle || 'full_body') as MuscleGroup,
+      sets: data.sets.map((set: any) => ({
+        reps: Number(set.reps),
+        weight: Number(set.weight),
+      })),
+    }));
+  }, [workoutData.gymSessions, findExerciseInLibrary]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 max-w-7xl mx-auto">
       {/* Calendar Section - Left Side */}
@@ -773,6 +801,12 @@ export const WorkoutCalendar = ({
                     toggleExercise={toggleExercise}
                     userWeight={userWeight}
                     exerciseHistory={exerciseHistory}
+                    previousSessionExercises={formState.sessionType ? 
+                      findPreviousSessionExercises(
+                        formState.sessionType,
+                        formState.gymDate || new Date().toISOString().split('T')[0]
+                      ) || undefined : undefined
+                    }
                   />
                 </div>
                 <div>
