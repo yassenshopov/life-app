@@ -8,14 +8,7 @@ import { User } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 
 // Icons
-import {
-  Moon,
-  Heart,
-  Footprints,
-  BarChart2,
-  Dumbbell,
-  Calendar,
-} from 'lucide-react';
+import { Moon, Heart, Footprints, BarChart2, Dumbbell, Calendar } from 'lucide-react';
 
 // Hooks
 import { useHealthData } from '@/hooks/useHealthData';
@@ -97,17 +90,10 @@ export default function Dashboard() {
   const [showAwakeTime, setShowAwakeTime] = useState(true);
   const [showGymForm, setShowGymForm] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
-  const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(
-    null
-  );
+  const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
   const [autoOpenManualEntry, setAutoOpenManualEntry] = useState(true);
 
-  const {
-    entries,
-    setEntries,
-    isLoading: healthLoading,
-    error,
-  } = useHealthData(dateRange);
+  const { entries, setEntries, isLoading: healthLoading, error } = useHealthData(dateRange);
   const { gymSessions, loading: gymLoading } = useGymData(dateRange);
 
   const isLoading = healthLoading || gymLoading;
@@ -122,32 +108,52 @@ export default function Dashboard() {
         fromDate.setHours(0, 0, 0, 0);
         const toDate = new Date(dateRange.to);
         toDate.setHours(23, 59, 59, 999);
-        
+
         return entryDate >= fromDate && entryDate <= toDate;
       })
       .reverse()
-      .map((entry) => ({
-        date: new Date(entry.date)
-          .toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-          })
-          .replace(/(\d+)/, (match) => {
-            const day = parseInt(match);
-            const suffix =
-              ['th', 'st', 'nd', 'rd'][day % 10 > 3 ? 0 : day % 10] || 'th';
-            return `${day}${suffix}`;
-          }),
-        totalSleep: Number(
-          (entry.totalSleepHours + entry.totalSleepMinutes / 60).toFixed(2)
-        ),
-        deepSleep: entry.deepSleepPercentage,
-        remSleep: entry.remSleepPercentage,
-        awakeTime: entry.awakeTimeMinutes,
-        restingHeartRate: entry.restingHeartRate,
-        steps: entry.steps,
-        weight: entry.weight,
-      }))
+      .map((entry) => {
+        // Let's check if we need to calculate sleep duration differently
+        // for cases where sleep crosses midnight
+        let totalSleep;
+
+        // If we have sleep and wake times, calculate duration more accurately
+        if (entry.sleepTime && entry.wakeTime) {
+          const [sleepHour, sleepMin] = entry.sleepTime.split(':').map(Number);
+          const [wakeHour, wakeMin] = entry.wakeTime.split(':').map(Number);
+
+          const sleepDecimal = sleepHour + sleepMin / 60;
+          const wakeDecimal = wakeHour + wakeMin / 60;
+
+          totalSleep = wakeDecimal - sleepDecimal;
+          if (totalSleep < 0) {
+            totalSleep += 24; // Add 24 hours if sleep crosses midnight
+          }
+        } else {
+          // Fall back to the original calculation
+          totalSleep = Number((entry.totalSleepHours + entry.totalSleepMinutes / 60).toFixed(2));
+        }
+
+        return {
+          date: new Date(entry.date)
+            .toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+            })
+            .replace(/(\d+)/, (match) => {
+              const day = parseInt(match);
+              const suffix = ['th', 'st', 'nd', 'rd'][day % 10 > 3 ? 0 : day % 10] || 'th';
+              return `${day}${suffix}`;
+            }),
+          totalSleep,
+          deepSleep: entry.deepSleepPercentage,
+          remSleep: entry.remSleepPercentage,
+          awakeTime: entry.awakeTimeMinutes,
+          restingHeartRate: entry.restingHeartRate,
+          steps: entry.steps,
+          weight: entry.weight,
+        };
+      })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [entries, dateRange]);
 
@@ -166,23 +172,25 @@ export default function Dashboard() {
         const sleepDecimal = sleepHour + sleepMin / 60;
         const wakeDecimal = wakeHour + wakeMin / 60;
 
+        let duration = wakeDecimal - sleepDecimal;
+        if (duration < 0) {
+          duration += 24;
+        }
+
         return {
           date: new Date(entry.date).toLocaleDateString(),
           fullDate: entry.date,
           sleepStart: sleepDecimal,
           sleepEnd: wakeDecimal,
-          duration: (wakeDecimal - sleepDecimal + 24) % 24,
+          duration,
         };
       })
-      .sort(
-        (a, b) =>
-          new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()
-      );
+      .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime());
   }, [entries, dateRange]);
 
   const handleDateRangeFilter = (days: number | string) => {
     setIsChartLoading(true);
-    
+
     const now = new Date();
     const to = new Date(now);
     let from = new Date(now);
@@ -200,12 +208,9 @@ export default function Dashboard() {
     from.setHours(0, 0, 0, 0);
 
     setDateRange({ from, to });
-    
+
     // Adjust timeout based on date range
-    const timeout = 
-      days === 'YTD' || Number(days) >= 365 ? 1500 :
-      Number(days) >= 90 ? 1000 :
-      500;
+    const timeout = days === 'YTD' || Number(days) >= 365 ? 1500 : Number(days) >= 90 ? 1000 : 500;
 
     setTimeout(() => {
       setIsChartLoading(false);
@@ -345,8 +350,7 @@ export default function Dashboard() {
                 );
                 const hasMeaningfulSleepData =
                   todayEntry &&
-                  (todayEntry.totalSleepHours > 0 ||
-                    todayEntry.totalSleepMinutes > 0);
+                  (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
 
                 return hasMeaningfulSleepData ? (
                   <div className="mb-8">
@@ -356,10 +360,7 @@ export default function Dashboard() {
               })()}
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
-              <SleepDurationChart
-                data={prepareChartData}
-                isLoadingCharts={isChartLoading}
-              />
+              <SleepDurationChart data={prepareChartData} isLoadingCharts={isChartLoading} />
               <SleepStats entries={entries} dateRange={dateRange} />
             </div>
 
@@ -374,9 +375,7 @@ export default function Dashboard() {
                   isChartLoading ? 'opacity-50' : 'opacity-100'
                 }`}
               >
-                <SleepPatternChart
-                  data={entries.length > 0 ? prepareSleepPatternData : []}
-                />
+                <SleepPatternChart data={entries.length > 0 ? prepareSleepPatternData : []} />
               </div>
             </div>
 
@@ -476,9 +475,7 @@ export default function Dashboard() {
               <div className="relative">
                 <div
                   className={`transition-opacity duration-200 ${
-                    isChartLoading || isCalendarLoading
-                      ? 'opacity-50'
-                      : 'opacity-100'
+                    isChartLoading || isCalendarLoading ? 'opacity-50' : 'opacity-100'
                   }`}
                 >
                   <WorkoutCalendar
@@ -508,10 +505,7 @@ export default function Dashboard() {
                 title="Exercise Analysis"
                 className={activeSection === 'all' ? 'mt-12' : ''}
               />
-              <ExerciseAnalysis
-                gymSessions={gymSessions}
-                onMuscleClick={handleMuscleClick}
-              />
+              <ExerciseAnalysis gymSessions={gymSessions} onMuscleClick={handleMuscleClick} />
             </div>
           </>
         )}
@@ -536,7 +530,7 @@ export default function Dashboard() {
         {activeSection === 'habits' && (
           <>
             <SectionHeader title="Habits Tracker" />
-            <HabitsOverview 
+            <HabitsOverview
               dateRange={dateRange}
               activeTab={activeTab}
               handleDateRangeFilter={handleDateRangeFilter}
