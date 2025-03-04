@@ -40,28 +40,18 @@ export function ManualEntryForm({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const selectedEntry = Array.isArray(entries) 
-    ? entries.find(
-        (entry) => entry.date === selectedDate.toISOString().split('T')[0]
-      )
+  const selectedEntry = Array.isArray(entries)
+    ? entries.find((entry) => entry.date === selectedDate.toISOString().split('T')[0])
     : undefined;
 
   const hasMeaningfulSleepData =
-    selectedEntry &&
-    (selectedEntry.totalSleepHours > 0 || selectedEntry.totalSleepMinutes > 0);
+    selectedEntry && (selectedEntry.totalSleepHours > 0 || selectedEntry.totalSleepMinutes > 0);
 
   const setFormValues = (entry: DayEntry | undefined) => {
     if (entry) {
-      // Convert times to 24-hour format
-      const convertTo24Hour = (time: string) => {
-        const [hours, minutes] = time.split(':').map(Number);
-        return `${hours.toString().padStart(2, '0')}:${minutes
-          .toString()
-          .padStart(2, '0')}`;
-      };
-
-      setSleepTime(convertTo24Hour(entry.sleepTime));
-      setWakeTime(convertTo24Hour(entry.wakeTime));
+      // Set the values directly in 24-hour format
+      setSleepTime(entry.sleepTime);
+      setWakeTime(entry.wakeTime);
       setDeepSleep(Math.round(entry.deepSleepPercentage).toString());
       setRemSleep(Math.round(entry.remSleepPercentage).toString());
       setAwakeTime(Math.round(entry.awakeTimeMinutes).toString());
@@ -71,50 +61,32 @@ export function ManualEntryForm({
     }
   };
 
-  const handleEditClick = () => {
-    if (!showUpdateForm) {
-      setFormValues(selectedEntry);
-    } else {
-      setSleepTime('');
-      setWakeTime('');
-      setDeepSleep('');
-      setRemSleep('');
-      setAwakeTime('');
-      setRestingHeartRate('');
-      setSteps('');
-      setWeight('');
-    }
-    setShowUpdateForm(!showUpdateForm);
-  };
-
   const handleDateChange = (days: number) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     setSelectedDate(newDate);
-    
+
     if (Array.isArray(entries)) {
-      setFormValues(
-        entries.find(
-          (entry) => entry.date === newDate.toISOString().split('T')[0]
-        )
-      );
+      setFormValues(entries.find((entry) => entry.date === newDate.toISOString().split('T')[0]));
     }
   };
 
-  const fetchEntries = useCallback(async (databaseId: string) => {
-    const response = await fetch(
-      `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}&databaseId=${databaseId}`
-    );
-    if (!response.ok) {
-      throw new Error('Failed to fetch entries');
-    }
-    const data = await response.json();
-    setEntries(data);
-  }, [dateRange]);
+  const fetchEntries = useCallback(
+    async (databaseId: string) => {
+      const response = await fetch(
+        `/api/notion/entries?startDate=${dateRange.from.toISOString()}&endDate=${dateRange.to.toISOString()}&databaseId=${databaseId}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch entries');
+      }
+      const data = await response.json();
+      setEntries(data);
+    },
+    [dateRange]
+  );
 
   const handleSubmit = async () => {
-    if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime)
-      return;
+    if (!sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime) return;
 
     setIsSubmitting(true);
     setSubmitSuccess(false);
@@ -125,7 +97,7 @@ export function ManualEntryForm({
         throw new Error('Failed to fetch Notion credentials');
       }
       const credentials = await credentialsResponse.json();
-      
+
       if (!credentials.notionDatabaseId) {
         throw new Error('Notion database ID not found');
       }
@@ -135,7 +107,22 @@ export function ManualEntryForm({
 
       // Convert hour 24 to 0
       const normalizedSleepHour = parseInt(sleepHour) === 24 ? 0 : parseInt(sleepHour);
-      
+
+      // Convert 24-hour format to 12-hour format for display
+      const sleepHour12 =
+        normalizedSleepHour > 12
+          ? normalizedSleepHour - 12
+          : normalizedSleepHour === 0
+          ? 12
+          : normalizedSleepHour;
+
+      const wakeHour12 =
+        parseInt(wakeHour) > 12
+          ? parseInt(wakeHour) - 12
+          : parseInt(wakeHour) === 0
+          ? 12
+          : parseInt(wakeHour);
+
       const entryDate = selectedDate.toISOString().split('T')[0];
       const existingEntry = entries.find((entry) => entry.date === entryDate);
 
@@ -143,9 +130,9 @@ export function ManualEntryForm({
         date: entryDate,
         pageId: existingEntry?.id,
         databaseId: credentials.notionDatabaseId,
-        GoneToSleepH: normalizedSleepHour,
+        GoneToSleepH: sleepHour12, // Use 12-hour format
         GoneToSleepM: parseInt(sleepMinute),
-        AwokeH: parseInt(wakeHour),
+        AwokeH: wakeHour12, // Use 12-hour format
         AwokeM: parseInt(wakeMinute),
         deepSleepPercentage: parseInt(deepSleep),
         remSleepPercentage: parseInt(remSleep),
@@ -186,15 +173,33 @@ export function ManualEntryForm({
   };
 
   useEffect(() => {
+    // When the dialog opens, set the form values for the selected date
+    if (isOpen && Array.isArray(entries)) {
+      const entry = entries.find(
+        (entry) => entry.date === selectedDate.toISOString().split('T')[0]
+      );
+      setFormValues(entry);
+    }
+  }, [isOpen, selectedDate, entries]);
+
+  // Add this useEffect to initialize with today's data when component mounts
+  useEffect(() => {
+    if (Array.isArray(entries)) {
+      const today = new Date();
+      const todayEntry = entries.find((entry) => entry.date === today.toISOString().split('T')[0]);
+      setFormValues(todayEntry);
+    }
+  }, [entries]);
+
+  useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todayEntry = Array.isArray(entries) 
+    const todayEntry = Array.isArray(entries)
       ? entries.find((entry) => entry.date === today)
       : undefined;
 
     // Only auto-open if there's no meaningful sleep data for today AND autoOpen is true
     const hasMeaningfulData =
-      todayEntry &&
-      (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
+      todayEntry && (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
 
     if (!hasMeaningfulData && autoOpen) {
       setIsOpen(true);
@@ -324,9 +329,7 @@ export function ManualEntryForm({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium cursor-pointer">
-              Resting Heart Rate (bpm)
-            </label>
+            <label className="text-sm font-medium cursor-pointer">Resting Heart Rate (bpm)</label>
             <input
               type="number"
               min="30"
@@ -339,9 +342,7 @@ export function ManualEntryForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium cursor-pointer">
-                Steps
-              </label>
+              <label className="text-sm font-medium cursor-pointer">Steps</label>
               <input
                 type="text"
                 value={steps ? Number(steps).toLocaleString() : ''}
@@ -353,9 +354,7 @@ export function ManualEntryForm({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium cursor-pointer">
-                Weight (kg)
-              </label>
+              <label className="text-sm font-medium cursor-pointer">Weight (kg)</label>
               <input
                 type="number"
                 min="30"
@@ -376,12 +375,7 @@ export function ManualEntryForm({
               setIsOpen(false);
             }}
             disabled={
-              !sleepTime ||
-              !wakeTime ||
-              !deepSleep ||
-              !remSleep ||
-              !awakeTime ||
-              isSubmitting
+              !sleepTime || !wakeTime || !deepSleep || !remSleep || !awakeTime || isSubmitting
             }
             className="bg-indigo-600 hover:bg-indigo-700 text-white"
           >
