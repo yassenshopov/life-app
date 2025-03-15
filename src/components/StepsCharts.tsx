@@ -9,7 +9,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Outfit } from 'next/font/google';
-import { ChartLoadingOverlay } from '@/components/ChartLoadingOverlay';
+import { ChartLoadingOverlay } from './ChartLoadingOverlay';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -29,15 +29,23 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
   const validSteps = data
     .filter((entry) => entry.steps !== null)
     .map((entry) => entry.steps as number);
-  
-  const averageSteps = validSteps.length > 0
-    ? Math.round(validSteps.reduce((acc, curr) => acc + curr, 0) / validSteps.length)
-    : 0;
+
+  const chartData = data
+    .filter((entry) => entry.steps !== null)
+    .map((entry) => ({
+      ...entry,
+      steps: entry.steps,
+    }));
+
+  const averageSteps =
+    validSteps.length > 0
+      ? Math.round(validSteps.reduce((acc, curr) => acc + curr, 0) / validSteps.length)
+      : 0;
 
   const CustomYAxisTick = (props: any) => {
     const { x, y, payload } = props;
     const value = Number(payload.value).toLocaleString();
-    
+
     return (
       <text
         x={x}
@@ -46,7 +54,7 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
         dx={-2}
         textAnchor="end"
         fill="currentColor"
-        fontSize="0.7rem"  // Match x-axis font size
+        fontSize="0.7rem" // Match x-axis font size
       >
         {value}
       </text>
@@ -55,16 +63,19 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
 
   return (
     <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-      <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <h3
+        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+      >
         Daily Steps
       </h3>
       <div className="relative">
-        <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-200 ${
+            isLoadingCharts ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
           <ResponsiveContainer width="100%" height={350}>
-            <AreaChart 
-              data={data} 
-              margin={{ bottom: 15, left: 5, right: 15, top: 5 }}
-            >
+            <AreaChart data={chartData} margin={{ bottom: 15, left: 5, right: 15, top: 5 }}>
               <defs>
                 <linearGradient id="stepsGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#eab308" stopOpacity={0.8} />
@@ -78,16 +89,16 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
                 textAnchor="end"
                 height={60}
                 interval={tickInterval}
-                tick={{ 
-                  dy: 10, 
+                tick={{
+                  dy: 10,
                   fontSize: '0.7rem',
-                  fill: 'currentColor' 
+                  fill: 'currentColor',
                 }}
                 scale="point"
                 padding={{ left: 10, right: 10 }}
               />
               <YAxis
-                width={50}  // Slightly wider to ensure no cutoff
+                width={50} // Slightly wider to ensure no cutoff
                 tick={<CustomYAxisTick />}
                 tickFormatter={(value) => value.toLocaleString()}
               />
@@ -96,9 +107,7 @@ export const StepsChart = ({ data, isLoadingCharts, tickInterval }: StepsChartPr
                   if (active && payload && payload.length) {
                     return (
                       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">
-                          {label}
-                        </p>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
                           Steps: {payload[0].value?.toLocaleString()}
                         </p>
@@ -158,7 +167,9 @@ export const StepsAnalytics = ({ data }: StepsAnalyticsProps) => {
   if (validData.length === 0) {
     return (
       <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           Steps Analytics
         </h3>
         <p className="text-slate-600 dark:text-slate-400">
@@ -168,58 +179,60 @@ export const StepsAnalytics = ({ data }: StepsAnalyticsProps) => {
     );
   }
 
-  const average = Math.round(validData.reduce((acc, curr) => acc + curr.steps, 0) / validData.length);
+  const average = Math.round(
+    validData.reduce((acc, curr) => acc + curr.steps, 0) / validData.length
+  );
   const min = Math.min(...validData.map((d) => d.steps));
   const max = Math.max(...validData.map((d) => d.steps));
   const firstReading = validData[validData.length - 1].steps;
   const lastReading = validData[0].steps;
   const trend = lastReading - firstReading;
 
-  const meanSquaredDiff = validData.reduce((acc, curr) => acc + Math.pow(curr.steps - average, 2), 0) / validData.length;
+  const meanSquaredDiff =
+    validData.reduce((acc, curr) => acc + Math.pow(curr.steps - average, 2), 0) / validData.length;
   const standardDeviation = Math.round(Math.sqrt(meanSquaredDiff));
 
   return (
     <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-      <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <h3
+        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+      >
         Steps Analytics
       </h3>
       <div className="space-y-4">
         <div>
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            {average.toLocaleString()} <span className="text-sm font-normal text-slate-500">steps</span>
+            {average.toLocaleString()}{' '}
+            <span className="text-sm font-normal text-slate-500">steps</span>
           </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            Average Daily Steps
-          </div>
+          <div className="text-sm text-slate-600 dark:text-slate-400">Average Daily Steps</div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {min.toLocaleString()} <span className="text-xs font-normal text-slate-500">steps</span>
+              {min.toLocaleString()}{' '}
+              <span className="text-xs font-normal text-slate-500">steps</span>
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              Lowest
-            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Lowest</div>
           </div>
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {max.toLocaleString()} <span className="text-xs font-normal text-slate-500">steps</span>
+              {max.toLocaleString()}{' '}
+              <span className="text-xs font-normal text-slate-500">steps</span>
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              Highest
-            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Highest</div>
           </div>
         </div>
 
         <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              Period Trend
-            </span>
-            <div className={`flex items-center gap-1 text-sm ${
-              trend > 0 ? 'text-green-500' : trend < 0 ? 'text-red-500' : 'text-slate-500'
-            }`}>
+            <span className="text-sm text-slate-600 dark:text-slate-400">Period Trend</span>
+            <div
+              className={`flex items-center gap-1 text-sm ${
+                trend > 0 ? 'text-green-500' : trend < 0 ? 'text-red-500' : 'text-slate-500'
+              }`}
+            >
               {trend !== 0 && (
                 <svg
                   className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`}
@@ -239,9 +252,7 @@ export const StepsAnalytics = ({ data }: StepsAnalyticsProps) => {
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              Variability
-            </span>
+            <span className="text-sm text-slate-600 dark:text-slate-400">Variability</span>
             <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
               ±{standardDeviation.toLocaleString()} steps
             </span>
@@ -250,4 +261,4 @@ export const StepsAnalytics = ({ data }: StepsAnalyticsProps) => {
       </div>
     </div>
   );
-}; 
+};

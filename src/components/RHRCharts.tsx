@@ -12,7 +12,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Outfit } from 'next/font/google';
-import { ChartLoadingOverlay } from '@/components/ChartLoadingOverlay';
+import { ChartLoadingOverlay } from './ChartLoadingOverlay';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -40,18 +40,25 @@ interface RHRChartProps {
 }
 
 export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps) => {
-  const chartData = data.map((entry) => ({
-    date: entry.date,
-    rhr: entry.restingHeartRate,
-  }));
-
   const validRHR = data
     .filter((entry) => entry.restingHeartRate !== null)
     .map((entry) => entry.restingHeartRate as number);
 
-  const averageRHR = validRHR.length > 0
-    ? Math.round(validRHR.reduce((acc, curr) => acc + curr, 0) / validRHR.length)
-    : 0;
+  const chartData = data
+    .filter((entry) => entry.restingHeartRate !== null)
+    .map((entry) => ({
+      date: entry.date,
+      rhr: entry.restingHeartRate,
+    }));
+
+  const averageRHR =
+    validRHR.length > 0
+      ? Math.round(validRHR.reduce((acc, curr) => acc + curr, 0) / validRHR.length)
+      : 0;
+
+  const minRHR = validRHR.length > 0 ? Math.min(...validRHR) : 0;
+  const maxRHR = validRHR.length > 0 ? Math.max(...validRHR) : 100;
+  const yAxisTicks = generateYAxisTicks(minRHR, maxRHR, averageRHR);
 
   const CustomYAxisTick = (props: any) => {
     const { x, y, payload } = props;
@@ -71,21 +78,20 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
     );
   };
 
-  const minRHR = Math.min(...validRHR);
-  const maxRHR = Math.max(...validRHR);
-  const yAxisTicks = generateYAxisTicks(minRHR, maxRHR, averageRHR);
-
   return (
     <div className="lg:col-span-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-      <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <h3
+        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+      >
         Resting Heart Rate
       </h3>
-      <div className={`transition-opacity duration-200 ${isLoadingCharts ? 'opacity-50' : 'opacity-100'}`}>
+      <div
+        className={`transition-opacity duration-200 ${
+          isLoadingCharts ? 'opacity-50' : 'opacity-100'
+        }`}
+      >
         <ResponsiveContainer width="100%" height={350}>
-          <AreaChart 
-            data={chartData} 
-            margin={{ bottom: 15, left: 5, right: 15, top: 5 }}
-          >
+          <AreaChart data={chartData} margin={{ bottom: 15, left: 5, right: 15, top: 5 }}>
             <defs>
               <linearGradient id="rhrGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
@@ -99,10 +105,10 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
               textAnchor="end"
               height={60}
               interval={tickInterval}
-              tick={{ 
-                dy: 10, 
+              tick={{
+                dy: 10,
                 fontSize: '0.7rem',
-                fill: 'currentColor' 
+                fill: 'currentColor',
               }}
               scale="point"
               padding={{ left: 10, right: 10 }}
@@ -118,9 +124,7 @@ export const RHRChart = ({ data, isLoadingCharts, tickInterval }: RHRChartProps)
                 if (active && payload && payload.length) {
                   return (
                     <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-                      <p className="font-medium text-slate-900 dark:text-slate-100">
-                        {label}
-                      </p>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         RHR: {payload[0].value} bpm
                       </p>
@@ -175,12 +179,12 @@ export const RHRAnalytics = ({ data }: RHRAnalyticsProps) => {
   if (validData.length === 0) {
     return (
       <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
-        <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+        <h3
+          className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+        >
           RHR Analytics
         </h3>
-        <p className="text-slate-600 dark:text-slate-400">
-          No RHR data available for this period.
-        </p>
+        <p className="text-slate-600 dark:text-slate-400">No RHR data available for this period.</p>
       </div>
     );
   }
@@ -192,13 +196,16 @@ export const RHRAnalytics = ({ data }: RHRAnalyticsProps) => {
   const lastReading = validData[0].rhr;
   const trend = lastReading - firstReading;
 
-  const meanSquaredDiff = validData.reduce((acc, curr) => acc + Math.pow(curr.rhr - average, 2), 0) / validData.length;
+  const meanSquaredDiff =
+    validData.reduce((acc, curr) => acc + Math.pow(curr.rhr - average, 2), 0) / validData.length;
   const standardDeviation = Math.round(Math.sqrt(meanSquaredDiff) * 10) / 10;
 
   return (
     <div className="lg:col-span-1 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800">
       {/* ... existing analytics JSX ... */}
-      <h3 className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}>
+      <h3
+        className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+      >
         RHR Analytics
       </h3>
       <div className="space-y-4">
@@ -206,9 +213,7 @@ export const RHRAnalytics = ({ data }: RHRAnalyticsProps) => {
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {average} <span className="text-sm font-normal text-slate-500">bpm</span>
           </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            Average RHR
-          </div>
+          <div className="text-sm text-slate-600 dark:text-slate-400">Average RHR</div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -216,28 +221,24 @@ export const RHRAnalytics = ({ data }: RHRAnalyticsProps) => {
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {min} <span className="text-xs font-normal text-slate-500">bpm</span>
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              Lowest
-            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Lowest</div>
           </div>
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {max} <span className="text-xs font-normal text-slate-500">bpm</span>
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              Highest
-            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Highest</div>
           </div>
         </div>
 
         <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              Period Trend
-            </span>
-            <div className={`flex items-center gap-1 text-sm ${
-              trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-500'
-            }`}>
+            <span className="text-sm text-slate-600 dark:text-slate-400">Period Trend</span>
+            <div
+              className={`flex items-center gap-1 text-sm ${
+                trend > 0 ? 'text-red-500' : trend < 0 ? 'text-green-500' : 'text-slate-500'
+              }`}
+            >
               {trend !== 0 && (
                 <svg
                   className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`}
@@ -257,9 +258,7 @@ export const RHRAnalytics = ({ data }: RHRAnalyticsProps) => {
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              Variability
-            </span>
+            <span className="text-sm text-slate-600 dark:text-slate-400">Variability</span>
             <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
               ±{standardDeviation} bpm
             </span>
@@ -268,4 +267,4 @@ export const RHRAnalytics = ({ data }: RHRAnalyticsProps) => {
       </div>
     </div>
   );
-}; 
+};
