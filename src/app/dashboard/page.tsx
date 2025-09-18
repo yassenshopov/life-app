@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Inter, Outfit } from 'next/font/google';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { User } from '@supabase/supabase-js';
+import { useUser } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/react';
 
 // Icons
@@ -48,12 +47,15 @@ import { Checklist } from '@/components/Checklist';
 import { SevenDayReport } from '@/components/SevenDayReport';
 import { FinancialOverview } from '@/components/FinancialOverview';
 import { HabitsOverview } from '@/components/HabitsOverview';
+import { DailyTrackingSection } from '@/components/DailyTrackingSection';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
 
 export default function Dashboard() {
   const [isChartLoading, setIsChartLoading] = useState(false);
+  const router = useRouter();
+  const { user, isLoaded } = useUser();
 
   const sections = [
     {
@@ -240,39 +242,11 @@ export default function Dashboard() {
     }, 100);
   };
 
-  const router = useRouter();
-  const supabase = createClientComponentClient();
-  const [user, setUser] = useState<User | null>(null);
-
   useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-
-      if (error || !session) {
-        router.push('/login');
-        return;
-      }
-
-      setUser(session.user);
-    };
-
-    checkUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        router.push('/login');
-      } else if (session) {
-        setUser(session.user);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase, router]);
+    if (isLoaded && !user) {
+      router.push('/login');
+    }
+  }, [isLoaded, user, router]);
 
   useEffect(() => {
     if (!entries.length) return;
@@ -306,22 +280,21 @@ export default function Dashboard() {
 
   return (
     <div
-      className={`min-h-screen p-4 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
+      className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
     >
       <Analytics />
-      <div className="fixed top-0 right-0 left-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
-        <NavigationTabs
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-          entries={entries}
-          user={user}
-        />
+      <div className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
         <DateRangeFilter
           dateRange={dateRange}
           setDateRange={setDateRange}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           handleDateRangeFilter={handleDateRangeFilter}
+        />
+        <NavigationTabs
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          entries={entries}
         />
       </div>
 
@@ -535,6 +508,13 @@ export default function Dashboard() {
               activeTab={activeTab}
               handleDateRangeFilter={handleDateRangeFilter}
             />
+          </>
+        )}
+
+        {activeSection === 'dailytracking' && (
+          <>
+            <SectionHeader title="Daily Tracking" />
+            <DailyTrackingSection />
           </>
         )}
       </main>

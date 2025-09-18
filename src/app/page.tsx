@@ -3,7 +3,7 @@
 import { Analytics } from '@vercel/analytics/react';
 import { Inter, Outfit } from 'next/font/google';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useAuth } from '@clerk/nextjs';
 import { useEffect } from 'react';
 import { Hero } from '@/components/landing/Hero';
 import { Features } from '@/components/landing/Features';
@@ -19,19 +19,13 @@ const outfit = Outfit({ subsets: ['latin'] });
 
 export default function LandingPage() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        router.push('/dashboard');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase, router]);
+    if (isSignedIn) {
+      router.push('/dashboard');
+    }
+  }, [isSignedIn, router]);
 
   return (
     <div

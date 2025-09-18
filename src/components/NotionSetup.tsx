@@ -1,178 +1,303 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from '@supabase/auth-helpers-react';
+import { useUser } from '@clerk/nextjs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogTrigger,
 } from '@/components/ui/dialog';
-import { Check as CheckIcon } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Trash2, Database, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import {
+  NOTION_DATABASE_TEMPLATES,
+  type NotionDatabaseTemplate,
+} from '@/constants/notion-templates';
 
-export function NotionSetup() {
-  const [isOpen, setIsOpen] = useState(false);
+interface NotionDatabase {
+  database_id: string;
+  database_name: string;
+  integration_id: string;
+  last_sync: string | null;
+  sync_frequency: string;
+  properties: {
+    [key: string]: {
+      type: string;
+      required?: boolean;
+      description?: string;
+    };
+  };
+}
+
+export default function NotionSetup() {
+  const { user } = useUser();
   const [notionDatabaseId, setNotionDatabaseId] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const session = useSession();
+  const [notionDatabaseName, setNotionDatabaseName] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<NotionDatabaseTemplate | null>(null);
+  const [databases, setDatabases] = useState<NotionDatabase[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingProperties, setIsFetchingProperties] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
-    console.log('useEffect triggered, session:', session);
-
-    if (session?.user) {
-      const checkCredentials = async () => {
+    if (user) {
+      // Fetch user's notion_databases directly from Supabase
+      const fetchDatabases = async () => {
         try {
           const response = await fetch('/api/user/notion-credentials');
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          console.log('API response data:', data);
-
-          if (data && data.notionDatabaseId) {
-            setIsConnected(true);
-            setNotionDatabaseId(data.notionDatabaseId);
-          } else {
-            setIsConnected(false);
-            setNotionDatabaseId('');
+          if (response.ok) {
+            const data = await response.json();
+            setDatabases(data);
           }
         } catch (error) {
-          console.error('Error checking credentials:', error);
-          setIsConnected(false);
-          setNotionDatabaseId('');
-        } finally {
-          setIsLoading(false);
+          console.error('Error fetching databases:', error);
         }
       };
-
-      checkCredentials();
-    } else {
-      console.log('No session found, resetting states');
-      setIsConnected(false);
-      setNotionDatabaseId('');
-      setIsLoading(false);
+      fetchDatabases();
     }
-  }, [session]);
+  }, [user]);
 
-  const extractDatabaseId = (url: string): string => {
-    // Handle URLs that start with @
-    url = url.startsWith('@') ? url.substring(1) : url;
-    
-    // Try to match the database ID pattern (32 characters with optional dashes)
-    const match = url.match(/([a-f0-9]{32}|[a-f0-9-]{36})/i);
+  const extractDatabaseId = (url: string) => {
+    const match = url.match(/[a-zA-Z0-9]{32}/);
     return match ? match[0] : url;
+  };
+
+  const fetchDatabaseProperties = async (databaseId: string) => {
+    setIsFetchingProperties(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/notion/database/${databaseId}`);
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Please sign in to continue');
+        }
+        if (response.status === 404) {
+          throw new Error('Database not found. Please check the database ID');
+        }
+        throw new Error('Failed to fetch database properties');
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to fetch database properties');
+      return null;
+    } finally {
+      setIsFetchingProperties(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setError('Please sign in to continue');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const cleanedDatabaseId = extractDatabaseId(notionDatabaseId);
+      const databaseId = extractDatabaseId(notionDatabaseId);
+
+      // Try to fetch database properties from Notion API
+      const databaseData = await fetchDatabaseProperties(databaseId);
+
+      // If we can't fetch properties, use the selected template's properties
+      const properties = databaseData?.properties || selectedTemplate?.properties || {};
+      const title = databaseData?.title || selectedTemplate?.name || 'Untitled Database';
+
       const response = await fetch('/api/user/notion-credentials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: session?.user?.id,
-          notionDatabaseId: cleanedDatabaseId,
+          database_id: databaseId,
+          database_name: notionDatabaseName || title,
+          properties: properties,
         }),
       });
 
-      if (response.ok) {
-        setIsOpen(false);
-      } else {
-        // Handle error
-        console.error('Failed to save Notion credentials');
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Please sign in to continue');
+        }
+        throw new Error('Failed to save Notion database');
       }
+
+      const newDatabase = await response.json();
+      setDatabases((prev) => [...prev, newDatabase]);
+      setNotionDatabaseId('');
+      setNotionDatabaseName('');
+      setSelectedTemplate(null);
+      setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to save Notion database');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <button className="w-full flex items-center justify-between p-3 sm:p-4 text-left hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg opacity-50">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <img src="/notion-logo.svg" alt="Notion Logo" className="w-5 h-5 sm:w-6 sm:h-6 dark:invert mr-1 sm:mr-2" />
-          <div>
-            <h3 className="font-medium text-sm sm:text-base">Notion Daily Tracking Integration</h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Loading...
-            </p>
-          </div>
-        </div>
-      </button>
-    );
-  }
+  const handleDeleteDatabase = async (databaseId: string) => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/user/notion-credentials', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ database_id: databaseId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete Notion database');
+      }
+
+      setDatabases((prev) => prev.filter((db) => db.database_id !== databaseId));
+    } catch (error) {
+      console.error('Error deleting Notion database:', error);
+    }
+  };
 
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="w-full flex items-center justify-between p-3 sm:p-4 text-left hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-      >
-        <div className="flex items-center gap-1 sm:gap-2">
-          <img src="/notion-logo.svg" alt="Notion Logo" className="w-5 h-5 sm:w-6 sm:h-6 dark:invert mr-1 sm:mr-2" />
-          <div>
-            <h3 className="font-medium text-sm sm:text-base">Notion Daily Tracking Integration</h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Connect Notion Daily Tracking database
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium">Notion Databases</h3>
+          <p className="text-sm text-muted-foreground">
+            Connect your Notion databases to sync data
+          </p>
         </div>
-        <span className={`text-xs sm:text-sm ${isConnected ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`}>
-          {isConnected ? (
-            <span className="flex items-center gap-1">
-              Connected <CheckIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-            </span>
-          ) : (
-            'Configure →'
-          )}
-        </span>
-      </button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Database
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add Notion Database</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <Label>Database Template</Label>
+                  <div className="grid grid-cols-1 gap-2 mt-2">
+                    {NOTION_DATABASE_TEMPLATES.map((template) => (
+                      <Button
+                        key={template.id}
+                        type="button"
+                        variant={selectedTemplate?.id === template.id ? 'default' : 'outline'}
+                        className="justify-start"
+                        onClick={() => {
+                          setSelectedTemplate(template);
+                          setNotionDatabaseName(template.name);
+                        }}
+                      >
+                        <template.icon className="w-4 h-4 mr-2" />
+                        <div className="text-left">
+                          <div className="font-medium">{template.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {template.description}
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md mx-4 sm:mx-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Setup Notion Daily Tracking Integration</DialogTitle>
-            <DialogDescription className="text-sm">
-              Please enter your Notion Daily Tracking database URL to continue.
-            </DialogDescription>
-          </DialogHeader>
+                <div>
+                  <Label htmlFor="databaseName">Database Name</Label>
+                  <Input
+                    id="databaseName"
+                    value={notionDatabaseName}
+                    onChange={(e) => setNotionDatabaseName(e.target.value)}
+                    placeholder={selectedTemplate?.name || 'Enter database name'}
+                  />
+                </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="notionDatabaseId"
-                className="block text-sm font-medium mb-1"
+                <div>
+                  <Label htmlFor="databaseId">Database ID or URL</Label>
+                  <Input
+                    id="databaseId"
+                    value={notionDatabaseId}
+                    onChange={(e) => setNotionDatabaseId(e.target.value)}
+                    placeholder="Enter Notion database ID or URL"
+                  />
+                </div>
+              </div>
+
+              {error && <div className="text-sm text-red-500">{error}</div>}
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading || isFetchingProperties}>
+                  {isLoading || isFetchingProperties ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {isFetchingProperties ? 'Fetching Properties...' : 'Adding...'}
+                    </>
+                  ) : (
+                    'Add Database'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid gap-4">
+        {databases.map((database) => (
+          <Card key={database.database_id}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="flex items-center space-x-2">
+                <Database className="w-4 h-4" />
+                <CardTitle className="text-base">{database.database_name}</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDeleteDatabase(database.database_id)}
               >
-                Notion Database ID
-              </label>
-              <input
-                id="notionDatabaseId"
-                type="text"
-                value={notionDatabaseId}
-                onChange={(e) => setNotionDatabaseId(e.target.value)}
-                placeholder="Paste your Notion database URL here"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
-                required
-              />
-            </div>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <CardDescription>ID: {database.database_id}</CardDescription>
+                <div className="flex items-center space-x-2">
+                  {database.last_sync ? (
+                    <div className="flex items-center text-sm text-green-500">
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                      Synced
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-sm text-red-500">
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Not Synced
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
 
-            <button
-              type="submit"
-              className="w-full border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-md py-2 text-sm"
-            >
-              Save
-            </button>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+        {databases.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">No databases connected yet</div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,12 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
+import { SignUp } from '@clerk/nextjs';
 import { Outfit } from 'next/font/google';
 import { Header } from '@/components/landing/Header';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
-export default function Login() {
+export default function SignUpPage() {
   return (
     <div
       className={`min-h-screen relative flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 overflow-hidden ${outfit.className}`}
@@ -22,12 +22,12 @@ export default function Login() {
         </div>
 
         <h1 className="text-7xl font-bold mb-12 bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 text-transparent bg-clip-text tracking-tight py-2 z-10">
-          Sign in :)
+          Sign up :)
         </h1>
         <div
           className={`w-full max-w-md p-8 !bg-white/60 dark:!bg-slate-900/10 backdrop-blur-md rounded-lg border border-slate-200/50 dark:border-slate-800/50 z-10 ${outfit.className}`}
         >
-          <SignIn
+          <SignUp
             appearance={{
               elements: {
                 formButtonPrimary:

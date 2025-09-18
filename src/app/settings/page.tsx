@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { User } from '@supabase/supabase-js';
-import { NotionSetup } from '@/components/NotionSetup';
+import { useUser, useClerk } from '@clerk/nextjs';
+import NotionSetup from '@/components/NotionSetup';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Inter, Outfit } from 'next/font/google';
@@ -15,42 +14,32 @@ import { Button } from '@/components/ui/button';
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
 
-const UserProfile = ({ user }: { user: User }) => (
+const UserProfile = ({ user }: { user: any }) => (
   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm text-slate-600 dark:text-slate-400 w-full">
-    {user.user_metadata?.avatar_url ? (
-      <img
-        src={user.user_metadata.avatar_url}
-        alt="Profile"
-        className="w-12 h-12 rounded-full"
-      />
+    {user.imageUrl ? (
+      <img src={user.imageUrl} alt="Profile" className="w-12 h-12 rounded-full" />
     ) : (
       <div className="w-12 h-12 rounded-full font-bold bg-purple-600 dark:bg-purple-500 flex items-center justify-center text-white">
-        {user.email?.[0].toUpperCase()}
+        {user.primaryEmailAddress?.emailAddress[0].toUpperCase()}
       </div>
     )}
     <div className="w-full">
       <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2 break-all">
-        {user.email}
-        {user.app_metadata?.provider === 'github' ? (
+        {user.primaryEmailAddress?.emailAddress}
+        {user.externalAccounts?.some((account: any) => account.provider === 'github') ? (
           <Github className="w-4 h-4 text-slate-500" />
         ) : (
           <Mail className="w-4 h-4 text-slate-500" />
         )}
       </div>
       <div className="text-sm text-slate-500 dark:text-slate-400">
-        Joined {new Date(Date.parse(user.created_at)).toLocaleDateString()}
+        Joined {new Date(user.createdAt).toLocaleDateString()}
       </div>
     </div>
   </div>
 );
 
-const SettingsSection = ({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) => (
+const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="bg-white dark:bg-slate-900 rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200 dark:border-slate-800">
     <h2
       className={`text-lg font-semibold mb-3 sm:mb-4 text-slate-900 dark:text-white ${outfit.className}`}
@@ -62,15 +51,15 @@ const SettingsSection = ({
 );
 
 export default function Settings() {
-  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut();
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -79,30 +68,13 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) throw error;
-        if (!session) {
-          router.push('/login');
-          return;
-        }
-
-        setUser(session.user);
-      } catch (error) {
-        console.error('Error checking user session:', error);
-        setError('Failed to authenticate. Please try again.');
-      } finally {
-        setIsLoading(false);
+    if (isLoaded) {
+      if (!user) {
+        router.push('/login');
       }
-    };
-
-    checkUser();
-  }, [supabase, router]);
+      setIsLoading(false);
+    }
+  }, [isLoaded, user, router]);
 
   if (isLoading) {
     return (

@@ -1,4 +1,4 @@
-export type DisplaySection = 
+export type DisplaySection =
   | 'all'
   | 'sleep'
   | 'rhr'
@@ -7,4 +7,5 @@ export type DisplaySection =
   | 'checklist'
   | 'finances'
   | 'gym'
-  | 'habits';
+  | 'habits'
+  | 'dailytracking';

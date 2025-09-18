@@ -1,11 +1,17 @@
 import { Client } from '@notionhq/client';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { auth } from '@clerk/nextjs';
+import { createClient } from '@supabase/supabase-js';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY,
 });
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 interface HabitResponse {
   id: string;
@@ -20,11 +26,9 @@ type Relation = { id: string };
 export async function GET() {
   try {
     const habitsDbId = process.env.NOTION_HABITS_DB_ID;
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const { userId } = auth();
+
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,23 +36,17 @@ export async function GET() {
     const { data, error } = await supabase
       .from('notion_credentials')
       .select('notion_database_daily_tracking_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (error || !data?.notion_database_daily_tracking_id) {
-      return NextResponse.json(
-        { error: 'Notion database not configured' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Notion database not configured' }, { status: 400 });
     }
 
     const dailyTrackingDbId = data.notion_database_daily_tracking_id;
 
     if (!habitsDbId || !dailyTrackingDbId) {
-      return NextResponse.json(
-        { error: 'Database IDs are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Database IDs are required' }, { status: 400 });
     }
 
     // Fetch all habits with pagination
@@ -78,26 +76,29 @@ export async function GET() {
     const habits = await Promise.all(
       allHabitResults.map(async (habit: any) => {
         const daysRelation = habit.properties.Days?.relation || [];
-        
+
         // Fetch related days if there are any
-        const daysDetails = daysRelation.length > 0
-          ? await Promise.all(
-              daysRelation.map(async (relation: { id: string }) => {
-                const pageResponse = await notion.pages.retrieve({
-                  page_id: relation.id,
-                });
-                const date = (pageResponse as any).properties.Date?.date?.start;
-                
-                // Convert the date to user's local timezone
-                const localDate = new Date(date);
-                const userTimezoneDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000);
-                return {
-                  id: relation.id,
-                  date: userTimezoneDate.toISOString().split('T')[0],
-                };
-              })
-            )
-          : [];
+        const daysDetails =
+          daysRelation.length > 0
+            ? await Promise.all(
+                daysRelation.map(async (relation: { id: string }) => {
+                  const pageResponse = await notion.pages.retrieve({
+                    page_id: relation.id,
+                  });
+                  const date = (pageResponse as any).properties.Date?.date?.start;
+
+                  // Convert the date to user's local timezone
+                  const localDate = new Date(date);
+                  const userTimezoneDate = new Date(
+                    localDate.getTime() - localDate.getTimezoneOffset() * 60000
+                  );
+                  return {
+                    id: relation.id,
+                    date: userTimezoneDate.toISOString().split('T')[0],
+                  };
+                })
+              )
+            : [];
 
         return {
           id: habit.id,
@@ -112,10 +113,7 @@ export async function GET() {
     return NextResponse.json(habits);
   } catch (error) {
     console.error('Error fetching habits:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch habits' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch habits' }, { status: 500 });
   }
 }
 
@@ -124,29 +122,23 @@ export async function POST(request: Request) {
   try {
     const { habitId, date, completed } = await request.json();
     console.log('Request params:', { habitId, date, completed });
-    
-    // Get user's database ID from Supabase
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.error('Auth error:', authError);
+
+    const { userId } = auth();
+
+    if (!userId) {
+      console.error('No user ID found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { data, error } = await supabase
       .from('notion_credentials')
       .select('notion_database_daily_tracking_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (error || !data?.notion_database_daily_tracking_id) {
       console.error('Database error:', error);
-      return NextResponse.json(
-        { error: 'Notion database not configured' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Notion database not configured' }, { status: 400 });
     }
 
     const dailyTrackingDbId = data.notion_database_daily_tracking_id;
@@ -154,10 +146,7 @@ export async function POST(request: Request) {
 
     if (!habitId || !date || !dailyTrackingDbId) {
       console.error('Missing required fields:', { habitId, date, dailyTrackingDbId });
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Find or create the daily entry
@@ -201,7 +190,7 @@ export async function POST(request: Request) {
     // Create new relation array based on completed status
     const newRelations = !completed
       ? currentRelations.filter((rel: Relation) => rel.id !== dayPageId) // Remove if uncompleting
-      : [...currentRelations, { id: dayPageId }];  // Add if completing
+      : [...currentRelations, { id: dayPageId }]; // Add if completing
 
     console.log('dayPageId to add/remove:', dayPageId);
     console.log('New relations structure:', JSON.stringify(newRelations, null, 2));
@@ -212,9 +201,9 @@ export async function POST(request: Request) {
         page_id: habitId,
         properties: {
           Days: {
-            relation: newRelations
-          }
-        }
+            relation: newRelations,
+          },
+        },
       });
       console.log('Notion update response:', JSON.stringify(updateResponse, null, 2));
     } catch (error) {
@@ -226,9 +215,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating habit:', error);
-    return NextResponse.json(
-      { error: 'Failed to update habit' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update habit' }, { status: 500 });
   }
-} 
+}
