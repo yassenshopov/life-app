@@ -1,6 +1,6 @@
 import { Client } from '@notionhq/client';
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 
 const notion = new Client({

@@ -14,7 +14,6 @@ import {
   Scatter,
   Area,
 } from 'recharts';
-// @ts-ignore
 import {
   FaArrowUp,
   FaArrowDown,
@@ -25,7 +24,6 @@ import {
   FaChevronDown,
   FaChevronRight,
 } from 'react-icons/fa';
-// @ts-ignore
 import { Tooltip as ReactTooltip } from 'react-tooltip';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
@@ -411,7 +409,7 @@ export function DailyTrackingSection() {
                   {summaryStats ? summaryStats.avgSteps.toLocaleString() : '-'}
                 </span>
               </div>
-              <div className="flex flex-col items-center hidden sm:block">
+              <div className="hidden sm:flex flex-col items-center">
                 <span className="text-xs text-gray-500 dark:text-slate-400">Avg Weight</span>
                 <span className="text-lg font-semibold text-purple-600 dark:text-purple-300">
                   {summaryStats ? summaryStats.avgWeight.toFixed(1) : '-'} kg

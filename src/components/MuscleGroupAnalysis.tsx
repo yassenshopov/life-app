@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { Outfit } from 'next/font/google';
 import { Exercise, EXERCISE_LIBRARY } from '@/constants/exercises';
 import { MuscleGroup } from '@/constants/muscle-groups';
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -40,9 +40,7 @@ const findExerciseInLibrary = (
   name: string
 ): Pick<Exercise, 'primaryMuscle' | 'secondaryMuscles'> | undefined => {
   for (const [_, exercises] of Object.entries(EXERCISE_LIBRARY)) {
-    const exercise = exercises.find(
-      (e) => e.name.toLowerCase() === name.replace(/_/g, ' ')
-    );
+    const exercise = exercises.find((e) => e.name.toLowerCase() === name.replace(/_/g, ' '));
     if (exercise)
       return {
         primaryMuscle: exercise.primaryMuscle,
@@ -97,10 +95,10 @@ interface MuscleGroupAnalysisProps {
   selectedMuscle?: MuscleGroup | null;
 }
 
-export function MuscleGroupAnalysis({ 
-  gymSessions, 
+export function MuscleGroupAnalysis({
+  gymSessions,
   onMuscleClick,
-  selectedMuscle 
+  selectedMuscle,
 }: MuscleGroupAnalysisProps) {
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['all']);
 
@@ -121,7 +119,7 @@ export function MuscleGroupAnalysis({
       window.addEventListener('hashchange', handleHashChange);
       return () => window.removeEventListener('hashchange', handleHashChange);
     }
-  }, []);
+  }, [onMuscleClick]);
 
   // Add this effect to respond to selectedMuscle changes
   useEffect(() => {
@@ -144,15 +142,13 @@ export function MuscleGroupAnalysis({
     )?.[0];
 
     if (category) {
-      setExpandedCategories(prev => 
-        prev.includes(category) ? prev : [...prev, category]
-      );
-      
+      setExpandedCategories((prev) => (prev.includes(category) ? prev : [...prev, category]));
+
       setTimeout(() => {
         const element = document.getElementById(muscle);
-        element?.scrollIntoView({ 
+        element?.scrollIntoView({
           behavior: 'smooth',
-          block: 'center'
+          block: 'center',
         });
       }, 100);
     }
@@ -165,50 +161,39 @@ export function MuscleGroupAnalysis({
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const weeklyGymSessions = gymSessions.filter(
-      (session) => new Date(session.date) >= oneWeekAgo
-    );
+    const weeklyGymSessions = gymSessions.filter((session) => new Date(session.date) >= oneWeekAgo);
 
     weeklyGymSessions.forEach((session) => {
-      Object.entries(session.exercise_log).forEach(
-        ([exerciseName, data]: [string, any]) => {
-          const exercise = findExerciseInLibrary(exerciseName);
-          if (!exercise) return;
+      Object.entries(session.exercise_log).forEach(([exerciseName, data]: [string, any]) => {
+        const exercise = findExerciseInLibrary(exerciseName);
+        if (!exercise) return;
 
-          // Count sets for primary muscle
-          const primaryStats = stats.get(exercise.primaryMuscle) || {
+        // Count sets for primary muscle
+        const primaryStats = stats.get(exercise.primaryMuscle) || {
+          sets: 0,
+          volume: 0,
+        };
+        stats.set(exercise.primaryMuscle, {
+          sets: primaryStats.sets + data.sets.length,
+          volume:
+            primaryStats.volume +
+            data.sets.reduce((acc: number, set: any) => acc + set.weight * set.reps, 0),
+        });
+
+        // Count half sets for secondary muscles
+        exercise.secondaryMuscles?.forEach((muscle) => {
+          const secondaryStats = stats.get(muscle) || {
             sets: 0,
             volume: 0,
           };
-          stats.set(exercise.primaryMuscle, {
-            sets: primaryStats.sets + data.sets.length,
+          stats.set(muscle, {
+            sets: secondaryStats.sets + Math.ceil(data.sets.length * 0.5),
             volume:
-              primaryStats.volume +
-              data.sets.reduce(
-                (acc: number, set: any) => acc + set.weight * set.reps,
-                0
-              ),
+              secondaryStats.volume +
+              data.sets.reduce((acc: number, set: any) => acc + set.weight * set.reps, 0) * 0.5,
           });
-
-          // Count half sets for secondary muscles
-          exercise.secondaryMuscles?.forEach((muscle) => {
-            const secondaryStats = stats.get(muscle) || {
-              sets: 0,
-              volume: 0,
-            };
-            stats.set(muscle, {
-              sets: secondaryStats.sets + Math.ceil(data.sets.length * 0.5),
-              volume:
-                secondaryStats.volume +
-                data.sets.reduce(
-                  (acc: number, set: any) => acc + set.weight * set.reps,
-                  0
-                ) *
-                  0.5,
-            });
-          });
-        }
-      );
+        });
+      });
     });
 
     return stats;
@@ -216,18 +201,14 @@ export function MuscleGroupAnalysis({
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
     );
   };
 
   // Add toggle all function
   const toggleAll = () => {
     setExpandedCategories((prev) =>
-      prev.length === Object.keys(muscleCategories).length
-        ? []
-        : Object.keys(muscleCategories)
+      prev.length === Object.keys(muscleCategories).length ? [] : Object.keys(muscleCategories)
     );
   };
 
@@ -313,12 +294,12 @@ export function MuscleGroupAnalysis({
                       </div>
                     </div>
                   </div>
-                )}
-              )}
+                );
+              })}
             </div>
           )}
         </div>
       ))}
     </div>
   );
-} 
+}
