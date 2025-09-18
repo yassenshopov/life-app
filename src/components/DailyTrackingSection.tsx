@@ -489,13 +489,17 @@ export function DailyTrackingSection() {
                     <YAxis
                       yAxisId="left"
                       domain={[0, 'dataMax + 1']}
-                      tickFormatter={(value) => `${value}h`}
+                      tickFormatter={(value) =>
+                        typeof value === 'number' ? `${value}h` : `${value}`
+                      }
                     />
                     <YAxis
                       yAxisId="rhr"
                       orientation="right"
                       domain={['dataMin - 5', 'dataMax + 5']}
-                      tickFormatter={(value) => `${value}bpm`}
+                      tickFormatter={(value) =>
+                        typeof value === 'number' ? `${value}bpm` : `${value}`
+                      }
                     />
                     <YAxis
                       yAxisId="deep"
@@ -586,7 +590,9 @@ export function DailyTrackingSection() {
                       />
                       <YAxis
                         domain={[0, 'dataMax + 1000']}
-                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                        tickFormatter={(value) =>
+                          typeof value === 'number' ? `${(value / 1000).toFixed(0)}k` : `${value}k`
+                        }
                       />
                       <Tooltip
                         labelFormatter={(date) => format(new Date(date), 'MMM d, yyyy')}
@@ -606,7 +612,9 @@ export function DailyTrackingSection() {
                       />
                       <YAxis
                         domain={['dataMin - 0.5', 'dataMax + 0.5']}
-                        tickFormatter={(value) => `${value}kg`}
+                        tickFormatter={(value) =>
+                          typeof value === 'number' ? `${value}kg` : `${value}`
+                        }
                       />
                       <Tooltip
                         labelFormatter={(date) => format(new Date(date), 'MMM d, yyyy')}
@@ -864,14 +872,16 @@ export function DailyTrackingSection() {
                               name="Sleep (h)"
                               unit="h"
                               domain={[4, 'dataMax + 1']}
-                              tickFormatter={(v) => `${v.toFixed(1)}h`}
+                              tickFormatter={(v) =>
+                                typeof v === 'number' ? `${v.toFixed(1)}h` : `${v}h`
+                              }
                             />
                             <YAxis
                               dataKey="rhr"
                               name="RHR"
                               unit="bpm"
                               domain={['dataMin - 5', 'dataMax + 5']}
-                              tickFormatter={(v) => `${v}bpm`}
+                              tickFormatter={(v) => (typeof v === 'number' ? `${v}bpm` : `${v}`)}
                             />
                             <Tooltip
                               formatter={(value: number, name: string) => [
@@ -897,14 +907,20 @@ export function DailyTrackingSection() {
                               name="Steps"
                               unit=""
                               domain={[0, 'dataMax + 1000']}
-                              tickFormatter={(value) => `${Math.round(value / 1000)}k`}
+                              tickFormatter={(value) =>
+                                typeof value === 'number'
+                                  ? `${Math.round(value / 1000)}k`
+                                  : `${value}k`
+                              }
                             />
                             <YAxis
                               dataKey="sleep"
                               name="Sleep"
                               unit="h"
                               domain={[4, 'dataMax + 1']}
-                              tickFormatter={(v) => `${v.toFixed(1)}h`}
+                              tickFormatter={(v) =>
+                                typeof v === 'number' ? `${v.toFixed(1)}h` : `${v}h`
+                              }
                             />
                             <Tooltip
                               formatter={(value: number, name: string) => [
@@ -959,7 +975,9 @@ export function DailyTrackingSection() {
                             <XAxis dataKey="day" />
                             <YAxis
                               domain={[0, 'dataMax + 1']}
-                              tickFormatter={(value) => `${value}h`}
+                              tickFormatter={(value) =>
+                                typeof value === 'number' ? `${value}h` : `${value}`
+                              }
                             />
                             <Tooltip formatter={(value: number) => [value.toFixed(1), 'Hours']} />
                             <Bar dataKey="total" fill="#3b82f6" name="Average Sleep" />
@@ -995,7 +1013,11 @@ export function DailyTrackingSection() {
                             <XAxis dataKey="day" />
                             <YAxis
                               domain={[0, 'dataMax + 1000']}
-                              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                              tickFormatter={(value) =>
+                                typeof value === 'number'
+                                  ? `${(value / 1000).toFixed(0)}k`
+                                  : `${value}k`
+                              }
                             />
                             <Tooltip
                               formatter={(value: number) => [value.toLocaleString(), 'Steps']}

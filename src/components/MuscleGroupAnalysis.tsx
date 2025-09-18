@@ -161,7 +161,9 @@ export function MuscleGroupAnalysis({
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const weeklyGymSessions = gymSessions.filter((session) => new Date(session.date) >= oneWeekAgo);
+    const weeklyGymSessions = (gymSessions || []).filter(
+      (session) => new Date(session.date) >= oneWeekAgo
+    );
 
     weeklyGymSessions.forEach((session) => {
       Object.entries(session.exercise_log).forEach(([exerciseName, data]: [string, any]) => {
