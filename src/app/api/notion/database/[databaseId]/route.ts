@@ -80,13 +80,12 @@ export async function GET(
         database_id: databaseId,
       });
 
-      // Get the database title from the first title property
-      const titleProperty = Object.entries(database.properties).find(
-        ([_, prop]) => prop.type === 'title'
-      );
-      const title = titleProperty
-        ? database.properties[titleProperty[0]].name
-        : 'Untitled Database';
+      // Get the database title from the database object itself
+      // The database title is in database.title[0].plain_text
+      const title =
+        (database as any).title && (database as any).title.length > 0
+          ? (database as any).title[0].plain_text
+          : 'Untitled Database';
 
       const response: NotionDatabaseProperties = {
         title,

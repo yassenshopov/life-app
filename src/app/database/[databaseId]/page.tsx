@@ -268,9 +268,9 @@ export default function DatabasePage() {
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
                 <DatabaseSyncSettings
-                  databaseId={database.database_id}
-                  databaseName={database.database_name}
-                  lastSync={database.last_sync}
+                  databaseId={databaseId}
+                  databaseName={database.title}
+                  lastSync={null}
                   properties={database.properties}
                   onSyncComplete={() => {
                     cacheUtils.invalidateDatabase(databaseId);

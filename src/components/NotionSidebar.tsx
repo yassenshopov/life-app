@@ -109,6 +109,18 @@ export default function NotionSidebar() {
     }
   }, [user]);
 
+  // Listen for database sync events to refresh sidebar data
+  useEffect(() => {
+    const handleDatabaseSynced = () => {
+      fetchDatabases();
+    };
+
+    window.addEventListener('database-synced', handleDatabaseSynced);
+    return () => {
+      window.removeEventListener('database-synced', handleDatabaseSynced);
+    };
+  }, []);
+
   const fetchDatabases = async () => {
     try {
       const response = await fetch('/api/user/notion-credentials');

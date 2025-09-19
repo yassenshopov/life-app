@@ -26,7 +26,40 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { formatPropertyValue } from '@/lib/notion-property-utils';
-import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
+// Import with fallback to handle potential module resolution issues
+let NOTION_PROPERTY_TYPES: any;
+try {
+  const notionProps = require('@/constants/notion-properties');
+  NOTION_PROPERTY_TYPES = notionProps.NOTION_PROPERTY_TYPES;
+} catch (error) {
+  console.error('Failed to import NOTION_PROPERTY_TYPES:', error);
+  // Fallback constants
+  NOTION_PROPERTY_TYPES = {
+    TITLE: 'title',
+    RICH_TEXT: 'rich_text',
+    NUMBER: 'number',
+    SELECT: 'select',
+    MULTI_SELECT: 'multi_select',
+    DATE: 'date',
+    PEOPLE: 'people',
+    FILES: 'files',
+    CHECKBOX: 'checkbox',
+    URL: 'url',
+    EMAIL: 'email',
+    PHONE: 'phone_number',
+    FORMULA: 'formula',
+    RELATION: 'relation',
+    ROLLUP: 'rollup',
+    CREATED_TIME: 'created_time',
+    CREATED_BY: 'created_by',
+    LAST_EDITED_TIME: 'last_edited_time',
+    LAST_EDITED_BY: 'last_edited_by',
+    STATUS: 'status',
+  };
+}
+
+// Debug the import
+console.log('DatabaseSyncSettings NOTION_PROPERTY_TYPES:', NOTION_PROPERTY_TYPES);
 
 interface DatabaseSyncSettingsProps {
   databaseId: string;
@@ -73,6 +106,12 @@ export function DatabaseSyncSettings({
 
       if (result.success && onSyncComplete) {
         onSyncComplete();
+        // Dispatch custom event to notify sidebar of sync completion
+        window.dispatchEvent(
+          new CustomEvent('database-synced', {
+            detail: { databaseId },
+          })
+        );
       }
     } catch (error) {
       console.error('Sync failed:', error);
@@ -94,6 +133,15 @@ export function DatabaseSyncSettings({
   };
 
   const getPropertyTypeIcon = (type: string) => {
+    // Debug logging
+    console.log('getPropertyTypeIcon called with:', { type, NOTION_PROPERTY_TYPES });
+
+    // Check if NOTION_PROPERTY_TYPES is defined
+    if (!NOTION_PROPERTY_TYPES) {
+      console.error('NOTION_PROPERTY_TYPES is undefined');
+      return '❓';
+    }
+
     switch (type) {
       case NOTION_PROPERTY_TYPES.TITLE:
         return '📝';
@@ -126,9 +174,10 @@ export function DatabaseSyncSettings({
 
   const hasChanges =
     syncResult &&
-    (syncResult.changes.added.length > 0 ||
-      syncResult.changes.removed.length > 0 ||
-      syncResult.changes.modified.length > 0);
+    syncResult.changes &&
+    (syncResult.changes.added?.length > 0 ||
+      syncResult.changes.removed?.length > 0 ||
+      syncResult.changes.modified?.length > 0);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -190,7 +239,7 @@ export function DatabaseSyncSettings({
                           <span className="font-medium">Changes detected:</span>
                         </div>
 
-                        {syncResult.changes.added.length > 0 && (
+                        {syncResult.changes?.added?.length > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 text-green-600">
                               <Plus className="w-4 h-4" />
@@ -199,7 +248,7 @@ export function DatabaseSyncSettings({
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              {syncResult.changes.added.map((prop) => (
+                              {syncResult.changes?.added?.map((prop) => (
                                 <Badge
                                   key={prop}
                                   variant="secondary"
@@ -212,7 +261,7 @@ export function DatabaseSyncSettings({
                           </div>
                         )}
 
-                        {syncResult.changes.removed.length > 0 && (
+                        {syncResult.changes?.removed?.length > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 text-red-600">
                               <Minus className="w-4 h-4" />
@@ -221,7 +270,7 @@ export function DatabaseSyncSettings({
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              {syncResult.changes.removed.map((prop) => (
+                              {syncResult.changes?.removed?.map((prop) => (
                                 <Badge
                                   key={prop}
                                   variant="secondary"
@@ -234,7 +283,7 @@ export function DatabaseSyncSettings({
                           </div>
                         )}
 
-                        {syncResult.changes.modified.length > 0 && (
+                        {syncResult.changes?.modified?.length > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 text-orange-600">
                               <Edit3 className="w-4 h-4" />
@@ -243,7 +292,7 @@ export function DatabaseSyncSettings({
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              {syncResult.changes.modified.map((prop) => (
+                              {syncResult.changes?.modified?.map((prop) => (
                                 <Badge
                                   key={prop}
                                   variant="secondary"

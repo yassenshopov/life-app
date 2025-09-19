@@ -90,10 +90,15 @@ export async function POST(
     console.log('Successfully fetched database properties:', Object.keys(freshProperties));
 
     // Extract additional database metadata
+    const databaseTitle =
+      (notionDb as any).title && (notionDb as any).title.length > 0
+        ? (notionDb as any).title[0].plain_text
+        : 'Untitled Database';
+
     const databaseMetadata = {
       icon: notionDb.icon,
       cover: notionDb.cover,
-      title: notionDb.title,
+      title: databaseTitle,
       description: notionDb.description,
       created_time: notionDb.created_time,
       last_edited_time: notionDb.last_edited_time,
@@ -241,6 +246,7 @@ export async function POST(
     // Update the database with fresh data
     const updatedDb = {
       ...currentDb,
+      database_name: databaseMetadata.title, // Update the database_name field for sidebar compatibility
       properties: freshProperties,
       last_sync: new Date().toISOString(),
       ...databaseMetadata, // Include icon, cover, title, etc.

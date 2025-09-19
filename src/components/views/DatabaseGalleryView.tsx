@@ -241,10 +241,37 @@ export function DatabaseGalleryView({
               return (
                 <Card
                   key={page.id}
-                  className="p-5 cursor-pointer hover:bg-muted/30 transition-colors group"
+                  className="p-0 cursor-pointer hover:bg-muted/30 transition-colors group overflow-hidden"
                   onClick={() => handleEntryClick(page)}
                 >
-                  <div className="space-y-4">
+                  {/* Cover Image */}
+                  <div className="aspect-video w-full overflow-hidden bg-muted/20">
+                    {page.cover ? (
+                      page.cover.type === 'external' ? (
+                        <img
+                          src={page.cover.external.url}
+                          alt="Cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      ) : page.cover.type === 'file' ? (
+                        <img
+                          src={page.cover.file.url}
+                          alt="Cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <PageIcon icon={page.icon} className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <PageIcon icon={page.icon} className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-5 space-y-4">
                     {/* Status Badge */}
                     {status && (
                       <div className="flex justify-start">
