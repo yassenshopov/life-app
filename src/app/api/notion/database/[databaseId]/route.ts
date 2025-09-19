@@ -2,6 +2,42 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 
+// Type guards for database object properties
+function hasIcon(obj: any): obj is { icon: any } {
+  return obj && typeof obj === 'object' && 'icon' in obj;
+}
+
+function hasCover(obj: any): obj is { cover: any } {
+  return obj && typeof obj === 'object' && 'cover' in obj;
+}
+
+function hasDescription(obj: any): obj is { description: any[] } {
+  return obj && typeof obj === 'object' && 'description' in obj && Array.isArray(obj.description);
+}
+
+function hasCreatedTime(obj: any): obj is { created_time: string } {
+  return (
+    obj && typeof obj === 'object' && 'created_time' in obj && typeof obj.created_time === 'string'
+  );
+}
+
+function hasLastEditedTime(obj: any): obj is { last_edited_time: string } {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    'last_edited_time' in obj &&
+    typeof obj.last_edited_time === 'string'
+  );
+}
+
+function hasCreatedBy(obj: any): obj is { created_by: any } {
+  return obj && typeof obj === 'object' && 'created_by' in obj;
+}
+
+function hasLastEditedBy(obj: any): obj is { last_edited_by: any } {
+  return obj && typeof obj === 'object' && 'last_edited_by' in obj;
+}
+
 interface NotionDatabaseProperties {
   title: string;
   properties: Record<
@@ -55,13 +91,13 @@ export async function GET(
       const response: NotionDatabaseProperties = {
         title,
         properties: database.properties,
-        icon: (database as any).icon,
-        cover: (database as any).cover,
-        description: (database as any).description,
-        created_time: (database as any).created_time,
-        last_edited_time: (database as any).last_edited_time,
-        created_by: (database as any).created_by,
-        last_edited_by: (database as any).last_edited_by,
+        icon: hasIcon(database) ? database.icon : undefined,
+        cover: hasCover(database) ? database.cover : undefined,
+        description: hasDescription(database) ? database.description : undefined,
+        created_time: hasCreatedTime(database) ? database.created_time : undefined,
+        last_edited_time: hasLastEditedTime(database) ? database.last_edited_time : undefined,
+        created_by: hasCreatedBy(database) ? database.created_by : undefined,
+        last_edited_by: hasLastEditedBy(database) ? database.last_edited_by : undefined,
       };
 
       return NextResponse.json(response, {

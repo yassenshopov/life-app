@@ -1,8 +1,8 @@
 import { Filter, FilterGroup, FilterState } from '@/types/filters';
-import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
+import { NOTION_PROPERTY_TYPES, NotionPropertyType } from '@/constants/notion-properties';
 
 // Helper function to get property value from a page
-function getPropertyValue(page: any, propertyKey: string, propertyType: string): any {
+function getPropertyValue(page: any, propertyKey: string, propertyType: NotionPropertyType): any {
   const property = page.properties?.[propertyKey];
   if (!property) return null;
 
@@ -46,32 +46,42 @@ function matchesFilter(page: any, filter: Filter): boolean {
 
   switch (filter.operator) {
     case 'equals':
-      if (filter.propertyType === NOTION_PROPERTY_TYPES.MULTI_SELECT) {
-        return Array.isArray(pageValue) && pageValue.includes(filterValue);
+      if (filter.propertyType === 'multi_select') {
+        // This should never happen with the new discriminated union, but keeping for safety
+        return (
+          Array.isArray(pageValue) &&
+          Array.isArray(filterValue) &&
+          filterValue.some((val) => pageValue.includes(val))
+        );
       }
       return pageValue === filterValue;
 
     case 'not_equals':
-      if (filter.propertyType === NOTION_PROPERTY_TYPES.MULTI_SELECT) {
-        return !Array.isArray(pageValue) || !pageValue.includes(filterValue);
+      if (filter.propertyType === 'multi_select') {
+        // This should never happen with the new discriminated union, but keeping for safety
+        return (
+          !Array.isArray(pageValue) ||
+          !Array.isArray(filterValue) ||
+          !filterValue.some((val) => pageValue.includes(val))
+        );
       }
       return pageValue !== filterValue;
 
     case 'contains':
+      if (filter.propertyType === 'multi_select' && Array.isArray(filterValue)) {
+        return Array.isArray(pageValue) && filterValue.some((val) => pageValue.includes(val));
+      }
       if (typeof pageValue === 'string' && typeof filterValue === 'string') {
         return pageValue.toLowerCase().includes(filterValue.toLowerCase());
-      }
-      if (Array.isArray(pageValue) && Array.isArray(filterValue)) {
-        return filterValue.some((val) => pageValue.includes(val));
       }
       return false;
 
     case 'does_not_contain':
+      if (filter.propertyType === 'multi_select' && Array.isArray(filterValue)) {
+        return !Array.isArray(pageValue) || !filterValue.some((val) => pageValue.includes(val));
+      }
       if (typeof pageValue === 'string' && typeof filterValue === 'string') {
         return !pageValue.toLowerCase().includes(filterValue.toLowerCase());
-      }
-      if (Array.isArray(pageValue) && Array.isArray(filterValue)) {
-        return !filterValue.some((val) => pageValue.includes(val));
       }
       return true;
 
@@ -122,16 +132,16 @@ function matchesFilter(page: any, filter: Filter): boolean {
       );
 
     case 'before':
-      return new Date(pageValue) < new Date(filterValue);
+      return filterValue ? new Date(pageValue) < new Date(filterValue) : false;
 
     case 'after':
-      return new Date(pageValue) > new Date(filterValue);
+      return filterValue ? new Date(pageValue) > new Date(filterValue) : false;
 
     case 'on_or_before':
-      return new Date(pageValue) <= new Date(filterValue);
+      return filterValue ? new Date(pageValue) <= new Date(filterValue) : false;
 
     case 'on_or_after':
-      return new Date(pageValue) >= new Date(filterValue);
+      return filterValue ? new Date(pageValue) >= new Date(filterValue) : false;
 
     case 'past_week':
       const weekAgo = new Date();

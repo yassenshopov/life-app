@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
@@ -6,11 +8,6 @@ import { createClient } from '@supabase/supabase-js';
 const notion = new Client({
   auth: process.env.NOTION_API_KEY,
 });
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 interface SyncResult {
   success: boolean;
@@ -34,10 +31,37 @@ export async function POST(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    // Validate required environment variables
+    const requiredEnvVars = {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      NOTION_API_KEY: process.env.NOTION_API_KEY,
+    };
+
+    const missingEnvVars = Object.entries(requiredEnvVars)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingEnvVars.length > 0) {
+      console.error('Missing required environment variables:', missingEnvVars);
+      return new NextResponse(
+        `Server configuration error: Missing required environment variables: ${missingEnvVars.join(
+          ', '
+        )}`,
+        { status: 500 }
+      );
+    }
+
     const { databaseId } = await params;
     if (!databaseId) {
       return new NextResponse('Database ID is required', { status: 400 });
     }
+
+    // Initialize Supabase client inside the request handler
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Get current user's databases
     const { data: user, error: userError } = await supabase

@@ -87,7 +87,24 @@ export const cacheUtils = {
   },
 
   // Get cached database pages
-  getCachedDatabasePages: (databaseId: string) => {
-    return queryClient.getQueryData(['database-pages', databaseId]);
+  getCachedDatabasePages: (databaseId: string, pageSize?: number) => {
+    if (pageSize !== undefined) {
+      // Return specific cached query for the given pageSize
+      return queryClient.getQueryData(['database-pages', databaseId, pageSize]);
+    } else {
+      // Return all cached queries for this databaseId
+      const queries = queryClient.getQueriesData({
+        queryKey: ['database-pages', databaseId],
+        exact: false,
+      });
+
+      // Aggregate all pages from matching queries
+      const allPages = queries
+        .map(([_, data]) => data)
+        .filter((data): data is any => data != null)
+        .flatMap((data) => data.pages || []);
+
+      return allPages.length > 0 ? { pages: allPages } : null;
+    }
   },
 };

@@ -34,21 +34,12 @@ interface DatabasePagesResponse {
 export function useDatabase(databaseId: string) {
   return useQuery({
     queryKey: ['database', databaseId],
-    queryFn: async (): Promise<NotionDatabase> => {
-      // First get all user's databases
-      const response = await fetch('/api/user/notion-credentials');
+    queryFn: async ({ signal }): Promise<NotionDatabase> => {
+      const response = await fetch(`/api/notion/database/${databaseId}`, { signal });
       if (!response.ok) {
-        throw new Error('Failed to fetch user databases');
+        throw new Error('Failed to fetch database');
       }
-      const databases = await response.json();
-
-      // Find the specific database
-      const foundDatabase = databases.find((db: NotionDatabase) => db.database_id === databaseId);
-      if (!foundDatabase) {
-        throw new Error('Database not found');
-      }
-
-      return foundDatabase;
+      return response.json();
     },
     staleTime: 60 * 60 * 1000, // 1 hour - database properties don't change often
     enabled: !!databaseId,

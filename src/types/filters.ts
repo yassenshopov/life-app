@@ -1,4 +1,4 @@
-import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
+import { NOTION_PROPERTY_TYPES, NotionPropertyType } from '@/constants/notion-properties';
 
 export type FilterOperator =
   | 'equals'
@@ -27,7 +27,7 @@ export type FilterOperator =
 export interface BaseFilter {
   id: string;
   property: string;
-  propertyType: string;
+  propertyType: NotionPropertyType;
   operator: FilterOperator;
 }
 
@@ -60,9 +60,15 @@ export interface NumberFilter extends BaseFilter {
 }
 
 export interface SelectFilter extends BaseFilter {
-  propertyType: 'select' | 'multi_select';
-  operator: 'equals' | 'not_equals' | 'contains' | 'does_not_contain' | 'is_empty' | 'is_not_empty';
-  value: string | string[];
+  propertyType: 'select';
+  operator: 'equals' | 'not_equals' | 'is_empty' | 'is_not_empty';
+  value: string | undefined;
+}
+
+export interface MultiSelectFilter extends BaseFilter {
+  propertyType: 'multi_select';
+  operator: 'contains' | 'does_not_contain' | 'is_empty' | 'is_not_empty';
+  value: string[] | undefined;
 }
 
 export interface DateFilter extends BaseFilter {
@@ -82,7 +88,7 @@ export interface DateFilter extends BaseFilter {
     | 'next_week'
     | 'next_month'
     | 'next_year';
-  value: string; // ISO date string
+  value?: string; // ISO date string (optional for operators that don't need values)
 }
 
 export interface CheckboxFilter extends BaseFilter {
@@ -91,7 +97,13 @@ export interface CheckboxFilter extends BaseFilter {
   value: boolean;
 }
 
-export type Filter = TextFilter | NumberFilter | SelectFilter | DateFilter | CheckboxFilter;
+export type Filter =
+  | TextFilter
+  | NumberFilter
+  | SelectFilter
+  | MultiSelectFilter
+  | DateFilter
+  | CheckboxFilter;
 
 export interface FilterGroup {
   id: string;
@@ -104,7 +116,7 @@ export interface FilterState {
 }
 
 // Helper function to get available operators for a property type
-export function getAvailableOperators(propertyType: string): FilterOperator[] {
+export function getAvailableOperators(propertyType: NotionPropertyType): FilterOperator[] {
   switch (propertyType) {
     case NOTION_PROPERTY_TYPES.TITLE:
     case NOTION_PROPERTY_TYPES.RICH_TEXT:

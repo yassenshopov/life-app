@@ -46,6 +46,7 @@ export function DatabaseCalendarView({
   const [isPeekOpen, setIsPeekOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [entryToDelete, setEntryToDelete] = React.useState<any>(null);
+  const [isNewEntryOpen, setIsNewEntryOpen] = React.useState(false);
 
   const { deleteEntry, isLoading: isDeleting } = useDeleteEntry({
     onSuccess: () => {
@@ -82,7 +83,7 @@ export function DatabaseCalendarView({
     });
 
     return groups;
-  }, [pages, dateProperty]);
+  }, [filteredPages, dateProperty]);
 
   const getPropertyValue = (page: any, propertyKey: string, property: any) => {
     const value = page.properties[propertyKey];
@@ -277,16 +278,10 @@ export function DatabaseCalendarView({
               </Button>
             </div>
           </div>
-          <NewEntryDialog
-            databaseId={databaseId}
-            properties={properties}
-            trigger={
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New
-              </Button>
-            }
-          />
+          <Button onClick={() => setIsNewEntryOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New
+          </Button>
         </div>
 
         {/* Calendar Grid */}
@@ -401,6 +396,12 @@ export function DatabaseCalendarView({
         description="Are you sure you want to delete this entry? This action cannot be undone."
         itemName={entryToDelete ? getEntryTitle(entryToDelete) : undefined}
         isLoading={isDeleting}
+      />
+
+      <NewEntryDialog
+        isOpen={isNewEntryOpen}
+        onClose={() => setIsNewEntryOpen(false)}
+        databaseId={databaseId}
       />
     </div>
   );

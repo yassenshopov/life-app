@@ -47,6 +47,7 @@ export function DatabaseBoardView({
   const [isPeekOpen, setIsPeekOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [entryToDelete, setEntryToDelete] = React.useState<any>(null);
+  const [isNewEntryOpen, setIsNewEntryOpen] = React.useState(false);
 
   const { deleteEntry, isLoading: isDeleting } = useDeleteEntry({
     onSuccess: () => {
@@ -87,7 +88,7 @@ export function DatabaseBoardView({
     });
 
     return groups;
-  }, [pages, properties]);
+  }, [filteredPages, properties]);
 
   const getPropertyValue = (page: any, propertyKey: string, property: any) => {
     const value = page.properties[propertyKey];
@@ -201,15 +202,14 @@ export function DatabaseBoardView({
                   <span className="font-medium text-foreground">{status}</span>
                   <span className="text-sm text-muted-foreground">({statusPages.length})</span>
                 </div>
-                <NewEntryDialog
-                  databaseId={databaseId}
-                  properties={properties}
-                  trigger={
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  }
-                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => setIsNewEntryOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
 
               <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
@@ -296,20 +296,15 @@ export function DatabaseBoardView({
                 )}
               </div>
 
-              <NewEntryDialog
-                databaseId={databaseId}
-                properties={properties}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full mt-3 text-muted-foreground hover:text-foreground"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New task
-                  </Button>
-                }
-              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-3 text-muted-foreground hover:text-foreground"
+                onClick={() => setIsNewEntryOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New task
+              </Button>
             </div>
           </div>
         ))}
@@ -334,6 +329,12 @@ export function DatabaseBoardView({
         description="Are you sure you want to delete this entry? This action cannot be undone."
         itemName={entryToDelete ? getEntryTitle(entryToDelete) : undefined}
         isLoading={isDeleting}
+      />
+
+      <NewEntryDialog
+        isOpen={isNewEntryOpen}
+        onClose={() => setIsNewEntryOpen(false)}
+        databaseId={databaseId}
       />
     </div>
   );

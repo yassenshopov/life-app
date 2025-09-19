@@ -134,6 +134,11 @@ export function EntryPeekModal({
     const updateProperties: Record<string, any> = {};
 
     Object.entries(properties).forEach(([key, prop]) => {
+      // Skip PEOPLE properties until proper writer is implemented
+      if (prop.type === NOTION_PROPERTY_TYPES.PEOPLE) {
+        return;
+      }
+
       const value = formData[key];
       const multiSelectValue = multiSelectValues[key];
 
@@ -153,7 +158,7 @@ export function EntryPeekModal({
   };
 
   const handleDelete = () => {
-    if (onDelete && entry) {
+    if (entry) {
       setDeleteDialogOpen(true);
     }
   };

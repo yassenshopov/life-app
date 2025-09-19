@@ -17,8 +17,8 @@ export const NOTION_PROPERTY_TYPES = {
   ROLLUP: 'rollup',
   CREATED_TIME: 'created_time',
   CREATED_BY: 'created_by',
-  LAST_EDIT_TIME: 'last_edited_time',
-  LAST_EDIT_BY: 'last_edited_by',
+  LAST_EDITED_TIME: 'last_edited_time',
+  LAST_EDITED_BY: 'last_edited_by',
   STATUS: 'status',
 } as const;
 
@@ -43,8 +43,8 @@ export const PROPERTY_TYPE_DISPLAY_NAMES: Record<NotionPropertyType, string> = {
   [NOTION_PROPERTY_TYPES.ROLLUP]: 'Rollup',
   [NOTION_PROPERTY_TYPES.CREATED_TIME]: 'Created time',
   [NOTION_PROPERTY_TYPES.CREATED_BY]: 'Created by',
-  [NOTION_PROPERTY_TYPES.LAST_EDIT_TIME]: 'Last edited time',
-  [NOTION_PROPERTY_TYPES.LAST_EDIT_BY]: 'Last edited by',
+  [NOTION_PROPERTY_TYPES.LAST_EDITED_TIME]: 'Last edited time',
+  [NOTION_PROPERTY_TYPES.LAST_EDITED_BY]: 'Last edited by',
   [NOTION_PROPERTY_TYPES.STATUS]: 'Status',
 };
 
@@ -89,13 +89,6 @@ export const PAGINATION = {
   MIN_PAGE_SIZE: 10,
 } as const;
 
-// Database view types
-export const DATABASE_VIEW_TYPES = {
-  TABLE: 'table',
-  BOARD: 'board',
-  CALENDAR: 'calendar',
-  GALLERY: 'gallery',
-  LIST: 'list',
-} as const;
+// Re-export database view types from canonical source
+export { DATABASE_VIEW_TYPES, type DatabaseViewType } from './database-views';
 
-export type DatabaseViewType = (typeof DATABASE_VIEW_TYPES)[keyof typeof DATABASE_VIEW_TYPES];

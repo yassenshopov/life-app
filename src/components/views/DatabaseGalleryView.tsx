@@ -47,6 +47,7 @@ export function DatabaseGalleryView({
   const [isPeekOpen, setIsPeekOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [entryToDelete, setEntryToDelete] = React.useState<any>(null);
+  const [isNewEntryOpen, setIsNewEntryOpen] = React.useState(false);
 
   const { deleteEntry, isLoading: isDeleting } = useDeleteEntry({
     onSuccess: () => {
@@ -189,16 +190,10 @@ export function DatabaseGalleryView({
               {filteredPages.length} {filteredPages.length === 1 ? 'entry' : 'entries'}
             </span>
           </div>
-          <NewEntryDialog
-            databaseId={databaseId}
-            properties={properties}
-            trigger={
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New
-              </Button>
-            }
-          />
+          <Button onClick={() => setIsNewEntryOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New
+          </Button>
         </div>
 
         {/* Gallery Grid */}
@@ -340,6 +335,12 @@ export function DatabaseGalleryView({
             description="Are you sure you want to delete this entry? This action cannot be undone."
             itemName={entryToDelete ? getEntryTitle(entryToDelete) : undefined}
             isLoading={isDeleting}
+          />
+
+          <NewEntryDialog
+            isOpen={isNewEntryOpen}
+            onClose={() => setIsNewEntryOpen(false)}
+            databaseId={databaseId}
           />
         </div>
       </div>

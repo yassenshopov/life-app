@@ -15,7 +15,6 @@ import {
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { NewEntryDialog } from '@/components/dialogs/NewEntryDialog';
 import { EntryPeekModal } from '@/components/EntryPeekModal';
-import { DeleteConfirmationDialog } from '@/components/dialogs/DeleteConfirmationDialog';
 import { useDeleteEntry } from '@/hooks/useDeleteEntry';
 import { useDatabasePages } from '@/hooks/useDatabase';
 import { FilterState } from '@/types/filters';
@@ -85,8 +84,7 @@ export function DatabaseTable({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [isPeekOpen, setIsPeekOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [entryToDelete, setEntryToDelete] = useState<any>(null);
+  const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -114,8 +112,7 @@ export function DatabaseTable({
 
   const { deleteEntry, isLoading: isDeleting } = useDeleteEntry({
     onSuccess: () => {
-      setDeleteDialogOpen(false);
-      setEntryToDelete(null);
+      // Entry deleted successfully
     },
     onError: (error) => {
       console.error('Failed to delete entry:', error);
@@ -156,22 +153,7 @@ export function DatabaseTable({
   };
 
   const handleEntryDelete = (entryId: string) => {
-    const entry = pages.find((p) => p.id === entryId);
-    if (entry) {
-      setEntryToDelete(entry);
-      setDeleteDialogOpen(true);
-    }
-  };
-
-  const handleConfirmDelete = () => {
-    if (entryToDelete) {
-      deleteEntry(entryToDelete.id, databaseId);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setDeleteDialogOpen(false);
-    setEntryToDelete(null);
+    deleteEntry(entryId, databaseId);
   };
 
   const getEntryTitle = (entry: any) => {
@@ -484,7 +466,7 @@ export function DatabaseTable({
                 ⌘K
               </div>
             </div>
-            <NewEntryDialog databaseId={databaseId} properties={properties} />
+            <Button onClick={() => setIsNewEntryOpen(true)}>New Entry</Button>
           </div>
         </div>
       </div>
@@ -589,15 +571,10 @@ export function DatabaseTable({
         onDelete={handleEntryDelete}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={handleCancelDelete}
-        onConfirm={handleConfirmDelete}
-        title="Delete Entry"
-        description="Are you sure you want to delete this entry? This action cannot be undone."
-        itemName={entryToDelete ? getEntryTitle(entryToDelete) : undefined}
-        isLoading={isDeleting}
+      <NewEntryDialog
+        isOpen={isNewEntryOpen}
+        onClose={() => setIsNewEntryOpen(false)}
+        databaseId={databaseId}
       />
     </div>
   );

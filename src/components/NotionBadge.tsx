@@ -35,7 +35,9 @@ export function NotionBadge({
       variant={variant}
       className={`text-xs hover:bg-transparent hover:text-current ${colorClass} ${className}`}
     >
-      <span className={`truncate max-w-[${maxWidth}] block`}>{name}</span>
+      <span className="truncate block" style={{ maxWidth }}>
+        {name}
+      </span>
     </Badge>
   );
 }
@@ -61,7 +63,7 @@ export function NotionBadgeList({
   const hasMore = limit && options.length > limit;
 
   return (
-    <div className={`flex flex-wrap gap-1 max-w-[${containerMaxWidth}] ${className}`}>
+    <div className={`flex flex-wrap gap-1 ${className}`} style={{ maxWidth: containerMaxWidth }}>
       {displayOptions.map((option, index) => (
         <NotionBadge key={index} option={option} variant={variant} maxWidth={maxWidth} />
       ))}

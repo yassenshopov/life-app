@@ -35,11 +35,11 @@ export function createNotionPropertyValue(value: any, propertyType: string): any
   switch (propertyType) {
     case NOTION_PROPERTY_TYPES.TITLE:
       return {
-        title: [{ plain_text: value || '' }],
+        title: [{ text: { content: value || '' } }],
       };
     case NOTION_PROPERTY_TYPES.RICH_TEXT:
       return {
-        rich_text: [{ plain_text: value || '' }],
+        rich_text: [{ text: { content: value || '' } }],
       };
     case NOTION_PROPERTY_TYPES.SELECT:
       return {
