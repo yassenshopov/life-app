@@ -21,8 +21,8 @@ export function getNotionColorClass(color: string): string {
 /**
  * Gets the color class for a multi-select option
  */
-export function getMultiSelectColorClass(option: { name: string; color: string }): string {
-  return getNotionColorClass(option.color);
+export function getMultiSelectColorClass(option: { name: string; color?: string }): string {
+  return getNotionColorClass(option.color || 'default');
 }
 
 /**

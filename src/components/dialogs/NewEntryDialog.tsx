@@ -480,7 +480,7 @@ export function NewEntryDialog({ isOpen, onClose, databaseId, onSuccess }: NewEn
         const newTagInput = newTagInputs[propertyKey] || '';
         const availableOptions = property.multi_select?.options || [];
         const filteredOptions = availableOptions.filter(
-          (option) =>
+          (option: { name: string; color?: string }) =>
             option.name.toLowerCase().includes(newTagInput.toLowerCase()) &&
             !currentTags.includes(option.name)
         );
@@ -583,50 +583,52 @@ export function NewEntryDialog({ isOpen, onClose, databaseId, onSuccess }: NewEn
                     <div className="p-2 text-xs font-medium text-muted-foreground border-b">
                       Select an option or create one
                     </div>
-                    {filteredOptions.map((option) => (
-                      <button
-                        key={option.id}
-                        onClick={() => {
-                          handleMultiSelectAdd(propertyKey, option.name);
-                          setNewTagInputs((prev) => ({
-                            ...prev,
-                            [propertyKey]: '',
-                          }));
-                          setOpenDropdowns((prev) => ({
-                            ...prev,
-                            [propertyKey]: false,
-                          }));
-                        }}
-                        className="w-full flex items-center space-x-2 p-2 hover:bg-muted text-left"
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            option.color === 'default'
-                              ? 'bg-gray-400'
-                              : option.color === 'gray'
-                              ? 'bg-gray-500'
-                              : option.color === 'brown'
-                              ? 'bg-amber-700'
-                              : option.color === 'orange'
-                              ? 'bg-orange-500'
-                              : option.color === 'yellow'
-                              ? 'bg-yellow-500'
-                              : option.color === 'green'
-                              ? 'bg-green-500'
-                              : option.color === 'blue'
-                              ? 'bg-blue-500'
-                              : option.color === 'purple'
-                              ? 'bg-purple-500'
-                              : option.color === 'pink'
-                              ? 'bg-pink-500'
-                              : option.color === 'red'
-                              ? 'bg-red-500'
-                              : 'bg-gray-400'
-                          }`}
-                        />
-                        <span className="text-sm">{option.name}</span>
-                      </button>
-                    ))}
+                    {filteredOptions.map(
+                      (option: { name: string; color?: string; id?: string }) => (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            handleMultiSelectAdd(propertyKey, option.name);
+                            setNewTagInputs((prev) => ({
+                              ...prev,
+                              [propertyKey]: '',
+                            }));
+                            setOpenDropdowns((prev) => ({
+                              ...prev,
+                              [propertyKey]: false,
+                            }));
+                          }}
+                          className="w-full flex items-center space-x-2 p-2 hover:bg-muted text-left"
+                        >
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              option.color === 'default'
+                                ? 'bg-gray-400'
+                                : option.color === 'gray'
+                                ? 'bg-gray-500'
+                                : option.color === 'brown'
+                                ? 'bg-amber-700'
+                                : option.color === 'orange'
+                                ? 'bg-orange-500'
+                                : option.color === 'yellow'
+                                ? 'bg-yellow-500'
+                                : option.color === 'green'
+                                ? 'bg-green-500'
+                                : option.color === 'blue'
+                                ? 'bg-blue-500'
+                                : option.color === 'purple'
+                                ? 'bg-purple-500'
+                                : option.color === 'pink'
+                                ? 'bg-pink-500'
+                                : option.color === 'red'
+                                ? 'bg-red-500'
+                                : 'bg-gray-400'
+                            }`}
+                          />
+                          <span className="text-sm">{option.name}</span>
+                        </button>
+                      )
+                    )}
                   </div>
                 )}
 
@@ -634,7 +636,8 @@ export function NewEntryDialog({ isOpen, onClose, databaseId, onSuccess }: NewEn
                 {openDropdowns[propertyKey] &&
                   newTagInput &&
                   !availableOptions.some(
-                    (opt) => opt.name.toLowerCase() === newTagInput.toLowerCase()
+                    (opt: { name: string; color?: string }) =>
+                      opt.name.toLowerCase() === newTagInput.toLowerCase()
                   ) && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-none z-10">
                       <button

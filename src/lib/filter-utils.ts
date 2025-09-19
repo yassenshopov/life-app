@@ -46,7 +46,7 @@ function matchesFilter(page: any, filter: Filter): boolean {
 
   switch (filter.operator) {
     case 'equals':
-      if (filter.propertyType === 'multi_select') {
+      if ((filter as any).propertyType === 'multi_select') {
         // This should never happen with the new discriminated union, but keeping for safety
         return (
           Array.isArray(pageValue) &&
@@ -57,7 +57,7 @@ function matchesFilter(page: any, filter: Filter): boolean {
       return pageValue === filterValue;
 
     case 'not_equals':
-      if (filter.propertyType === 'multi_select') {
+      if ((filter as any).propertyType === 'multi_select') {
         // This should never happen with the new discriminated union, but keeping for safety
         return (
           !Array.isArray(pageValue) ||
@@ -68,7 +68,7 @@ function matchesFilter(page: any, filter: Filter): boolean {
       return pageValue !== filterValue;
 
     case 'contains':
-      if (filter.propertyType === 'multi_select' && Array.isArray(filterValue)) {
+      if ((filter as any).propertyType === 'multi_select' && Array.isArray(filterValue)) {
         return Array.isArray(pageValue) && filterValue.some((val) => pageValue.includes(val));
       }
       if (typeof pageValue === 'string' && typeof filterValue === 'string') {
@@ -77,7 +77,7 @@ function matchesFilter(page: any, filter: Filter): boolean {
       return false;
 
     case 'does_not_contain':
-      if (filter.propertyType === 'multi_select' && Array.isArray(filterValue)) {
+      if ((filter as any).propertyType === 'multi_select' && Array.isArray(filterValue)) {
         return !Array.isArray(pageValue) || !filterValue.some((val) => pageValue.includes(val));
       }
       if (typeof pageValue === 'string' && typeof filterValue === 'string') {
@@ -132,46 +132,46 @@ function matchesFilter(page: any, filter: Filter): boolean {
       );
 
     case 'before':
-      return filterValue ? new Date(pageValue) < new Date(filterValue) : false;
+      return filterValue ? new Date(pageValue as any) < new Date(filterValue as any) : false;
 
     case 'after':
-      return filterValue ? new Date(pageValue) > new Date(filterValue) : false;
+      return filterValue ? new Date(pageValue as any) > new Date(filterValue as any) : false;
 
     case 'on_or_before':
-      return filterValue ? new Date(pageValue) <= new Date(filterValue) : false;
+      return filterValue ? new Date(pageValue as any) <= new Date(filterValue as any) : false;
 
     case 'on_or_after':
-      return filterValue ? new Date(pageValue) >= new Date(filterValue) : false;
+      return filterValue ? new Date(pageValue as any) >= new Date(filterValue as any) : false;
 
     case 'past_week':
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      return new Date(pageValue) >= weekAgo;
+      return new Date(pageValue as any) >= weekAgo;
 
     case 'past_month':
       const monthAgo = new Date();
       monthAgo.setMonth(monthAgo.getMonth() - 1);
-      return new Date(pageValue) >= monthAgo;
+      return new Date(pageValue as any) >= monthAgo;
 
     case 'past_year':
       const yearAgo = new Date();
       yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-      return new Date(pageValue) >= yearAgo;
+      return new Date(pageValue as any) >= yearAgo;
 
     case 'next_week':
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
-      return new Date(pageValue) <= nextWeek;
+      return new Date(pageValue as any) <= nextWeek;
 
     case 'next_month':
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
-      return new Date(pageValue) <= nextMonth;
+      return new Date(pageValue as any) <= nextMonth;
 
     case 'next_year':
       const nextYear = new Date();
       nextYear.setFullYear(nextYear.getFullYear() + 1);
-      return new Date(pageValue) <= nextYear;
+      return new Date(pageValue as any) <= nextYear;
 
     default:
       return false;

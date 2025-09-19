@@ -82,7 +82,9 @@ export function FilterMenu({
       group.id === groupId
         ? {
             ...group,
-            filters: group.filters.map((f) => (f.id === filterId ? { ...f, ...updates } : f)),
+            filters: group.filters.map((f) =>
+              f.id === filterId ? ({ ...f, ...updates } as Filter) : f
+            ),
           }
         : group
     );
@@ -275,13 +277,12 @@ export function FilterMenu({
         return (
           <Input
             value={(value as string) || ''}
-            onChange={(e) =>
-              updateFilter(
-                filters.groups.find((g) => g.filters.some((f) => f.id === filter.id))?.id || '',
-                filter.id,
-                { value: e.target.value }
-              )
-            }
+            onChange={(e) => {
+              const groupId =
+                filters.groups.find((g) => g.filters.some((f) => f.id === (filter as Filter).id))
+                  ?.id || '';
+              updateFilter(groupId, (filter as Filter).id, { value: e.target.value });
+            }}
             placeholder="Enter value..."
             className="w-48"
           />

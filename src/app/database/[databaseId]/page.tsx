@@ -317,10 +317,6 @@ export default function DatabasePage() {
             )}
             {currentView === 'table' && (
               <>
-                {console.log('Rendering DatabaseTable with:', {
-                  databaseId: databaseId,
-                  properties: database.properties,
-                })}
                 <DatabaseTable
                   databaseId={databaseId}
                   properties={database.properties}
@@ -394,7 +390,7 @@ export default function DatabasePage() {
       <NewEntryDialog
         isOpen={isNewEntryDialogOpen}
         onClose={() => setIsNewEntryDialogOpen(false)}
-        databaseId={database.database_id}
+        databaseId={databaseId}
         onSuccess={handleNewEntrySuccess}
       />
     </DashboardLayout>
