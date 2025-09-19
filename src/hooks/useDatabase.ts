@@ -1,18 +1,21 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 
 interface NotionDatabase {
-  database_id: string;
-  database_name: string;
-  integration_id: string;
-  last_sync: string | null;
-  sync_frequency: string;
-  properties: {
-    [key: string]: {
+  title: string;
+  properties: Record<
+    string,
+    {
       type: string;
-      required?: boolean;
-      description?: string;
-    };
-  };
+      name: string;
+    }
+  >;
+  icon?: any;
+  cover?: any;
+  description?: any[];
+  created_time?: string;
+  last_edited_time?: string;
+  created_by?: any;
+  last_edited_by?: any;
 }
 
 interface NotionPage {
@@ -22,6 +25,8 @@ interface NotionPage {
   };
   created_time: string;
   last_edited_time: string;
+  icon?: any;
+  cover?: any;
 }
 
 interface DatabasePagesResponse {
@@ -32,14 +37,25 @@ interface DatabasePagesResponse {
 
 // Hook for fetching database info
 export function useDatabase(databaseId: string) {
+  console.log('useDatabase called with:', { databaseId });
+
   return useQuery({
     queryKey: ['database', databaseId],
     queryFn: async ({ signal }): Promise<NotionDatabase> => {
+      console.log('useDatabase queryFn called with:', { databaseId });
+
       const response = await fetch(`/api/notion/database/${databaseId}`, { signal });
+      console.log('useDatabase response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('useDatabase API Error:', { status: response.status, errorText });
         throw new Error('Failed to fetch database');
       }
-      return response.json();
+
+      const data = await response.json();
+      console.log('useDatabase response data:', data);
+      return data;
     },
     staleTime: 60 * 60 * 1000, // 1 hour - database properties don't change often
     enabled: !!databaseId,
@@ -48,11 +64,14 @@ export function useDatabase(databaseId: string) {
 
 // Hook for fetching database pages with infinite scroll
 export function useDatabasePages(databaseId: string, pageSize: number = 50) {
+  console.log('useDatabasePages called with:', { databaseId, pageSize });
+
   return useInfiniteQuery({
     queryKey: ['database-pages', databaseId, pageSize],
     queryFn: async ({ pageParam }): Promise<DatabasePagesResponse> => {
+      console.log('useDatabasePages queryFn called with:', { databaseId, pageSize, pageParam });
+
       const params = new URLSearchParams({
-        databaseId,
         pageSize: pageSize.toString(),
       });
 
@@ -60,8 +79,15 @@ export function useDatabasePages(databaseId: string, pageSize: number = 50) {
         params.append('start_cursor', pageParam);
       }
 
-      const response = await fetch(`/api/notion/database/${databaseId}/pages?${params}`);
+      const url = `/api/notion/database/${databaseId}/pages?${params}`;
+      console.log('Fetching URL:', url);
+
+      const response = await fetch(url);
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', { status: response.status, errorText });
         throw new Error('Failed to fetch database pages');
       }
       return response.json();
@@ -86,7 +112,6 @@ export function useAllDatabasePages(databaseId: string) {
 
       while (hasMore) {
         const params = new URLSearchParams({
-          databaseId,
           pageSize: '100', // Use max page size
         });
 

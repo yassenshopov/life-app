@@ -28,7 +28,7 @@ export async function POST(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Validate required environment variables
@@ -54,7 +54,7 @@ export async function POST(
 
     const { databaseId } = await params;
     if (!databaseId) {
-      return new NextResponse('Database ID is required', { status: 400 });
+      return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
     }
 
     // Initialize Supabase client inside the request handler
@@ -71,7 +71,7 @@ export async function POST(
       .single();
 
     if (userError || !user?.notion_databases) {
-      return new NextResponse('User databases not found', { status: 404 });
+      return NextResponse.json({ error: 'User databases not found' }, { status: 404 });
     }
 
     const databases = Array.isArray(user.notion_databases)
@@ -80,7 +80,7 @@ export async function POST(
 
     const currentDb = databases.find((db: any) => db.database_id === databaseId);
     if (!currentDb) {
-      return new NextResponse('Database not found', { status: 404 });
+      return NextResponse.json({ error: 'Database not found' }, { status: 404 });
     }
 
     // Fetch fresh database info from Notion
@@ -258,7 +258,7 @@ export async function POST(
 
     if (updateError) {
       console.error('Error updating database:', updateError);
-      return new NextResponse('Failed to update database', { status: 500 });
+      return NextResponse.json({ error: 'Failed to update database' }, { status: 500 });
     }
 
     const result: SyncResult = {

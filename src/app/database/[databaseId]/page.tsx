@@ -36,18 +36,21 @@ import { cacheUtils } from '@/lib/cache-utils';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface NotionDatabase {
-  database_id: string;
-  database_name: string;
-  integration_id: string;
-  last_sync: string | null;
-  sync_frequency: string;
-  properties: {
-    [key: string]: {
+  title: string;
+  properties: Record<
+    string,
+    {
       type: string;
-      required?: boolean;
-      description?: string;
-    };
-  };
+      name: string;
+    }
+  >;
+  icon?: any;
+  cover?: any;
+  description?: any[];
+  created_time?: string;
+  last_edited_time?: string;
+  created_by?: any;
+  last_edited_by?: any;
 }
 
 export default function DatabasePage() {
@@ -58,6 +61,8 @@ export default function DatabasePage() {
 
   const { data: database, isLoading, error, refetch } = useDatabase(databaseId);
   const [currentView, setCurrentView] = React.useState('table');
+
+  console.log('DatabasePage render:', { databaseId, database, isLoading, error, currentView });
   const [isNewEntryDialogOpen, setIsNewEntryDialogOpen] = React.useState(false);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [visibleProperties, setVisibleProperties] = React.useState<string[]>([]);
@@ -175,7 +180,7 @@ export default function DatabasePage() {
             <span className="mx-2">/</span>
             <span>Databases</span>
             <span className="mx-2">/</span>
-            <span className="text-foreground font-medium">{database.database_name}</span>
+            <span className="text-foreground font-medium">{database.title}</span>
           </nav>
 
           {/* Database Cover */}
@@ -217,14 +222,14 @@ export default function DatabasePage() {
                       className="w-6 h-6 rounded"
                     />
                   ) : (
-                    getDatabaseIcon(database.database_name)
+                    getDatabaseIcon(database.title)
                   )
                 ) : (
-                  getDatabaseIcon(database.database_name)
+                  getDatabaseIcon(database.title)
                 )}
               </div>
               <div className="flex-1">
-                <h1 className="text-2xl font-semibold text-foreground">{database.database_name}</h1>
+                <h1 className="text-2xl font-semibold text-foreground">{database.title}</h1>
                 {database.description && database.description.length > 0 && (
                   <p className="text-sm text-muted-foreground mt-1">
                     {database.description
@@ -311,25 +316,31 @@ export default function DatabasePage() {
               </div>
             )}
             {currentView === 'table' && (
-              <DatabaseTable
-                databaseId={database.database_id}
-                properties={database.properties}
-                visibleProperties={visibleProperties}
-                filters={filters}
-                emptyState={
-                  <EmptyState
-                    icon={DATABASE_VIEW_CONFIGS.table.icon}
-                    title={DATABASE_VIEW_CONFIGS.table.emptyState.title}
-                    description={DATABASE_VIEW_CONFIGS.table.emptyState.description}
-                    actionText={DATABASE_VIEW_CONFIGS.table.emptyState.actionText}
-                    onAction={() => setIsNewEntryDialogOpen(true)}
-                  />
-                }
-              />
+              <>
+                {console.log('Rendering DatabaseTable with:', {
+                  databaseId: databaseId,
+                  properties: database.properties,
+                })}
+                <DatabaseTable
+                  databaseId={databaseId}
+                  properties={database.properties}
+                  visibleProperties={visibleProperties}
+                  filters={filters}
+                  emptyState={
+                    <EmptyState
+                      icon={DATABASE_VIEW_CONFIGS.table.icon}
+                      title={DATABASE_VIEW_CONFIGS.table.emptyState.title}
+                      description={DATABASE_VIEW_CONFIGS.table.emptyState.description}
+                      actionText={DATABASE_VIEW_CONFIGS.table.emptyState.actionText}
+                      onAction={() => setIsNewEntryDialogOpen(true)}
+                    />
+                  }
+                />
+              </>
             )}
             {currentView === 'board' && (
               <DatabaseBoardView
-                databaseId={database.database_id}
+                databaseId={databaseId}
                 properties={database.properties}
                 filters={filters}
                 emptyState={
@@ -345,7 +356,7 @@ export default function DatabasePage() {
             )}
             {currentView === 'calendar' && (
               <DatabaseCalendarView
-                databaseId={database.database_id}
+                databaseId={databaseId}
                 properties={database.properties}
                 filters={filters}
                 emptyState={
@@ -361,7 +372,7 @@ export default function DatabasePage() {
             )}
             {currentView === 'gallery' && (
               <DatabaseGalleryView
-                databaseId={database.database_id}
+                databaseId={databaseId}
                 properties={database.properties}
                 filters={filters}
                 emptyState={

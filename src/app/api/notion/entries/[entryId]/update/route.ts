@@ -2,12 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 
-const notion = new Client({
-  auth: process.env.NOTION_API_KEY,
-});
-
 export async function PATCH(request: NextRequest, { params }: { params: { entryId: string } }) {
   try {
+    // Validate required environment variables
+    if (!process.env.NOTION_API_KEY) {
+      console.error('Missing required environment variable: NOTION_API_KEY');
+      return NextResponse.json(
+        { error: 'Server configuration error: Missing Notion API key' },
+        { status: 500 }
+      );
+    }
+
+    // Normalize ALLOWED_DATABASE_IDS
+    const allowedDatabaseIds = process.env.ALLOWED_DATABASE_IDS
+      ? process.env.ALLOWED_DATABASE_IDS.split(',')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+      : [];
+
+    // Initialize Notion client after validation
+    const notion = new Client({
+      auth: process.env.NOTION_API_KEY,
+    });
+
     const { userId } = await auth();
 
     if (!userId) {
@@ -23,17 +40,39 @@ export async function PATCH(request: NextRequest, { params }: { params: { entryI
     // CSRF Protection: Check Origin header against allowlist
     const origin = request.headers.get('origin');
     const referer = request.headers.get('referer');
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
     const currentHost = request.headers.get('host');
+
+    // Normalize ALLOWED_ORIGINS
+    const allowedOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',')
+          .map((origin) => origin.trim())
+          .filter((origin) => origin.length > 0)
+      : [];
 
     const requestOrigin = origin || referer;
     if (requestOrigin && allowedOrigins.length > 0) {
-      const isAllowedOrigin = allowedOrigins.some(
-        (allowedOrigin) =>
-          requestOrigin.includes(allowedOrigin.trim()) || requestOrigin.includes(currentHost || '')
-      );
+      try {
+        // Parse the request origin to get the actual origin
+        const parsedOrigin = new URL(requestOrigin);
+        const requestOriginValue = parsedOrigin.origin;
 
-      if (!isAllowedOrigin) {
+        // Create current host origin for comparison
+        const currentHostOrigin = currentHost ? `https://${currentHost}` : null;
+
+        // Check for exact match against allowed origins or current host
+        const isAllowedOrigin = allowedOrigins.some((allowedOrigin) => {
+          const trimmedAllowedOrigin = allowedOrigin.trim();
+          return (
+            requestOriginValue === trimmedAllowedOrigin ||
+            (currentHostOrigin && requestOriginValue === currentHostOrigin)
+          );
+        });
+
+        if (!isAllowedOrigin) {
+          return NextResponse.json({ error: 'Forbidden: Invalid origin' }, { status: 403 });
+        }
+      } catch (urlError) {
+        // If URL parsing fails, reject the request
         return NextResponse.json({ error: 'Forbidden: Invalid origin' }, { status: 403 });
       }
     }
@@ -50,7 +89,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { entryI
     }
 
     // Check if the page belongs to an allowed database
-    const allowedDatabaseIds = process.env.ALLOWED_DATABASE_IDS?.split(',') || [];
 
     if (page.parent && page.parent.type === 'database_id') {
       const databaseId = page.parent.database_id;

@@ -63,7 +63,7 @@ export async function GET(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const notion = new Client({
@@ -72,7 +72,7 @@ export async function GET(
 
     const { databaseId } = await params;
     if (!databaseId) {
-      return new NextResponse('Database ID is required', { status: 400 });
+      return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
     }
 
     try {
@@ -109,12 +109,12 @@ export async function GET(
     } catch (notionError: any) {
       console.error('Notion API error:', notionError);
       if (notionError.code === 'object_not_found') {
-        return new NextResponse('Database not found', { status: 404 });
+        return NextResponse.json({ error: 'Database not found' }, { status: 404 });
       }
-      return new NextResponse('Failed to fetch database properties', { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch database properties' }, { status: 500 });
     }
   } catch (error) {
     console.error('Error in GET /api/notion/database/[databaseId]:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

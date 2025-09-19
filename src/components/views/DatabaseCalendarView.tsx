@@ -4,6 +4,8 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { PageIcon } from '@/components/PageIcon';
 import { useDatabasePages } from '@/hooks/useDatabase';
 import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
 import { NewEntryDialog } from '@/components/dialogs/NewEntryDialog';
@@ -222,23 +224,24 @@ export function DatabaseCalendarView({
     return page.properties[dateKey]?.date?.start;
   });
 
-  if (pagesWithDates.length === 0 && emptyState) {
+  console.log('Calendar view debug:', {
+    filteredPages: filteredPages.length,
+    pagesWithDates: pagesWithDates.length,
+    dateProperty: dateProperty ? dateProperty[0] : null,
+    properties: Object.keys(properties),
+    samplePage: filteredPages[0] ? Object.keys(filteredPages[0].properties) : null,
+  });
+
+  // Check if we should show a disclaimer banner
+  const showNoDatesBanner = pagesWithDates.length === 0 && filteredPages.length > 0;
+  const hasDateProperty = !!dateProperty;
+
+  // Only show empty state if there are truly no entries at all
+  if (filteredPages.length === 0 && emptyState) {
     return <div className="flex-1 overflow-hidden">{emptyState}</div>;
   }
 
-  if (!dateProperty) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No date property found in this database</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Add a date property to use the calendar view
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Remove the early return - let it fall through to show calendar grid with banner
 
   const days = getDaysInMonth(currentDate);
   const monthNames = [
@@ -284,6 +287,20 @@ export function DatabaseCalendarView({
           </Button>
         </div>
 
+        {/* Disclaimer Banner */}
+        {showNoDatesBanner && (
+          <div className="mx-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                {hasDateProperty
+                  ? 'No entries with dates found. Add dates to your entries to see them on the calendar.'
+                  : 'No date property found in this database. Add a date property to use the calendar view.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Calendar Grid */}
         <div className="flex-1 overflow-auto p-4">
           <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
@@ -300,7 +317,7 @@ export function DatabaseCalendarView({
             {/* Calendar days */}
             {days.map((date, index) => {
               if (!date) {
-                return <div key={index} className="bg-background min-h-[100px]" />;
+                return <div key={index} className="bg-background min-h-[120px]" />;
               }
 
               const tasks = getTasksForDate(date);
@@ -309,11 +326,11 @@ export function DatabaseCalendarView({
               return (
                 <div
                   key={date.toISOString()}
-                  className={`bg-background min-h-[100px] p-2 border-r border-b ${
+                  className={`bg-background min-h-[120px] p-3 border-r border-b ${
                     isCurrentDay ? 'bg-blue-50 dark:bg-blue-950/20' : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <span
                       className={`text-sm font-medium ${
                         isCurrentDay ? 'text-blue-600 dark:text-blue-400' : 'text-foreground'
@@ -322,13 +339,13 @@ export function DatabaseCalendarView({
                       {date.getDate()}
                     </span>
                     {tasks.length > 0 && (
-                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      <Badge variant="secondary" className="text-xs px-2 py-1">
                         {tasks.length}
-                      </span>
+                      </Badge>
                     )}
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {tasks.slice(0, 3).map((task) => {
                       // Get title property
                       const titleProperty = Object.entries(properties).find(
@@ -353,9 +370,12 @@ export function DatabaseCalendarView({
                           onClick={() => handleEntryClick(task)}
                         >
                           <div className="space-y-1">
-                            <p className="font-medium truncate">{title}</p>
+                            <div className="flex items-center gap-2">
+                              <PageIcon icon={task.icon} className="w-3 h-3 flex-shrink-0" />
+                              <p className="font-medium truncate">{title}</p>
+                            </div>
                             {status && (
-                              <Badge variant="secondary" className="text-xs px-1 py-0.5">
+                              <Badge variant="outline" className="text-xs px-1 py-0.5">
                                 {status}
                               </Badge>
                             )}
@@ -365,7 +385,7 @@ export function DatabaseCalendarView({
                     })}
 
                     {tasks.length > 3 && (
-                      <div className="text-xs text-muted-foreground text-center">
+                      <div className="text-xs text-muted-foreground text-center py-1">
                         +{tasks.length - 3} more
                       </div>
                     )}

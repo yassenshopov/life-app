@@ -4,6 +4,7 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageIcon } from '@/components/PageIcon';
 import { useDatabasePages } from '@/hooks/useDatabase';
 import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
 import { NewEntryDialog } from '@/components/dialogs/NewEntryDialog';
@@ -240,10 +241,10 @@ export function DatabaseGalleryView({
               return (
                 <Card
                   key={page.id}
-                  className="p-4 cursor-pointer hover:bg-muted/30 transition-colors group"
+                  className="p-5 cursor-pointer hover:bg-muted/30 transition-colors group"
                   onClick={() => handleEntryClick(page)}
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {/* Status Badge */}
                     {status && (
                       <div className="flex justify-start">
@@ -256,10 +257,13 @@ export function DatabaseGalleryView({
                       </div>
                     )}
 
-                    {/* Title */}
-                    <h3 className="font-medium text-sm leading-tight line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {title}
-                    </h3>
+                    {/* Title with Icon */}
+                    <div className="flex items-start gap-3">
+                      <PageIcon icon={page.icon} className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      <h3 className="font-medium text-sm leading-tight line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {title}
+                      </h3>
+                    </div>
 
                     {/* Assignees */}
                     {assignees && assignees.length > 0 && (

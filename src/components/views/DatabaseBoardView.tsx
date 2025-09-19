@@ -4,6 +4,7 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageIcon } from '@/components/PageIcon';
 import { useDatabasePages } from '@/hooks/useDatabase';
 import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
 import { NewEntryDialog } from '@/components/dialogs/NewEntryDialog';
@@ -246,11 +247,14 @@ export function DatabaseBoardView({
                   return (
                     <Card
                       key={page.id}
-                      className="p-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                      className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
                       onClick={() => handleEntryClick(page)}
                     >
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-sm leading-tight">{title}</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <PageIcon icon={page.icon} className="w-4 h-4 flex-shrink-0" />
+                          <h4 className="font-medium text-sm leading-tight">{title}</h4>
+                        </div>
 
                         {assignees && assignees.length > 0 && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">

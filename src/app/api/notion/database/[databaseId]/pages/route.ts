@@ -13,12 +13,12 @@ export async function GET(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { databaseId } = await params;
     if (!databaseId) {
-      return new NextResponse('Database ID is required', { status: 400 });
+      return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
     }
 
     const url = new URL(request.url);
@@ -58,7 +58,7 @@ export async function GET(
     }
   } catch (error) {
     console.error('Error in GET /api/notion/database/[databaseId]/pages:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -69,19 +69,19 @@ export async function POST(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { databaseId } = await params;
     if (!databaseId) {
-      return new NextResponse('Database ID is required', { status: 400 });
+      return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
     }
 
     const body = await request.json();
     const { properties } = body;
 
     if (!properties) {
-      return new NextResponse('Properties are required', { status: 400 });
+      return NextResponse.json({ error: 'Properties are required' }, { status: 400 });
     }
 
     try {
@@ -109,6 +109,6 @@ export async function POST(
     }
   } catch (error) {
     console.error('Error in POST /api/notion/database/[databaseId]/pages:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -36,6 +36,7 @@ import {
   Target,
   Database,
 } from 'lucide-react';
+import { PageIcon } from '@/components/PageIcon';
 import {
   NOTION_PROPERTY_TYPES,
   PROPERTY_TYPE_DISPLAY_NAMES,
@@ -478,7 +479,7 @@ export function DatabaseTable({
             {propertyEntries.map(([key, property]) => (
               <TableHead
                 key={key}
-                className="cursor-pointer hover:bg-muted/50 transition-colors group"
+                className="cursor-pointer hover:bg-muted/50 transition-colors group py-4"
                 onClick={() => handleSort(key)}
               >
                 <div className="flex items-center gap-2">
@@ -527,11 +528,26 @@ export function DatabaseTable({
                 } cursor-pointer hover:bg-muted/50 transition-colors`}
                 onClick={() => handleEntryClick(page)}
               >
-                {propertyEntries.map(([key, property]) => (
-                  <TableCell key={key} className="text-sm">
-                    {renderPropertyValue(property, page.properties[key])}
-                  </TableCell>
-                ))}
+                {propertyEntries.map(([key, property]) => {
+                  // Check if this is the title property to add icon
+                  const isTitleProperty = property.type === NOTION_PROPERTY_TYPES.TITLE;
+
+                  return (
+                    <TableCell
+                      key={key}
+                      className={`text-sm py-4 ${isTitleProperty ? 'font-medium' : ''}`}
+                    >
+                      {isTitleProperty ? (
+                        <div className="flex items-center gap-2">
+                          <PageIcon icon={page.icon} className="w-4 h-4 flex-shrink-0" />
+                          <span>{renderPropertyValue(property, page.properties[key])}</span>
+                        </div>
+                      ) : (
+                        renderPropertyValue(property, page.properties[key])
+                      )}
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))
           )}
