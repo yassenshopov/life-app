@@ -13,7 +13,10 @@ interface NotionDatabaseProperties {
   >;
 }
 
-export async function GET(request: Request, { params }: { params: { databaseId: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ databaseId: string }> }
+) {
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -24,7 +27,7 @@ export async function GET(request: Request, { params }: { params: { databaseId: 
       auth: process.env.NOTION_API_KEY,
     });
 
-    const databaseId = params.databaseId;
+    const { databaseId } = await params;
     if (!databaseId) {
       return new NextResponse('Database ID is required', { status: 400 });
     }
@@ -47,7 +50,12 @@ export async function GET(request: Request, { params }: { params: { databaseId: 
         properties: database.properties,
       };
 
-      return NextResponse.json(response);
+      return NextResponse.json(response, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200', // 1 hour cache, 2 hours stale
+          'CDN-Cache-Control': 'public, s-maxage=3600',
+        },
+      });
     } catch (notionError: any) {
       console.error('Notion API error:', notionError);
       if (notionError.code === 'object_not_found') {

@@ -48,6 +48,7 @@ import { SevenDayReport } from '@/components/SevenDayReport';
 import { FinancialOverview } from '@/components/FinancialOverview';
 import { HabitsOverview } from '@/components/HabitsOverview';
 import { DailyTrackingSection } from '@/components/DailyTrackingSection';
+import DashboardLayout from '@/components/DashboardLayout';
 
 const inter = Inter({ subsets: ['latin'] });
 const outfit = Outfit({ subsets: ['latin'] });
@@ -279,245 +280,247 @@ export default function Dashboard() {
   }
 
   return (
-    <div
-      className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
-    >
-      <Analytics />
-      <div className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
-        <DateRangeFilter
-          dateRange={dateRange}
-          setDateRange={setDateRange}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          handleDateRangeFilter={handleDateRangeFilter}
-        />
-        <NavigationTabs
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-          entries={entries}
-        />
-      </div>
+    <DashboardLayout>
+      <div
+        className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
+      >
+        <Analytics />
+        <div className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm text-slate-900 dark:text-slate-200 shadow-sm">
+          <DateRangeFilter
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            handleDateRangeFilter={handleDateRangeFilter}
+          />
+          <NavigationTabs
+            activeSection={activeSection}
+            setActiveSection={setActiveSection}
+            entries={entries}
+          />
+        </div>
 
-      {activeSection === 'all' && <FloatingToc sections={sections} />}
+        {activeSection === 'all' && <FloatingToc sections={sections} />}
 
-      <main className="max-w-7xl mx-auto pt-16">
-        {activeSection === 'all' && (
-          <div className="mb-8">
-            <SevenDayReport entries={entries} gymSessions={gymSessions} />
-          </div>
-        )}
-
-        {(activeSection === 'all' || activeSection === 'sleep') && (
-          <>
-            <SectionHeader title="Sleep Analysis" />
-            <ManualEntryForm
-              entries={entries}
-              dateRange={dateRange}
-              setEntries={setEntries}
-              autoOpen={autoOpenManualEntry}
-            />
-            {entries.length > 0 &&
-              (() => {
-                const todayEntry = entries.find(
-                  (e) => e.date === new Date().toISOString().split('T')[0]
-                );
-                const hasMeaningfulSleepData =
-                  todayEntry &&
-                  (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
-
-                return hasMeaningfulSleepData ? (
-                  <div className="mb-8">
-                    <SleepAnalysisCard entry={todayEntry} entries={entries} />
-                  </div>
-                ) : null;
-              })()}
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
-              <SleepDurationChart data={prepareChartData} isLoadingCharts={isChartLoading} />
-              <SleepStats entries={entries} dateRange={dateRange} />
+        <main className="max-w-7xl mx-auto pt-16">
+          {activeSection === 'all' && (
+            <div className="mb-8">
+              <SevenDayReport entries={entries} gymSessions={gymSessions} />
             </div>
+          )}
 
-            <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
-              <h3
-                className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
-              >
-                Sleep Pattern
-              </h3>
-              <div
-                className={`transition-opacity duration-200 ${
-                  isChartLoading ? 'opacity-50' : 'opacity-100'
-                }`}
-              >
-                <SleepPatternChart data={entries.length > 0 ? prepareSleepPatternData : []} />
-              </div>
-            </div>
-
-            <SleepCompositionChart
-              data={prepareChartData}
-              isLoadingCharts={isChartLoading}
-              showAwakeTime={showAwakeTime}
-              setShowAwakeTime={setShowAwakeTime}
-            />
-          </>
-        )}
-
-        {(activeSection === 'all' || activeSection === 'rhr') && (
-          <>
-            <SectionHeader
-              title="Heart Rate Analysis"
-              className={activeSection === 'all' ? 'mt-12' : ''}
-            />
-            <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <div className="lg:col-span-3 relative">
-                <RHRChart
-                  data={prepareChartData}
-                  isLoadingCharts={isChartLoading}
-                  tickInterval={getTickInterval(prepareChartData.length)}
-                />
-              </div>
-              <RHRAnalytics data={prepareChartData} />
-            </div>
-          </>
-        )}
-
-        {(activeSection === 'all' || activeSection === 'steps') && (
-          <>
-            <SectionHeader
-              title="Steps Analysis"
-              className={activeSection === 'all' ? 'mt-12' : ''}
-            />
-            <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <div className="lg:col-span-3 relative">
-                <StepsChart
-                  data={prepareChartData}
-                  isLoadingCharts={isChartLoading}
-                  tickInterval={getTickInterval(prepareChartData.length)}
-                />
-              </div>
-              <StepsAnalytics data={prepareChartData} />
-            </div>
-          </>
-        )}
-
-        {(activeSection === 'all' || activeSection === 'weight') && (
-          <>
-            <SectionHeader
-              title="Weight Analysis"
-              className={activeSection === 'all' ? 'mt-12' : ''}
-            />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <WeightAnalytics data={prepareChartData} />
-              <WeightChart
-                data={prepareChartData}
-                isLoadingCharts={isChartLoading}
-                tickInterval={getTickInterval(prepareChartData.length)}
+          {(activeSection === 'all' || activeSection === 'sleep') && (
+            <>
+              <SectionHeader title="Sleep Analysis" />
+              <ManualEntryForm
+                entries={entries}
+                dateRange={dateRange}
+                setEntries={setEntries}
+                autoOpen={autoOpenManualEntry}
               />
-            </div>
-          </>
-        )}
+              {entries.length > 0 &&
+                (() => {
+                  const todayEntry = entries.find(
+                    (e) => e.date === new Date().toISOString().split('T')[0]
+                  );
+                  const hasMeaningfulSleepData =
+                    todayEntry &&
+                    (todayEntry.totalSleepHours > 0 || todayEntry.totalSleepMinutes > 0);
 
-        {(activeSection === 'all' || activeSection === 'gym') && (
-          <>
-            {activeSection === 'gym' && (
-              <FloatingToc
-                sections={[
-                  {
-                    id: 'gym-planner',
-                    title: 'Calendar',
-                    icon: <Calendar className="w-4 h-4" />,
-                  },
-                  {
-                    id: 'muscle-group-analysis',
-                    title: 'Muscle Groups',
-                    icon: <BarChart2 className="w-4 h-4" />,
-                  },
-                  {
-                    id: 'exercise-analysis',
-                    title: 'Exercises',
-                    icon: <Dumbbell className="w-4 h-4" />,
-                  },
-                ]}
-              />
-            )}
+                  return hasMeaningfulSleepData ? (
+                    <div className="mb-8">
+                      <SleepAnalysisCard entry={todayEntry} entries={entries} />
+                    </div>
+                  ) : null;
+                })()}
 
-            <div id="gym-planner">
-              <SectionHeader
-                title="Gym Planner"
-                className={activeSection === 'all' ? 'mt-12' : ''}
-              />
-              <div className="relative">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+                <SleepDurationChart data={prepareChartData} isLoadingCharts={isChartLoading} />
+                <SleepStats entries={entries} dateRange={dateRange} />
+              </div>
+
+              <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-4 border border-slate-200 dark:border-slate-800 relative">
+                <h3
+                  className={`text-lg font-medium mb-4 text-slate-900 dark:text-slate-100 ${outfit.className}`}
+                >
+                  Sleep Pattern
+                </h3>
                 <div
                   className={`transition-opacity duration-200 ${
-                    isChartLoading || isCalendarLoading ? 'opacity-50' : 'opacity-100'
+                    isChartLoading ? 'opacity-50' : 'opacity-100'
                   }`}
                 >
-                  <WorkoutCalendar
-                    onLoadingChange={setIsCalendarLoading}
-                    showGymForm={showGymForm}
-                    setShowGymForm={setShowGymForm}
-                    onMuscleClick={handleMuscleClick}
-                  />
+                  <SleepPatternChart data={entries.length > 0 ? prepareSleepPatternData : []} />
                 </div>
               </div>
-            </div>
 
-            <div id="muscle-group-analysis">
+              <SleepCompositionChart
+                data={prepareChartData}
+                isLoadingCharts={isChartLoading}
+                showAwakeTime={showAwakeTime}
+                setShowAwakeTime={setShowAwakeTime}
+              />
+            </>
+          )}
+
+          {(activeSection === 'all' || activeSection === 'rhr') && (
+            <>
               <SectionHeader
-                title="Muscle Group Analysis"
+                title="Heart Rate Analysis"
                 className={activeSection === 'all' ? 'mt-12' : ''}
               />
-              <MuscleGroupAnalysis
-                gymSessions={gymSessions}
-                onMuscleClick={handleMuscleClick}
-                selectedMuscle={selectedMuscle}
-              />
-            </div>
+              <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div className="lg:col-span-3 relative">
+                  <RHRChart
+                    data={prepareChartData}
+                    isLoadingCharts={isChartLoading}
+                    tickInterval={getTickInterval(prepareChartData.length)}
+                  />
+                </div>
+                <RHRAnalytics data={prepareChartData} />
+              </div>
+            </>
+          )}
 
-            <div id="exercise-analysis">
+          {(activeSection === 'all' || activeSection === 'steps') && (
+            <>
               <SectionHeader
-                title="Exercise Analysis"
+                title="Steps Analysis"
                 className={activeSection === 'all' ? 'mt-12' : ''}
               />
-              <ExerciseAnalysis gymSessions={gymSessions} onMuscleClick={handleMuscleClick} />
-            </div>
-          </>
-        )}
+              <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div className="lg:col-span-3 relative">
+                  <StepsChart
+                    data={prepareChartData}
+                    isLoadingCharts={isChartLoading}
+                    tickInterval={getTickInterval(prepareChartData.length)}
+                  />
+                </div>
+                <StepsAnalytics data={prepareChartData} />
+              </div>
+            </>
+          )}
 
-        {activeSection === 'finances' && (
-          <>
-            <SectionHeader title="Financial Overview" />
-            <FinancialOverview />
-          </>
-        )}
+          {(activeSection === 'all' || activeSection === 'weight') && (
+            <>
+              <SectionHeader
+                title="Weight Analysis"
+                className={activeSection === 'all' ? 'mt-12' : ''}
+              />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <WeightAnalytics data={prepareChartData} />
+                <WeightChart
+                  data={prepareChartData}
+                  isLoadingCharts={isChartLoading}
+                  tickInterval={getTickInterval(prepareChartData.length)}
+                />
+              </div>
+            </>
+          )}
 
-        {activeSection === 'checklist' && (
-          <Checklist
-            entries={entries}
-            dateRange={dateRange}
-            isLoadingCharts={isChartLoading}
-            setIsLoadingCharts={() => {}}
-            setEntries={setEntries}
-          />
-        )}
+          {(activeSection === 'all' || activeSection === 'gym') && (
+            <>
+              {activeSection === 'gym' && (
+                <FloatingToc
+                  sections={[
+                    {
+                      id: 'gym-planner',
+                      title: 'Calendar',
+                      icon: <Calendar className="w-4 h-4" />,
+                    },
+                    {
+                      id: 'muscle-group-analysis',
+                      title: 'Muscle Groups',
+                      icon: <BarChart2 className="w-4 h-4" />,
+                    },
+                    {
+                      id: 'exercise-analysis',
+                      title: 'Exercises',
+                      icon: <Dumbbell className="w-4 h-4" />,
+                    },
+                  ]}
+                />
+              )}
 
-        {activeSection === 'habits' && (
-          <>
-            <SectionHeader title="Habits Tracker" />
-            <HabitsOverview
+              <div id="gym-planner">
+                <SectionHeader
+                  title="Gym Planner"
+                  className={activeSection === 'all' ? 'mt-12' : ''}
+                />
+                <div className="relative">
+                  <div
+                    className={`transition-opacity duration-200 ${
+                      isChartLoading || isCalendarLoading ? 'opacity-50' : 'opacity-100'
+                    }`}
+                  >
+                    <WorkoutCalendar
+                      onLoadingChange={setIsCalendarLoading}
+                      showGymForm={showGymForm}
+                      setShowGymForm={setShowGymForm}
+                      onMuscleClick={handleMuscleClick}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div id="muscle-group-analysis">
+                <SectionHeader
+                  title="Muscle Group Analysis"
+                  className={activeSection === 'all' ? 'mt-12' : ''}
+                />
+                <MuscleGroupAnalysis
+                  gymSessions={gymSessions}
+                  onMuscleClick={handleMuscleClick}
+                  selectedMuscle={selectedMuscle}
+                />
+              </div>
+
+              <div id="exercise-analysis">
+                <SectionHeader
+                  title="Exercise Analysis"
+                  className={activeSection === 'all' ? 'mt-12' : ''}
+                />
+                <ExerciseAnalysis gymSessions={gymSessions} onMuscleClick={handleMuscleClick} />
+              </div>
+            </>
+          )}
+
+          {activeSection === 'finances' && (
+            <>
+              <SectionHeader title="Financial Overview" />
+              <FinancialOverview />
+            </>
+          )}
+
+          {activeSection === 'checklist' && (
+            <Checklist
+              entries={entries}
               dateRange={dateRange}
-              activeTab={activeTab}
-              handleDateRangeFilter={handleDateRangeFilter}
+              isLoadingCharts={isChartLoading}
+              setIsLoadingCharts={() => {}}
+              setEntries={setEntries}
             />
-          </>
-        )}
+          )}
 
-        {activeSection === 'dailytracking' && (
-          <>
-            <SectionHeader title="Daily Tracking" />
-            <DailyTrackingSection />
-          </>
-        )}
-      </main>
-    </div>
+          {activeSection === 'habits' && (
+            <>
+              <SectionHeader title="Habits Tracker" />
+              <HabitsOverview
+                dateRange={dateRange}
+                activeTab={activeTab}
+                handleDateRangeFilter={handleDateRangeFilter}
+              />
+            </>
+          )}
+
+          {activeSection === 'dailytracking' && (
+            <>
+              <SectionHeader title="Daily Tracking" />
+              <DailyTrackingSection />
+            </>
+          )}
+        </main>
+      </div>
+    </DashboardLayout>
   );
 }

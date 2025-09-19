@@ -83,3 +83,44 @@ body {
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* Notion Color Mappings for Multi-Select and Select Properties */
+.notion-color-default {
+  @apply bg-gray-100 text-gray-800 border-gray-800 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-200;
+}
+
+.notion-color-gray {
+  @apply bg-gray-200 text-gray-800 border-gray-800 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-200;
+}
+
+.notion-color-brown {
+  @apply bg-amber-100 text-amber-800 border-amber-800 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-200;
+}
+
+.notion-color-orange {
+  @apply bg-orange-100 text-orange-800 border-orange-800 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-200;
+}
+
+.notion-color-yellow {
+  @apply bg-yellow-100 text-yellow-800 border-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-200;
+}
+
+.notion-color-green {
+  @apply bg-green-100 text-green-800 border-green-800 dark:bg-green-900 dark:text-green-200 dark:border-green-200;
+}
+
+.notion-color-blue {
+  @apply bg-blue-100 text-blue-800 border-blue-800 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-200;
+}
+
+.notion-color-purple {
+  @apply bg-purple-100 text-purple-800 border-purple-800 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-200;
+}
+
+.notion-color-pink {
+  @apply bg-pink-100 text-pink-800 border-pink-800 dark:bg-pink-900 dark:text-pink-200 dark:border-pink-200;
+}
+
+.notion-color-red {
+  @apply bg-red-100 text-red-800 border-red-800 dark:bg-red-900 dark:text-red-200 dark:border-red-200;
+}
