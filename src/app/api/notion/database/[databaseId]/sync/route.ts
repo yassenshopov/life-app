@@ -96,14 +96,14 @@ export async function POST(
         : 'Untitled Database';
 
     const databaseMetadata = {
-      icon: notionDb.icon,
-      cover: notionDb.cover,
+      icon: (notionDb as any).icon,
+      cover: (notionDb as any).cover,
       title: databaseTitle,
-      description: notionDb.description,
-      created_time: notionDb.created_time,
-      last_edited_time: notionDb.last_edited_time,
-      created_by: notionDb.created_by,
-      last_edited_by: notionDb.last_edited_by,
+      description: (notionDb as any).description,
+      created_time: (notionDb as any).created_time,
+      last_edited_time: (notionDb as any).last_edited_time,
+      created_by: (notionDb as any).created_by,
+      last_edited_by: (notionDb as any).last_edited_by,
     };
 
     // Compare with stored properties
