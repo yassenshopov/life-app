@@ -38,13 +38,13 @@ export async function DELETE(
       // Check if the page belongs to a database the user has access to
       // This is a basic check - in a production app, you'd want to verify
       // the user has specific permissions on the parent database
-      if (!page.parent || page.parent.type !== 'database_id') {
+      if (!(page as any).parent || (page as any).parent.type !== 'database_id') {
         return NextResponse.json({ error: 'Forbidden: Invalid resource' }, { status: 403 });
       }
 
       // Additional check: Verify the database exists and is accessible
       try {
-        await notion.databases.retrieve({ database_id: page.parent.database_id });
+        await notion.databases.retrieve({ database_id: (page as any).parent.database_id });
       } catch (dbError) {
         return NextResponse.json({ error: 'Forbidden: Database not accessible' }, { status: 403 });
       }

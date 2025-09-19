@@ -108,7 +108,11 @@ export async function POST(
 
     // Compare with stored properties
     const oldProperties = currentDb.properties || {};
-    const changes = {
+    const changes: {
+      added: string[];
+      removed: string[];
+      modified: string[];
+    } = {
       added: [],
       removed: [],
       modified: [],

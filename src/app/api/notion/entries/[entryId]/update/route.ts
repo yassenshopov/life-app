@@ -93,8 +93,8 @@ export async function PATCH(
 
     // Check if the page belongs to an allowed database
 
-    if (page.parent && page.parent.type === 'database_id') {
-      const databaseId = page.parent.database_id;
+    if ((page as any).parent && (page as any).parent.type === 'database_id') {
+      const databaseId = (page as any).parent.database_id;
 
       // Check against allowed database IDs
       if (allowedDatabaseIds.length > 0 && !allowedDatabaseIds.includes(databaseId)) {
@@ -114,8 +114,8 @@ export async function PATCH(
     // Optional: Check for owner/relation property if it exists
     // This would require knowing the property name that contains the owner
     const ownerPropertyName = process.env.OWNER_PROPERTY_NAME; // e.g., 'Owner', 'Assigned To'
-    if (ownerPropertyName && page.properties[ownerPropertyName]) {
-      const ownerProperty = page.properties[ownerPropertyName];
+    if (ownerPropertyName && (page as any).properties[ownerPropertyName]) {
+      const ownerProperty = (page as any).properties[ownerPropertyName];
       if (ownerProperty.type === 'people' && ownerProperty.people) {
         const ownerIds = ownerProperty.people.map((person: any) => person.id);
         if (!ownerIds.includes(userId)) {
