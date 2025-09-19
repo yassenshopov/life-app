@@ -32,6 +32,13 @@ interface NotionDatabase {
       description?: string;
     };
   };
+  icon?: any;
+  cover?: any;
+  description?: any[];
+  created_time?: string;
+  last_edited_time?: string;
+  created_by?: any;
+  last_edited_by?: any;
 }
 
 export default function NotionSetup() {
@@ -262,7 +269,27 @@ export default function NotionSetup() {
           <Card key={database.database_id}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="flex items-center space-x-2">
-                <Database className="w-4 h-4" />
+                {database.icon ? (
+                  database.icon.type === 'emoji' ? (
+                    <span className="text-lg">{database.icon.emoji}</span>
+                  ) : database.icon.type === 'external' ? (
+                    <img
+                      src={database.icon.external.url}
+                      alt="Database icon"
+                      className="w-4 h-4 rounded"
+                    />
+                  ) : database.icon.type === 'file' ? (
+                    <img
+                      src={database.icon.file.url}
+                      alt="Database icon"
+                      className="w-4 h-4 rounded"
+                    />
+                  ) : (
+                    <Database className="w-4 h-4" />
+                  )
+                ) : (
+                  <Database className="w-4 h-4" />
+                )}
                 <CardTitle className="text-base">{database.database_name}</CardTitle>
               </div>
               <Button

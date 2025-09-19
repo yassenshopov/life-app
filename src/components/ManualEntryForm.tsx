@@ -82,7 +82,7 @@ export function ManualEntryForm({
       const data = await response.json();
       setEntries(data);
     },
-    [dateRange]
+    [dateRange, setEntries]
   );
 
   const handleSubmit = async () => {

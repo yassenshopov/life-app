@@ -1,6 +1,6 @@
 import { Client } from '@notionhq/client';
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
 
 const notion = new Client({
@@ -26,7 +26,7 @@ type Relation = { id: string };
 export async function GET() {
   try {
     const habitsDbId = process.env.NOTION_HABITS_DB_ID;
-    const { userId } = auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     const { habitId, date, completed } = await request.json();
     console.log('Request params:', { habitId, date, completed });
 
-    const { userId } = auth();
+    const { userId } = await auth();
 
     if (!userId) {
       console.error('No user ID found');
