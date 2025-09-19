@@ -26,37 +26,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { formatPropertyValue } from '@/lib/notion-property-utils';
-// Import with fallback to handle potential module resolution issues
-let NOTION_PROPERTY_TYPES: any;
-try {
-  const notionProps = require('@/constants/notion-properties');
-  NOTION_PROPERTY_TYPES = notionProps.NOTION_PROPERTY_TYPES;
-} catch (error) {
-  console.error('Failed to import NOTION_PROPERTY_TYPES:', error);
-  // Fallback constants
-  NOTION_PROPERTY_TYPES = {
-    TITLE: 'title',
-    RICH_TEXT: 'rich_text',
-    NUMBER: 'number',
-    SELECT: 'select',
-    MULTI_SELECT: 'multi_select',
-    DATE: 'date',
-    PEOPLE: 'people',
-    FILES: 'files',
-    CHECKBOX: 'checkbox',
-    URL: 'url',
-    EMAIL: 'email',
-    PHONE: 'phone_number',
-    FORMULA: 'formula',
-    RELATION: 'relation',
-    ROLLUP: 'rollup',
-    CREATED_TIME: 'created_time',
-    CREATED_BY: 'created_by',
-    LAST_EDITED_TIME: 'last_edited_time',
-    LAST_EDITED_BY: 'last_edited_by',
-    STATUS: 'status',
-  };
-}
+import { NOTION_PROPERTY_TYPES } from '@/constants/notion-properties';
 
 // Debug the import
 console.log('DatabaseSyncSettings NOTION_PROPERTY_TYPES:', NOTION_PROPERTY_TYPES);
