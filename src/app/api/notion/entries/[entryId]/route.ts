@@ -6,7 +6,10 @@ const notion = new Client({
   auth: process.env.NOTION_API_KEY,
 });
 
-export async function DELETE(request: NextRequest, { params }: { params: { entryId: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ entryId: string }> }
+) {
   try {
     const { userId } = await auth();
 
@@ -14,7 +17,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { entry
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { entryId } = params;
+    const { entryId } = await params;
 
     if (!entryId) {
       return NextResponse.json({ error: 'Entry ID is required' }, { status: 400 });

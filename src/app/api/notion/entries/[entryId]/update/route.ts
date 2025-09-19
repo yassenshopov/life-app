@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 
-export async function PATCH(request: NextRequest, { params }: { params: { entryId: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ entryId: string }> }
+) {
   try {
     // Validate required environment variables
     if (!process.env.NOTION_API_KEY) {
@@ -31,7 +34,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { entryI
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { entryId } = params;
+    const { entryId } = await params;
 
     if (!entryId) {
       return NextResponse.json({ error: 'Entry ID is required' }, { status: 400 });
