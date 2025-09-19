@@ -26,6 +26,7 @@ import { NewEntryDialog } from '@/components/dialogs/NewEntryDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { PropertyVisibilityMenu } from '@/components/PropertyVisibilityMenu';
 import { FilterMenu } from '@/components/FilterMenu';
+import { DatabaseSyncSettings } from '@/components/DatabaseSyncSettings';
 import DashboardLayout from '@/components/DashboardLayout';
 import { PROPERTY_TYPE_DISPLAY_NAMES } from '@/constants/notion-properties';
 import { DATABASE_VIEW_CONFIGS, DATABASE_VIEW_ORDER } from '@/constants/database-views';
@@ -177,14 +178,60 @@ export default function DatabasePage() {
             <span className="text-foreground font-medium">{database.database_name}</span>
           </nav>
 
+          {/* Database Cover */}
+          {database.cover && (
+            <div className="h-48 w-full overflow-hidden">
+              {database.cover.type === 'external' ? (
+                <img
+                  src={database.cover.external.url}
+                  alt="Database cover"
+                  className="w-full h-full object-cover"
+                />
+              ) : database.cover.type === 'file' ? (
+                <img
+                  src={database.cover.file.url}
+                  alt="Database cover"
+                  className="w-full h-full object-cover"
+                />
+              ) : null}
+            </div>
+          )}
+
           {/* Database Header - Notion Style */}
           <div className="px-6 py-4 border-b border-border">
             <div className="flex items-start space-x-3">
               <div className="w-8 h-8 rounded flex items-center justify-center bg-muted mt-1">
-                {getDatabaseIcon(database.database_name)}
+                {database.icon ? (
+                  database.icon.type === 'emoji' ? (
+                    <span className="text-lg">{database.icon.emoji}</span>
+                  ) : database.icon.type === 'external' ? (
+                    <img
+                      src={database.icon.external.url}
+                      alt="Database icon"
+                      className="w-6 h-6 rounded"
+                    />
+                  ) : database.icon.type === 'file' ? (
+                    <img
+                      src={database.icon.file.url}
+                      alt="Database icon"
+                      className="w-6 h-6 rounded"
+                    />
+                  ) : (
+                    getDatabaseIcon(database.database_name)
+                  )
+                ) : (
+                  getDatabaseIcon(database.database_name)
+                )}
               </div>
               <div className="flex-1">
                 <h1 className="text-2xl font-semibold text-foreground">{database.database_name}</h1>
+                {database.description && database.description.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {database.description
+                      .map((block: any) => (block.type === 'text' ? block.text.plain_text : ''))
+                      .join('')}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -215,6 +262,16 @@ export default function DatabasePage() {
                 >
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
+                <DatabaseSyncSettings
+                  databaseId={database.database_id}
+                  databaseName={database.database_name}
+                  lastSync={database.last_sync}
+                  properties={database.properties}
+                  onSyncComplete={() => {
+                    cacheUtils.invalidateDatabase(databaseId);
+                    refetch();
+                  }}
+                />
                 {database?.properties && (
                   <FilterMenu
                     properties={database.properties}

@@ -40,6 +40,13 @@ interface NotionDatabase {
       description?: string;
     };
   };
+  icon?: any;
+  cover?: any;
+  description?: any[];
+  created_time?: string;
+  last_edited_time?: string;
+  created_by?: any;
+  last_edited_by?: any;
 }
 
 interface SidebarSection {
@@ -66,24 +73,35 @@ export default function NotionSidebar() {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const [databases, setDatabases] = useState<NotionDatabase[]>([]);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['databases', 'preferences'])
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  // Load sidebar state from localStorage on mount
-  useEffect(() => {
-    const savedCollapsedState = localStorage.getItem('sidebar-collapsed');
-    if (savedCollapsedState !== null) {
-      setIsCollapsed(JSON.parse(savedCollapsedState));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    // Initialize state from localStorage if available
+    if (typeof window !== 'undefined') {
+      const savedExpandedState = localStorage.getItem('sidebar-expanded-sections');
+      return savedExpandedState !== null
+        ? new Set(JSON.parse(savedExpandedState))
+        : new Set(['databases', 'preferences']);
     }
-  }, []);
+    return new Set(['databases', 'preferences']);
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    // Initialize state from localStorage if available
+    if (typeof window !== 'undefined') {
+      const savedCollapsedState = localStorage.getItem('sidebar-collapsed');
+      return savedCollapsedState !== null ? JSON.parse(savedCollapsedState) : false;
+    }
+    return false;
+  });
 
   // Save sidebar state to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
+
+  // Save expanded sections state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('sidebar-expanded-sections', JSON.stringify(Array.from(expandedSections)));
+  }, [expandedSections]);
 
   useEffect(() => {
     if (user) {
@@ -117,8 +135,22 @@ export default function NotionSidebar() {
     });
   };
 
-  const getDatabaseIcon = (databaseName: string) => {
-    const name = databaseName.toLowerCase();
+  const getDatabaseIcon = (database: NotionDatabase) => {
+    // Use Notion icon if available
+    if (database.icon) {
+      if (database.icon.type === 'emoji') {
+        return <span className="text-sm">{database.icon.emoji}</span>;
+      } else if (database.icon.type === 'external') {
+        return (
+          <img src={database.icon.external.url} alt="Database icon" className="w-4 h-4 rounded" />
+        );
+      } else if (database.icon.type === 'file') {
+        return <img src={database.icon.file.url} alt="Database icon" className="w-4 h-4 rounded" />;
+      }
+    }
+
+    // Fallback to name-based icons
+    const name = database.database_name.toLowerCase();
     if (name.includes('daily') || name.includes('tracking'))
       return <Calendar className="w-4 h-4" />;
     if (name.includes('fitness') || name.includes('workout')) return <Target className="w-4 h-4" />;
@@ -138,7 +170,7 @@ export default function NotionSidebar() {
       items: databases.map((db) => ({
         id: `db-${db.database_id}`,
         title: db.database_name,
-        icon: getDatabaseIcon(db.database_name),
+        icon: getDatabaseIcon(db),
         href: `/database/${db.database_id}`,
         isDatabase: true,
       })),

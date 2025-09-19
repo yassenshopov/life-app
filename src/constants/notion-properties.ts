@@ -22,7 +22,7 @@ export const NOTION_PROPERTY_TYPES = {
   STATUS: 'status',
 } as const;
 
-export type NotionPropertyType = (typeof NOTION_PROPERTY_TYPES)[keyof typeof NOTionPropertyType];
+export type NotionPropertyType = (typeof NOTION_PROPERTY_TYPES)[keyof typeof NOTION_PROPERTY_TYPES];
 
 // Property type display names
 export const PROPERTY_TYPE_DISPLAY_NAMES: Record<NotionPropertyType, string> = {

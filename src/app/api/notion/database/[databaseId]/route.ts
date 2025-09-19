@@ -11,6 +11,13 @@ interface NotionDatabaseProperties {
       name: string;
     }
   >;
+  icon?: any;
+  cover?: any;
+  description?: any[];
+  created_time?: string;
+  last_edited_time?: string;
+  created_by?: any;
+  last_edited_by?: any;
 }
 
 export async function GET(
@@ -48,6 +55,13 @@ export async function GET(
       const response: NotionDatabaseProperties = {
         title,
         properties: database.properties,
+        icon: (database as any).icon,
+        cover: (database as any).cover,
+        description: (database as any).description,
+        created_time: (database as any).created_time,
+        last_edited_time: (database as any).last_edited_time,
+        created_by: (database as any).created_by,
+        last_edited_by: (database as any).last_edited_by,
       };
 
       return NextResponse.json(response, {
