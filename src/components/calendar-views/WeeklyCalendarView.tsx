@@ -6,6 +6,7 @@ import { CalendarEvent } from '../HQCalendar';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import {
   isToday,
+  isSameDay,
   getEventsForDay,
   getAllDayEventsForDay,
   getTimedEventsForDay,
@@ -30,6 +31,7 @@ interface WeeklyCalendarViewProps {
   onEventClick?: (event: CalendarEvent) => void;
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
+  previewEvent?: CalendarEvent | null;
 }
 
 export function WeeklyCalendarView({
@@ -40,6 +42,7 @@ export function WeeklyCalendarView({
   onEventClick,
   onEventUpdate,
   onEmptySpaceClick,
+  previewEvent,
 }: WeeklyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
@@ -300,6 +303,17 @@ export function WeeklyCalendarView({
                             />
                           );
                         })}
+                        {/* Preview event */}
+                        {previewEvent && !previewEvent.isAllDay && isSameDay(previewEvent.start, day) && (
+                          <AnimatedCalendarEvent
+                            key={previewEvent.id}
+                            event={previewEvent}
+                            style={calculateEventPosition(previewEvent)}
+                            timeFormat={timeFormat}
+                            currentDate={day}
+                            isPreview={true}
+                          />
+                        )}
                       </AnimatePresence>
                     </div>
                   </div>

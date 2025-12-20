@@ -14,6 +14,7 @@ interface AnimatedCalendarEventProps {
   timeFormat: TimeFormat;
   onClick?: (event: CalendarEvent) => void;
   currentDate?: Date; // The date of the column this event is in (for calculating absolute position)
+  isPreview?: boolean;
 }
 
 /**
@@ -25,13 +26,16 @@ export function AnimatedCalendarEvent({
   timeFormat,
   onClick,
   currentDate,
+  isPreview = false,
 }: AnimatedCalendarEventProps) {
   const bgColor = event.color || '#4285f4';
   const textColor = getContrastTextColor(bgColor);
   const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff'; // gray-900 or white
 
   const handleClick = (e: React.MouseEvent) => {
-    onClick?.(event);
+    if (!isPreview) {
+      onClick?.(event);
+    }
   };
 
   const displayStart = event.start;
@@ -40,22 +44,29 @@ export function AnimatedCalendarEvent({
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: -5 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
+      animate={{ 
+        opacity: isPreview ? 0.4 : 1, 
+        scale: 1, 
+        y: 0 
+      }}
       exit={{ opacity: 0, scale: 0.95, y: -5 }}
       transition={{
         duration: 0.2,
         ease: 'easeOut',
       }}
-      whileHover={{ scale: 1.02 }}
+      whileHover={isPreview ? {} : { scale: 1.02 }}
       onClick={handleClick}
       className={cn(
-        "absolute left-1 right-1 rounded px-2 py-1 text-xs pointer-events-auto cursor-pointer",
-        "hover:opacity-90 transition-opacity"
+        "absolute left-1 right-1 rounded px-2 py-1 text-xs pointer-events-auto",
+        isPreview 
+          ? "cursor-default border-2 border-dashed" 
+          : "cursor-pointer hover:opacity-90 transition-opacity"
       )}
       style={{
         ...style,
-        backgroundColor: bgColor,
+        backgroundColor: isPreview ? `${bgColor}40` : bgColor,
         color: textColorValue,
+        borderColor: isPreview ? bgColor : undefined,
       }}
       title={[
         event.title,

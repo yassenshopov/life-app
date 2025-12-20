@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { formatTimeForInput, parseTimeInput } from '@/lib/time-format-utils';
+import { TimePicker } from '@/components/ui/time-picker';
 
 interface NewEventModalProps {
   isOpen: boolean;
@@ -45,6 +47,14 @@ interface NewEventModalProps {
     summary: string;
     color?: string;
   }>;
+  onPreviewChange?: (preview: {
+    title: string;
+    startTime: Date;
+    endTime: Date;
+    isAllDay: boolean;
+    calendarId: string;
+    color?: string;
+  } | null) => void;
 }
 
 /**
@@ -58,6 +68,7 @@ export function NewEventModal({
   initialDate,
   onEventCreate,
   availableCalendars = [],
+  onPreviewChange,
 }: NewEventModalProps) {
   const [title, setTitle] = React.useState('');
   const [isAllDay, setIsAllDay] = React.useState(false);
@@ -107,8 +118,68 @@ export function NewEventModal({
       if (titleRef.current) {
         titleRef.current.textContent = '';
       }
+      onPreviewChange?.(null);
     }
-  }, [isOpen, initialStartTime, initialDate, availableCalendars, selectedCalendarId]);
+  }, [isOpen, initialStartTime, initialDate, availableCalendars, selectedCalendarId, onPreviewChange]);
+
+  // Update preview whenever form fields change
+  const updatePreview = React.useCallback(() => {
+    if (!onPreviewChange || !selectedCalendarId || !startDate || !endDate) {
+      onPreviewChange?.(null);
+      return;
+    }
+
+    try {
+      let newStart: Date;
+      let newEnd: Date;
+
+      if (isAllDay) {
+        newStart = new Date(startDate);
+        newStart.setHours(0, 0, 0, 0);
+        newEnd = new Date(endDate);
+        newEnd.setHours(23, 59, 59, 999);
+      } else {
+        if (!startTime || !endTime) {
+          onPreviewChange?.(null);
+          return;
+        }
+        newStart = new Date(`${startDate}T${startTime}:00`);
+        newEnd = new Date(`${endDate}T${endTime}:00`);
+      }
+
+      if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime()) || newStart >= newEnd) {
+        onPreviewChange?.(null);
+        return;
+      }
+
+      const selectedCal = availableCalendars.find(cal => cal.id === selectedCalendarId);
+      const calendarColor = selectedCal?.color || '#4285f4';
+
+      onPreviewChange({
+        title: title.trim() || 'New Event',
+        startTime: newStart,
+        endTime: newEnd,
+        isAllDay,
+        calendarId: selectedCalendarId,
+        color: calendarColor,
+      });
+    } catch (error) {
+      onPreviewChange?.(null);
+    }
+  }, [title, startDate, startTime, endDate, endTime, isAllDay, selectedCalendarId, availableCalendars, onPreviewChange]);
+
+  // Update preview when relevant fields change
+  React.useEffect(() => {
+    if (isOpen) {
+      // Use requestAnimationFrame to batch updates and prevent infinite loops
+      const rafId = requestAnimationFrame(() => {
+        updatePreview();
+      });
+      return () => cancelAnimationFrame(rafId);
+    } else {
+      onPreviewChange?.(null);
+    }
+  }, [isOpen, title, startDate, startTime, endDate, endTime, isAllDay, selectedCalendarId, updatePreview, onPreviewChange]);
 
   const handleAllDayToggle = (checked: boolean) => {
     setIsAllDay(checked);
@@ -116,6 +187,7 @@ export function NewEventModal({
       setStartTime('00:00');
       setEndTime('23:59');
     }
+    updatePreview();
   };
 
   const handleCreate = async () => {
@@ -200,6 +272,8 @@ export function NewEventModal({
         
         <div className="p-8">
           <DialogHeader className="mb-6">
+            {/* Hidden DialogTitle for accessibility */}
+            <DialogTitle className="sr-only">New Event</DialogTitle>
             {/* Editable title - H1 style */}
             <h1
               ref={titleRef}
@@ -212,10 +286,12 @@ export function NewEventModal({
                 if (!text.trim() && e.currentTarget.textContent) {
                   e.currentTarget.textContent = '';
                 }
+                updatePreview();
               }}
               onInput={(e) => {
                 const text = e.currentTarget.textContent || '';
                 setTitle(text);
+                updatePreview();
               }}
               className="text-3xl font-semibold mb-2 outline-none focus:outline-none focus:ring-0 min-h-[2.5rem] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground"
               data-placeholder="Add title..."
@@ -243,7 +319,10 @@ export function NewEventModal({
                     <Input
                       type="date"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        updatePreview();
+                      }}
                       className="h-7 px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors"
                       style={{ width: '95px', fontSize: '11px' }}
                     />
@@ -256,12 +335,14 @@ export function NewEventModal({
                     <>
                       {/* Start Time */}
                       <div className="relative flex-shrink-0">
-                        <Input
-                          type="time"
+                        <TimePicker
                           value={startTime}
-                          onChange={(e) => setStartTime(e.target.value)}
-                          className="h-7 px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors"
-                          style={{ width: '70px', fontSize: '11px' }}
+                          onChange={(value) => {
+                            setStartTime(value);
+                            updatePreview();
+                          }}
+                          timeFormat={timeFormat}
+                          className="h-7"
                         />
                         <div className="absolute -top-1.5 left-1 px-0.5 bg-background text-[8px] text-muted-foreground whitespace-nowrap">
                           Start time
@@ -278,7 +359,10 @@ export function NewEventModal({
                     <Input
                       type="date"
                       value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      onChange={(e) => {
+                        setEndDate(e.target.value);
+                        updatePreview();
+                      }}
                       className="h-7 px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors"
                       style={{ width: '95px', fontSize: '11px' }}
                     />
@@ -291,12 +375,14 @@ export function NewEventModal({
                     <>
                       {/* End Time */}
                       <div className="relative flex-shrink-0">
-                        <Input
-                          type="time"
+                        <TimePicker
                           value={endTime}
-                          onChange={(e) => setEndTime(e.target.value)}
-                          className="h-7 px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors"
-                          style={{ width: '70px', fontSize: '11px' }}
+                          onChange={(value) => {
+                            setEndTime(value);
+                            updatePreview();
+                          }}
+                          timeFormat={timeFormat}
+                          className="h-7"
                         />
                         <div className="absolute -top-1.5 left-1 px-0.5 bg-background text-[8px] text-muted-foreground whitespace-nowrap">
                           End time
@@ -330,7 +416,18 @@ export function NewEventModal({
                   <Label htmlFor="calendar-select" className="text-sm font-medium text-muted-foreground mb-1 block">
                     Calendar
                   </Label>
-                  <Select value={selectedCalendarId} onValueChange={setSelectedCalendarId}>
+                  <Select 
+                    value={selectedCalendarId} 
+                    onValueChange={(value) => {
+                      if (value !== selectedCalendarId) {
+                        setSelectedCalendarId(value);
+                        // Use requestAnimationFrame to prevent infinite loop
+                        requestAnimationFrame(() => {
+                          updatePreview();
+                        });
+                      }
+                    }}
+                  >
                     <SelectTrigger className="w-full h-10">
                       <SelectValue placeholder="Select a calendar" />
                     </SelectTrigger>

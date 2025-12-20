@@ -88,6 +88,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   const [availableCalendars, setAvailableCalendars] = React.useState<
     Array<{ id: string; summary: string; color?: string }>
   >([]);
+  const [previewEvent, setPreviewEvent] = React.useState<CalendarEvent | null>(null);
 
   const handleEventClick = (event: CalendarEvent) => {
     console.log('handleEventClick - Event data:', {
@@ -526,6 +527,32 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         case 's':
           setViewMode('schedule');
           break;
+        case 't':
+          // Go to today - inline to avoid dependency issues
+          const today = new Date();
+          if (viewMode === 'weekly') {
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(today);
+            monday.setDate(diff);
+            monday.setHours(0, 0, 0, 0);
+            setCurrentDate(monday);
+          } else if (viewMode === 'daily') {
+            const date = new Date(today);
+            date.setHours(0, 0, 0, 0);
+            setCurrentDate(date);
+          } else if (viewMode === 'monthly') {
+            const date = new Date(today.getFullYear(), today.getMonth(), 1);
+            setCurrentDate(date);
+          } else if (viewMode === 'year') {
+            const date = new Date(today.getFullYear(), 0, 1);
+            setCurrentDate(date);
+          } else if (viewMode === 'schedule') {
+            const date = new Date(today);
+            date.setHours(0, 0, 0, 0);
+            setCurrentDate(date);
+          }
+          break;
       }
     };
 
@@ -533,7 +560,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [viewMode]);
 
   const goToToday = () => {
     const today = new Date();
@@ -745,6 +772,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               onEventClick={handleEventClick}
               onEventUpdate={handleEventUpdate}
               onEmptySpaceClick={handleEmptySpaceClick}
+              previewEvent={previewEvent}
             />
           )}
           {viewMode === 'weekly' && (
@@ -756,6 +784,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               onEventClick={handleEventClick}
               onEventUpdate={handleEventUpdate}
               onEmptySpaceClick={handleEmptySpaceClick}
+              previewEvent={previewEvent}
             />
           )}
           {viewMode === 'monthly' && (
@@ -805,12 +834,30 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           setIsNewEventModalOpen(false);
           setNewEventInitialTime(undefined);
           setNewEventInitialDate(undefined);
+          setPreviewEvent(null);
         }}
         timeFormat={timeFormat}
         initialStartTime={newEventInitialTime}
         initialDate={newEventInitialDate}
         onEventCreate={handleEventCreate}
         availableCalendars={availableCalendars}
+        onPreviewChange={(preview) => {
+          if (!preview) {
+            setPreviewEvent(null);
+            return;
+          }
+          // Convert preview to CalendarEvent format
+          const calendarEvent: CalendarEvent = {
+            id: 'preview-' + Date.now(),
+            title: preview.title,
+            start: preview.startTime,
+            end: preview.endTime,
+            color: preview.color || '#4285f4',
+            calendarId: preview.calendarId,
+            isAllDay: preview.isAllDay,
+          };
+          setPreviewEvent(calendarEvent);
+        }}
       />
     </Card>
   );

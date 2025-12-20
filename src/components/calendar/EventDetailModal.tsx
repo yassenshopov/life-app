@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { formatTimeForInput } from '@/lib/time-format-utils';
+import { TimePicker } from '@/components/ui/time-picker';
 
 interface EventDetailModalProps {
   event: CalendarEvent | null;
@@ -61,14 +63,8 @@ export function EventDetailModal({
       setStartDate(start.toISOString().split('T')[0]);
       setEndDate(end.toISOString().split('T')[0]);
       
-      // Format for time input (HH:mm)
-      const formatTime = (date: Date) => {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-      };
-      setStartTime(formatTime(start));
-      setEndTime(formatTime(end));
+      setStartTime(formatTimeForInput(start));
+      setEndTime(formatTimeForInput(end));
     }
   }, [event, isEditing]);
 
@@ -166,13 +162,8 @@ export function EventDetailModal({
       const end = new Date(event.end);
       setStartDate(start.toISOString().split('T')[0]);
       setEndDate(end.toISOString().split('T')[0]);
-      const formatTime = (date: Date) => {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-      };
-      setStartTime(formatTime(start));
-      setEndTime(formatTime(end));
+      setStartTime(formatTimeForInput(start));
+      setEndTime(formatTimeForInput(end));
     }
     setIsEditing(false);
   };
@@ -325,12 +316,11 @@ export function EventDetailModal({
                         <>
                           {/* Start Time */}
                           <div className="relative">
-                            <Input
-                              type="time"
+                            <TimePicker
                               value={startTime}
-                              onChange={(e) => setStartTime(e.target.value)}
-                              className="h-10 px-3 py-2 bg-background border rounded-md text-sm font-medium cursor-pointer hover:bg-accent transition-colors"
-                              style={{ minWidth: '100px' }}
+                              onChange={setStartTime}
+                              timeFormat={timeFormat}
+                              className="h-10"
                             />
                             <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
                               Start time
@@ -342,12 +332,11 @@ export function EventDetailModal({
 
                           {/* End Time */}
                           <div className="relative">
-                            <Input
-                              type="time"
+                            <TimePicker
                               value={endTime}
-                              onChange={(e) => setEndTime(e.target.value)}
-                              className="h-10 px-3 py-2 bg-background border rounded-md text-sm font-medium cursor-pointer hover:bg-accent transition-colors"
-                              style={{ minWidth: '100px' }}
+                              onChange={setEndTime}
+                              timeFormat={timeFormat}
+                              className="h-10"
                             />
                             <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
                               End time

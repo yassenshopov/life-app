@@ -167,10 +167,33 @@ export async function POST(req: Request) {
       ? new Date(googleEvent.end.date + 'T00:00:00Z')
       : new Date(googleEvent.end.dateTime);
 
-    // Get calendar color
-    const calendarList = await calendar.calendarList.list();
-    const calendarInfo = calendarList.data.items?.find((cal: any) => cal.id === calendarId);
-    const color = calendarInfo?.backgroundColor || '#4285f4';
+    // Get calendar color - try from cached calendars first to avoid extra API call
+    let color = '#4285f4';
+    try {
+      const { data: cachedCalendar } = await supabase
+        .from('google_calendars')
+        .select('background_color')
+        .eq('user_id', userId)
+        .eq('calendar_id', calendarId)
+        .single();
+      
+      if (cachedCalendar?.background_color) {
+        color = cachedCalendar.background_color;
+      } else {
+        // Fallback: try to get from API (but don't fail if it doesn't work)
+        try {
+          const calendarList = await calendar.calendarList.list();
+          const calendarInfo = calendarList.data.items?.find((cal: any) => cal.id === calendarId);
+          color = calendarInfo?.backgroundColor || '#4285f4';
+        } catch (error) {
+          console.warn('Could not fetch calendar color from API, using default:', error);
+          // Use default color, don't fail the request
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch calendar color, using default:', error);
+      // Use default color, don't fail the request
+    }
 
     const { error: insertError } = await supabase
       .from('google_calendar_events')

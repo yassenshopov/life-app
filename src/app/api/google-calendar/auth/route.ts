@@ -38,10 +38,12 @@ export async function GET() {
     const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
     // Generate the auth URL
-    // Include write permissions for updating events
+    // Request all calendar scopes to avoid insufficient authentication errors
     const scopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/calendar', // Full calendar access (read/write)
+      'https://www.googleapis.com/auth/calendar.events', // Full event access (read/write)
+      'https://www.googleapis.com/auth/calendar.readonly', // Read-only access (for compatibility)
+      'https://www.googleapis.com/auth/calendar.settings.readonly', // Calendar settings read
     ];
 
     const authUrl = oauth2Client.generateAuthUrl({
