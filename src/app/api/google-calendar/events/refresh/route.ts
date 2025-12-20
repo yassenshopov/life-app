@@ -198,6 +198,9 @@ export async function POST(req: Request) {
           end = new Date(event.end.dateTime);
         }
 
+        // Get color for the event
+        const color = getColorFromColorId(event.colorId, calendarColor);
+
         return {
           user_id: userId,
           calendar_id: calendarId,

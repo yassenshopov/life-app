@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -199,60 +200,103 @@ export function EntryPeekModal({
 
   if (!entry) return null;
 
-  // Sort properties: title first, then others
-  const sortedProperties = Object.entries(properties).sort(([, propA], [, propB]) => {
-    if (propA.type === NOTION_PROPERTY_TYPES.TITLE) return -1;
-    if (propB.type === NOTION_PROPERTY_TYPES.TITLE) return 1;
-    return propA.name.localeCompare(propB.name);
-  });
+  // Filter out metadata properties and sort: title first, then others
+  const sortedProperties = Object.entries(properties)
+    .filter(([, prop]) => {
+      // Exclude metadata properties
+      return (
+        prop.type !== NOTION_PROPERTY_TYPES.CREATED_TIME &&
+        prop.type !== NOTION_PROPERTY_TYPES.CREATED_BY &&
+        prop.type !== NOTION_PROPERTY_TYPES.LAST_EDITED_TIME &&
+        prop.type !== NOTION_PROPERTY_TYPES.LAST_EDITED_BY
+      );
+    })
+    .sort(([, propA], [, propB]) => {
+      if (propA.type === NOTION_PROPERTY_TYPES.TITLE) return -1;
+      if (propB.type === NOTION_PROPERTY_TYPES.TITLE) return 1;
+      return propA.name.localeCompare(propB.name);
+    });
+
+  // Animation variants for modal content
+  const contentVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        delay: 0.1,
+        staggerChildren: 0.05,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.2,
+      },
+    },
+  };
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle className="text-xl font-semibold">Entry Details</DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <Share className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
+          <motion.div
+            variants={contentVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
+            <DialogHeader className="flex flex-row items-center justify-between">
+              <DialogTitle className="text-xl font-semibold">Entry Details</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Share className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onClose}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {sortedProperties.map(([propertyKey, property]) => {
-              const value = getPropertyValue(propertyKey, property);
-              const isTitle = property.type === NOTION_PROPERTY_TYPES.TITLE;
+            <div className="space-y-6 py-4">
+              {sortedProperties.map(([propertyKey, property], index) => {
+                const value = getPropertyValue(propertyKey, property);
+                const isTitle = property.type === NOTION_PROPERTY_TYPES.TITLE;
 
-              return (
-                <div key={propertyKey} className="space-y-2">
-                  <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                return (
+                  <motion.div
+                    key={propertyKey}
+                    variants={itemVariants}
+                    className="space-y-2"
+                  >
+                    <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      {isTitle ? (
+                        <Star className="h-4 w-4" />
+                      ) : property.type === NOTION_PROPERTY_TYPES.DATE ? (
+                        <Calendar className="h-4 w-4" />
+                      ) : property.type === NOTION_PROPERTY_TYPES.PEOPLE ? (
+                        <User className="h-4 w-4" />
+                      ) : property.type === NOTION_PROPERTY_TYPES.MULTI_SELECT ? (
+                        <Tag className="h-4 w-4" />
+                      ) : property.type === NOTION_PROPERTY_TYPES.SELECT ? (
+                        <List className="h-4 w-4" />
+                      ) : (
+                        <ArrowUpRight className="h-4 w-4" />
+                      )}
+                      {property.name}
+                    </Label>
+
                     {isTitle ? (
-                      <Star className="h-4 w-4" />
-                    ) : property.type === NOTION_PROPERTY_TYPES.DATE ? (
-                      <Calendar className="h-4 w-4" />
-                    ) : property.type === NOTION_PROPERTY_TYPES.PEOPLE ? (
-                      <User className="h-4 w-4" />
-                    ) : property.type === NOTION_PROPERTY_TYPES.MULTI_SELECT ? (
-                      <Tag className="h-4 w-4" />
-                    ) : property.type === NOTION_PROPERTY_TYPES.SELECT ? (
-                      <List className="h-4 w-4" />
-                    ) : (
-                      <ArrowUpRight className="h-4 w-4" />
-                    )}
-                    {property.name}
-                  </Label>
-
-                  {isTitle ? (
                     <div className="space-y-2">
                       <div className="relative">
                         <div
@@ -387,40 +431,44 @@ export function EntryPeekModal({
                       onBlur={handleSave}
                     />
                   )}
-                </div>
-              );
-            })}
-          </div>
+                  </motion.div>
+                );
+              })}
+            </div>
 
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div className="flex items-center gap-2">
-              <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-2">
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              {hasChanges && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={isUpdating}
-                  className="gap-2"
-                >
-                  {isUpdating ? (
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save
+            <motion.div
+              variants={itemVariants}
+              className="flex items-center justify-between pt-4 border-t"
+            >
+              <div className="flex items-center gap-2">
+                <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Delete
                 </Button>
-              )}
-              <Button variant="outline" onClick={onClose}>
-                Close
-              </Button>
-            </div>
-          </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasChanges && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={isUpdating}
+                    className="gap-2"
+                  >
+                    {isUpdating ? (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Save
+                  </Button>
+                )}
+                <Button variant="outline" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
         </DialogContent>
       </Dialog>
 

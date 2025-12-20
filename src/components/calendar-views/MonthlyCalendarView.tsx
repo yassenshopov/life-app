@@ -77,7 +77,7 @@ export function MonthlyCalendarView({
           {/* Weekday headers - Fixed */}
           <div
             className="grid border-b sticky top-0 z-10 bg-background"
-            style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}
+            style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
           >
             {weekDays.map((day, index) => (
               <div
@@ -95,7 +95,7 @@ export function MonthlyCalendarView({
       <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="min-w-[800px]">
-            <div className="grid relative" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            <div className="grid relative" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
               {weeks.map((week, weekIndex) =>
                 week.map((day, dayIndex) => {
                   const dayEvents = day ? getEventsForDay(events, day) : [];
@@ -103,16 +103,23 @@ export function MonthlyCalendarView({
                     <div
                       key={`${weekIndex}-${dayIndex}`}
                       className={cn(
-                        'border-r border-b min-h-[100px] p-2 relative',
+                        'border-r border-b min-h-[100px] p-2 relative min-w-0',
                         isToday(day) && 'bg-blue-50 dark:bg-blue-950/20'
                       )}
                     >
                       <div
                         className={cn(
-                          'text-sm font-semibold mb-1',
+                          'text-sm font-semibold mb-1 cursor-pointer hover:underline',
                           isToday(day) && 'text-blue-600 dark:text-blue-400',
                           !isCurrentMonth(day) && 'text-muted-foreground opacity-50'
                         )}
+                        onClick={(e) => {
+                          if (day) {
+                            e.stopPropagation();
+                            // Pass a second parameter to indicate we want to switch to weekly view
+                            onNavigate(day, true);
+                          }
+                        }}
                       >
                         {day ? day.getDate() : ''}
                       </div>

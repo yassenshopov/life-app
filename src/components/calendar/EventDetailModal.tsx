@@ -38,13 +38,16 @@ export function EventDetailModal({
   timeFormat,
   onEventUpdate,
 }: EventDetailModalProps) {
-  if (!event) return null;
-
+  // All hooks must be called before any early returns
   const [isEditing, setIsEditing] = React.useState(false);
-  const [editedStart, setEditedStart] = React.useState<Date>(new Date(event.start));
-  const [editedEnd, setEditedEnd] = React.useState<Date>(new Date(event.end));
+  const [editedStart, setEditedStart] = React.useState<Date>(() => 
+    event ? new Date(event.start) : new Date()
+  );
+  const [editedEnd, setEditedEnd] = React.useState<Date>(() => 
+    event ? new Date(event.end) : new Date()
+  );
   const [isSaving, setIsSaving] = React.useState(false);
-  const [isAllDayEdit, setIsAllDayEdit] = React.useState(event.isAllDay || false);
+  const [isAllDayEdit, setIsAllDayEdit] = React.useState(() => event?.isAllDay || false);
   const [startDate, setStartDate] = React.useState<string>('');
   const [startTime, setStartTime] = React.useState<string>('');
   const [endDate, setEndDate] = React.useState<string>('');
@@ -67,6 +70,9 @@ export function EventDetailModal({
       setEndTime(formatTimeForInput(end));
     }
   }, [event, isEditing]);
+
+  // Early return after all hooks
+  if (!event) return null;
 
   // Handle all-day toggle
   const handleAllDayToggle = (checked: boolean) => {
@@ -701,28 +707,6 @@ export function EventDetailModal({
                   </div>
                   <div className="text-base capitalize">
                     {event.transparency === 'transparent' ? 'Shows as available' : event.transparency}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Created/Updated timestamps */}
-            {(event.created || event.updated) && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <div className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Metadata
-                  </div>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    {event.created && (
-                      <div>Created: {format(event.created, 'PPpp')}</div>
-                    )}
-                    {event.updated && (
-                      <div>Updated: {format(event.updated, 'PPpp')}</div>
-                    )}
                   </div>
                 </div>
               </div>

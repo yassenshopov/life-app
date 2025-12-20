@@ -674,7 +674,19 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     return '';
   };
 
-  const handleNavigate = (date: Date) => {
+  const handleNavigate = (date: Date, switchToWeekly?: boolean) => {
+    // If switchToWeekly is true (clicked day number in monthly view), switch to weekly view
+    if (switchToWeekly && viewMode === 'monthly') {
+      setViewMode('weekly');
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(date);
+      monday.setDate(diff);
+      monday.setHours(0, 0, 0, 0);
+      setCurrentDate(monday);
+      return;
+    }
+
     if (viewMode === 'weekly') {
       const day = date.getDay();
       const diff = date.getDate() - day + (day === 0 ? -6 : 1);
@@ -702,8 +714,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   return (
     <Card className="w-full">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle>HQ Calendar</CardTitle>
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             <Select
               value={viewMode}
