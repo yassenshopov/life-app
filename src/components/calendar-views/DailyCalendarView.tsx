@@ -1,0 +1,257 @@
+'use client';
+
+import * as React from 'react';
+import { cn } from '@/lib/utils';
+import { CalendarEvent } from '../HQCalendar';
+import { TimeFormat } from '@/components/CalendarSettingsDialog';
+import {
+  isToday,
+  getEventsForDay,
+  getAllDayEventsForDay,
+  getTimedEventsForDay,
+  calculateEventPosition,
+  formatTime,
+  formatEventTime,
+  generateTimeSlots,
+} from '@/lib/calendar-utils';
+import { CurrentTimeIndicator } from '@/components/calendar/CurrentTimeIndicator';
+import { AnimatedCalendarEvent } from '@/components/calendar/AnimatedCalendarEvent';
+import { AllDayEvents } from '@/components/calendar/AllDayEvents';
+import { AnimatePresence } from 'framer-motion';
+
+interface DailyCalendarViewProps {
+  currentDate: Date;
+  events: CalendarEvent[];
+  timeFormat: TimeFormat;
+  onNavigate: (date: Date) => void;
+}
+
+export function DailyCalendarView({
+  currentDate,
+  events,
+  timeFormat,
+  onNavigate,
+}: DailyCalendarViewProps) {
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  
+  // Smooth scrolling implementation
+  React.useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let isScrolling = false;
+    let scrollTimeout: NodeJS.Timeout;
+    let targetScrollTop = container.scrollTop;
+
+    const smoothScroll = () => {
+      if (Math.abs(container.scrollTop - targetScrollTop) < 1) {
+        container.scrollTop = targetScrollTop;
+        isScrolling = false;
+        return;
+      }
+
+      const diff = targetScrollTop - container.scrollTop;
+      container.scrollTop += diff * 0.1; // Smooth easing factor
+      requestAnimationFrame(smoothScroll);
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      
+      targetScrollTop += e.deltaY;
+      targetScrollTop = Math.max(0, Math.min(targetScrollTop, container.scrollHeight - container.clientHeight));
+
+      if (!isScrolling) {
+        isScrolling = true;
+        smoothScroll();
+      }
+
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling = false;
+      }, 150);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // Allow native touch scrolling but make it smoother
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const currentScroll = container.scrollTop;
+        const delta = touch.clientY - (container as any).lastTouchY;
+        (container as any).lastTouchY = touch.clientY;
+        
+        targetScrollTop = currentScroll - delta;
+        targetScrollTop = Math.max(0, Math.min(targetScrollTop, container.scrollHeight - container.clientHeight));
+        
+        if (!isScrolling) {
+          isScrolling = true;
+          smoothScroll();
+        }
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        (container as any).lastTouchY = e.touches[0].clientY;
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+
+    return () => {
+      clearTimeout(scrollTimeout);
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchstart', handleTouchStart);
+    };
+  }, []);
+  
+  // Scroll to current time if viewing today
+  React.useEffect(() => {
+    if (!scrollContainerRef.current || !isToday(currentDate)) return;
+
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const pixelsPerMinute = 45 / 60;
+    const position = minutes * pixelsPerMinute;
+    const scrollPosition = Math.max(0, position - 200);
+
+    // Use smooth scroll animation
+    const container = scrollContainerRef.current;
+    const startScroll = container.scrollTop;
+    const targetScroll = scrollPosition;
+    const duration = 500;
+    const startTime = Date.now();
+
+    const animateScroll = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+      
+      container.scrollTop = startScroll + (targetScroll - startScroll) * ease;
+      
+      if (progress < 1) {
+        requestAnimationFrame(animateScroll);
+      }
+    };
+
+    requestAnimationFrame(animateScroll);
+  }, [currentDate]);
+
+  // Time slots from midnight (00:00) to 11 PM
+  const timeSlots = React.useMemo(() => generateTimeSlots(), []);
+
+  // Get all-day and timed events separately
+  const allDayEvents = React.useMemo(
+    () => getAllDayEventsForDay(events, currentDate),
+    [events, currentDate]
+  );
+  
+  const timedEvents = React.useMemo(
+    () => getTimedEventsForDay(events, currentDate),
+    [events, currentDate]
+  );
+
+  const dateString = currentDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return (
+    <div className="flex flex-col h-[600px]">
+      <div className="overflow-x-auto">
+        <div className="min-w-[400px]">
+          {/* Day header - Fixed */}
+          <div className="grid border-b sticky top-0 z-10 bg-background" style={{ gridTemplateColumns: '60px 1fr' }}>
+            <div className="border-r p-2 bg-background text-foreground">
+              <div className="text-xs text-muted-foreground font-medium mb-1">All Day</div>
+            </div>
+            <div
+              className={cn(
+                'border-r flex flex-col',
+                isToday(currentDate) && 'bg-blue-50 dark:bg-blue-950/20'
+              )}
+            >
+              <div className="p-2 text-center">
+                <div className="text-xs text-muted-foreground font-medium">{dateString}</div>
+              </div>
+              {/* All-day events */}
+              {allDayEvents.length > 0 && (
+                <AllDayEvents events={allDayEvents} className="flex-1" />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Calendar grid - Scrollable */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar"
+      >
+        <div className="overflow-x-auto hide-scrollbar">
+          <div className="min-w-[400px]">
+            <div className="grid relative" style={{ gridTemplateColumns: '60px 1fr' }}>
+              {/* Time column */}
+              <div className="border-r bg-background text-primary">
+                {timeSlots.map((hour) => (
+                  <div
+                    key={hour}
+                    className="border-b border-foreground/20 h-[45px] relative px-2"
+                    style={{ minHeight: '45px' }}
+                  >
+                    <div className="absolute -top-2 right-2 text-xs text-foreground font-medium bg-background px-2">
+                      {formatTime(hour, timeFormat)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Day column */}
+              <div
+                className={cn(
+                  'border-r relative',
+                  isToday(currentDate) && 'bg-blue-50/30 dark:bg-blue-950/10'
+                )}
+              >
+                {/* Time slot grid */}
+                {timeSlots.map((hour) => (
+                  <div
+                    key={hour}
+                    className="border-b h-[45px] relative"
+                    style={{ minHeight: '45px' }}
+                  />
+                ))}
+
+                {/* Current time indicator */}
+                <CurrentTimeIndicator currentDate={currentDate} />
+
+                {/* Events */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <AnimatePresence>
+                    {timedEvents.map((event) => {
+                      const style = calculateEventPosition(event);
+                      return (
+                        <AnimatedCalendarEvent
+                          key={event.id}
+                          event={event}
+                          style={style}
+                          timeFormat={timeFormat}
+                        />
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

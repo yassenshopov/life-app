@@ -57,6 +57,7 @@ A comprehensive health tracking dashboard built with Next.js that helps users mo
 - [Next.js 14](https://nextjs.org) - React framework
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 - [Supabase](https://supabase.com) - Authentication & Database
+- [Prisma](https://www.prisma.io) - Database ORM
 - [Notion API](https://developers.notion.com) - Data storage & sync
 - [Tailwind CSS](https://tailwindcss.com) - Styling
 - [Lucide Icons](https://lucide.dev) - UI Icons
@@ -96,13 +97,36 @@ cp .env.example .env.local
 Add your Supabase and Notion credentials to `.env.local`:
 
 ```
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Prisma Database Connection (Supabase PostgreSQL connection string)
+DATABASE_URL=postgresql://user:password@host:port/database?schema=public
+
+# Notion
 NOTION_API_KEY=your_notion_api_key
 NOTION_DATABASE_ID=your_notion_database_id
 ```
 
-4. Start the development server:
+4. Set up the database:
+
+Run the migration files from `supabase/migrations/` in your Supabase SQL editor, starting with `0001_initial_schema.sql`.
+
+Alternatively, you can use Prisma to push the schema:
+
+```bash
+npm run prisma:push
+```
+
+Generate Prisma Client:
+
+```bash
+npm run prisma:generate
+```
+
+5. Start the development server:
 
 ```bash
 npm run dev

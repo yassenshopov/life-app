@@ -283,6 +283,26 @@ export default function NotionSidebar() {
   const sections: SidebarSection[] = React.useMemo(
     () => [
       {
+        id: 'pages',
+        title: 'Pages',
+        icon: <ChevronRight className="w-4 h-4" />,
+        collapsible: false,
+        items: [
+          {
+            id: 'hq',
+            title: 'Mission HQ',
+            icon: <Target className="w-4 h-4" />,
+            href: '/hq',
+          },
+          {
+            id: 'dashboard',
+            title: 'Health Dashboard',
+            icon: <BarChart3 className="w-4 h-4" />,
+            href: '/dashboard',
+          },
+        ],
+      },
+      {
         id: 'databases',
         title: 'Connected Databases',
         icon: <Database className="w-4 h-4" />,

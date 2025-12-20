@@ -23,7 +23,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (isSignedIn) {
-      router.push('/dashboard');
+      router.push('/hq');
     }
   }, [isSignedIn, router]);
 
