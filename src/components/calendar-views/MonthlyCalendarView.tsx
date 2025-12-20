@@ -4,17 +4,20 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
 import { getEventsForDay } from '@/lib/calendar-utils';
+import { getContrastTextColor } from '@/lib/color-utils';
 
 interface MonthlyCalendarViewProps {
   currentMonth: Date;
   events: CalendarEvent[];
   onNavigate: (date: Date) => void;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
 export function MonthlyCalendarView({
   currentMonth,
   events,
   onNavigate,
+  onEventClick,
 }: MonthlyCalendarViewProps) {
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -114,19 +117,32 @@ export function MonthlyCalendarView({
                         {day ? day.getDate() : ''}
                       </div>
                       <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map((event) => (
-                          <div
-                            key={event.id}
-                            className="text-xs px-2 py-0.5 rounded text-white truncate cursor-pointer hover:opacity-90"
-                            style={{ backgroundColor: event.color || '#4285f4' }}
-                            title={`${event.title} - ${event.start.toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}`}
-                          >
-                            {event.title}
-                          </div>
-                        ))}
+                        {dayEvents.slice(0, 3).map((event) => {
+                          const eventColor = event.color || '#4285f4';
+                          const textColor = getContrastTextColor(eventColor);
+                          const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
+                          
+                          return (
+                            <div
+                              key={event.id}
+                              className="text-xs px-2 py-0.5 rounded truncate cursor-pointer hover:opacity-90"
+                              style={{ 
+                                backgroundColor: eventColor,
+                                color: textColorValue,
+                              }}
+                              title={`${event.title} - ${event.start.toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEventClick?.(event);
+                              }}
+                            >
+                              {event.title}
+                            </div>
+                          );
+                        })}
                         {dayEvents.length > 3 && (
                           <div className="text-xs text-muted-foreground">
                             +{dayEvents.length - 3} more

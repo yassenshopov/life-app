@@ -21,6 +21,33 @@ interface GoogleCalendarCredentials {
   expiry_date?: number;
 }
 
+/**
+ * Map Google Calendar colorId to hex color
+ * Google Calendar uses predefined color IDs (1-11) that map to specific colors
+ */
+function getColorFromColorId(colorId: string | undefined | null, calendarColor: string): string {
+  if (!colorId) {
+    return calendarColor; // Fall back to calendar color if no event-specific color
+  }
+
+  // Google Calendar color ID to hex mapping
+  const colorMap: Record<string, string> = {
+    '1': '#a4bdfc', // Lavender
+    '2': '#7ae7bf', // Sage
+    '3': '#dbadff', // Grape
+    '4': '#ff887c', // Flamingo
+    '5': '#fbd75b', // Banana
+    '6': '#ffb878', // Tangerine
+    '7': '#46d6db', // Peacock
+    '8': '#e1e1e1', // Graphite
+    '9': '#5484ed', // Blueberry
+    '10': '#51b749', // Basil
+    '11': '#dc2127', // Tomato
+  };
+
+  return colorMap[colorId] || calendarColor; // Fall back to calendar color if colorId not recognized
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -102,7 +129,7 @@ export async function POST(req: Request) {
     const calendarList = await calendar.calendarList.list();
     const calInfo = calendarList.data.items?.find((cal: any) => cal.id === calendarId);
     const backgroundColor = calInfo?.backgroundColor || '#4285f4';
-    const color = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
+    const calendarColor = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
 
     // Fetch ALL events - use a wide time range (configurable, default: 10 years past to 10 years future)
     // Google Calendar API requires timeMin and timeMax, so we use a wide range

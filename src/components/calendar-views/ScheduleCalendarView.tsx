@@ -12,6 +12,7 @@ interface ScheduleCalendarViewProps {
   events: CalendarEvent[];
   timeFormat: TimeFormat;
   onNavigate: (date: Date) => void;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
 export function ScheduleCalendarView({
@@ -19,6 +20,7 @@ export function ScheduleCalendarView({
   events,
   timeFormat,
   onNavigate,
+  onEventClick,
 }: ScheduleCalendarViewProps) {
   // Get events for the next 30 days, grouped by day
   const groupedEvents = React.useMemo(() => {
@@ -153,7 +155,14 @@ export function ScheduleCalendarView({
                           borderLeftColor: eventColor,
                           backgroundColor: `${eventColor}08`, // Very light tint
                         }}
-                        onClick={() => onNavigate(new Date(event.start))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onEventClick) {
+                            onEventClick(event);
+                          } else {
+                            onNavigate(new Date(event.start));
+                          }
+                        }}
                       >
                         {/* Colored indicator bar */}
                         <div

@@ -21,6 +21,33 @@ interface GoogleCalendarCredentials {
   expiry_date?: number;
 }
 
+/**
+ * Map Google Calendar colorId to hex color
+ * Google Calendar uses predefined color IDs (1-11) that map to specific colors
+ */
+function getColorFromColorId(colorId: string | undefined | null, calendarColor: string): string {
+  if (!colorId) {
+    return calendarColor; // Fall back to calendar color if no event-specific color
+  }
+
+  // Google Calendar color ID to hex mapping
+  const colorMap: Record<string, string> = {
+    '1': '#a4bdfc', // Lavender
+    '2': '#7ae7bf', // Sage
+    '3': '#dbadff', // Grape
+    '4': '#ff887c', // Flamingo
+    '5': '#fbd75b', // Banana
+    '6': '#ffb878', // Tangerine
+    '7': '#46d6db', // Peacock
+    '8': '#e1e1e1', // Graphite
+    '9': '#5484ed', // Blueberry
+    '10': '#51b749', // Basil
+    '11': '#dc2127', // Tomato
+  };
+
+  return colorMap[colorId] || calendarColor; // Fall back to calendar color if colorId not recognized
+}
+
 export async function GET(req: Request) {
   try {
     const { userId } = await auth();
@@ -229,7 +256,7 @@ export async function GET(req: Request) {
             title: event.title,
             start,
             end,
-            color: event.color || '#4285f4',
+            color: event.color || '#4285f4', // This already has the event-specific color if it was set
             calendar: event.organizer_display_name || event.calendar_id,
             calendarId: event.calendar_id, // Include the actual calendar ID
             // Use column value if available, otherwise fallback to event_data
@@ -385,9 +412,11 @@ export async function GET(req: Request) {
           backgroundColor = calInfo?.backgroundColor || '#4285f4';
         }
         
-        const color = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
+        const calendarColor = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
 
         const events = (response.data.items || []).map((event: any) => {
+          // Check if event has its own colorId, otherwise use calendar color
+          const eventColor = getColorFromColorId(event.colorId, calendarColor);
           // Check if it's an all-day event (has date but no dateTime)
           const isAllDay = !event.start?.dateTime && !!event.start?.date;
           
@@ -424,7 +453,7 @@ export async function GET(req: Request) {
             start_date: startDate,
             end_date: endDate,
             is_all_day: isAllDay,
-            color,
+            color: eventColor, // Use event-specific color if available, otherwise calendar color
             description: event.description || null,
             location: event.location || null,
             organizer_email: event.organizer?.email || null,

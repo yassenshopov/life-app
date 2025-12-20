@@ -15,6 +15,10 @@ interface AnimatedCalendarEventProps {
   onClick?: (event: CalendarEvent) => void;
   currentDate?: Date; // The date of the column this event is in (for calculating absolute position)
   isPreview?: boolean;
+  touchingEvents?: {
+    top?: boolean; // Event touches this one from above
+    bottom?: boolean; // Event touches this one from below
+  };
 }
 
 /**
@@ -27,6 +31,7 @@ export function AnimatedCalendarEvent({
   onClick,
   currentDate,
   isPreview = false,
+  touchingEvents,
 }: AnimatedCalendarEventProps) {
   const bgColor = event.color || '#4285f4';
   const textColor = getContrastTextColor(bgColor);
@@ -51,6 +56,13 @@ export function AnimatedCalendarEvent({
   // For multi-day events, show only the portion visible on this day
   const displayStart = eventStart > dayStart ? eventStart : dayStart;
   const displayEnd = eventEnd < dayEnd ? eventEnd : dayEnd;
+  
+  // Always show the original event start time (not the portion start time)
+  const timeToDisplay = eventStart;
+  
+  // Calculate event duration in minutes to determine if we should show description/location
+  const durationMinutes = (displayEnd.getTime() - displayStart.getTime()) / (1000 * 60);
+  const showExtraInfo = durationMinutes > 60; // Only show if > 1 hour (not exactly 1 hour)
 
   return (
     <motion.div
@@ -65,10 +77,16 @@ export function AnimatedCalendarEvent({
         duration: 0.2,
         ease: 'easeOut',
       }}
-      whileHover={isPreview ? {} : { scale: 1.02 }}
       onClick={handleClick}
       className={cn(
-        "absolute left-1 right-1 rounded px-2 py-1 text-xs pointer-events-auto",
+        "absolute left-1 right-1 px-2 text-xs pointer-events-auto overflow-hidden",
+        // Less padding for short events (<=1hr)
+        showExtraInfo ? "py-1" : "py-0.5",
+        // Apply rounded corners conditionally based on touching events
+        !touchingEvents?.top && !touchingEvents?.bottom && "rounded",
+        !touchingEvents?.top && touchingEvents?.bottom && "rounded-t",
+        touchingEvents?.top && !touchingEvents?.bottom && "rounded-b",
+        // No rounded corners if touching both sides
         isPreview 
           ? "cursor-default border-2 border-dashed" 
           : "cursor-pointer hover:opacity-90 transition-opacity"
@@ -87,15 +105,30 @@ export function AnimatedCalendarEvent({
       ].filter(Boolean).join(' - ')}
     >
       {/* Event content */}
-      <div className="event-content">
-        <div className="font-medium truncate" style={{ color: textColorValue }}>
+      <div className="event-content overflow-hidden">
+        <div 
+          className={cn(
+            "font-medium",
+            showExtraInfo 
+              ? "text-xs break-words" // Allow wrapping for >1hr events
+              : "text-[10px] truncate" // Single line truncate for <=1hr events
+          )} 
+          style={{ 
+            color: textColorValue,
+            wordBreak: showExtraInfo ? 'break-word' : undefined,
+            overflowWrap: showExtraInfo ? 'break-word' : undefined,
+          }}
+        >
           {event.title}
         </div>
-        <div className="text-[10px] opacity-90" style={{ color: textColorValue }}>
-          {formatEventTime(displayStart, timeFormat)}
+        <div 
+          className={cn("opacity-90 truncate", showExtraInfo ? "text-[10px]" : "text-[9px]")} 
+          style={{ color: textColorValue }}
+        >
+          {formatEventTime(timeToDisplay, timeFormat)}
         </div>
-        {/* Location or Description */}
-        {(event.location || event.description) && (
+        {/* Location or Description - only show if event is >= 1 hour */}
+        {showExtraInfo && (event.location || event.description) && (
           <div className="text-[10px] opacity-75 mt-0.5 truncate" style={{ color: textColorValue }}>
             {event.location ? (
               <span className="flex items-center gap-1">

@@ -21,6 +21,33 @@ interface GoogleCalendarCredentials {
   expiry_date?: number;
 }
 
+/**
+ * Map Google Calendar colorId to hex color
+ * Google Calendar uses predefined color IDs (1-11) that map to specific colors
+ */
+function getColorFromColorId(colorId: string | undefined | null, calendarColor: string): string {
+  if (!colorId) {
+    return calendarColor; // Fall back to calendar color if no event-specific color
+  }
+
+  // Google Calendar color ID to hex mapping
+  const colorMap: Record<string, string> = {
+    '1': '#a4bdfc', // Lavender
+    '2': '#7ae7bf', // Sage
+    '3': '#dbadff', // Grape
+    '4': '#ff887c', // Flamingo
+    '5': '#fbd75b', // Banana
+    '6': '#ffb878', // Tangerine
+    '7': '#46d6db', // Peacock
+    '8': '#e1e1e1', // Graphite
+    '9': '#5484ed', // Blueberry
+    '10': '#51b749', // Basil
+    '11': '#dc2127', // Tomato
+  };
+
+  return colorMap[colorId] || calendarColor; // Fall back to calendar color if colorId not recognized
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ eventId: string }> }
@@ -181,6 +208,25 @@ export async function PATCH(
       );
     }
 
+    // Get calendar color for fallback
+    let calendarColor = '#4285f4';
+    try {
+      const { data: cachedCalendar } = await supabase
+        .from('google_calendars')
+        .select('background_color')
+        .eq('user_id', userId)
+        .eq('calendar_id', calendarId)
+        .single();
+      
+      if (cachedCalendar?.background_color) {
+        calendarColor = cachedCalendar.background_color.startsWith('#') 
+          ? cachedCalendar.background_color 
+          : `#${cachedCalendar.background_color}`;
+      }
+    } catch (error) {
+      console.warn('Could not fetch calendar color for event update response:', error);
+    }
+
     // Update event in Supabase cache
     const isAllDayEvent = !!googleEvent.start?.date;
     const eventStartTime = isAllDayEvent
@@ -190,6 +236,8 @@ export async function PATCH(
       ? new Date(googleEvent.end.date + 'T00:00:00Z')
       : new Date(googleEvent.end.dateTime);
 
+    const eventColor = getColorFromColorId(googleEvent.colorId, calendarColor);
+
     const { error: updateError } = await supabase
       .from('google_calendar_events')
       .update({
@@ -198,6 +246,7 @@ export async function PATCH(
         is_all_day: isAllDayEvent,
         start_date: isAllDayEvent ? googleEvent.start.date : null,
         end_date: isAllDayEvent ? googleEvent.end.date : null,
+        color: eventColor, // Update with event-specific color if available
         updated_at: new Date().toISOString(),
         last_synced_at: new Date().toISOString(),
         event_data: googleEvent, // Update full event data
@@ -217,11 +266,7 @@ export async function PATCH(
       title: googleEvent.summary || 'No Title',
       start: eventStartTime,
       end: eventEndTime,
-      color: googleEvent.colorId
-        ? `#${googleEvent.colorId}`
-        : googleEvent.colorId === undefined
-        ? '#4285f4'
-        : '#4285f4',
+      color: eventColor,
       calendar: calendarId,
       description: googleEvent.description || null,
       location: googleEvent.location || null,

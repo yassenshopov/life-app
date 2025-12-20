@@ -11,6 +11,8 @@ import {
   getAllDayEventsForDay,
   getTimedEventsForDay,
   calculateEventPosition,
+  groupOverlappingEvents,
+  eventsTouch,
   formatTime,
   formatEventTime,
   generateTimeSlots,
@@ -164,6 +166,12 @@ export function DailyCalendarView({
     [events, currentDate]
   );
 
+  // Group overlapping events
+  const overlappingGroups = React.useMemo(
+    () => groupOverlappingEvents(timedEvents, currentDate),
+    [timedEvents, currentDate]
+  );
+
   const dateString = currentDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -274,7 +282,23 @@ export function DailyCalendarView({
                 <div className="absolute inset-0 pointer-events-none">
                   <AnimatePresence>
                     {timedEvents.map((event) => {
-                      const style = calculateEventPosition(event, currentDate);
+                      // Find the overlapping group this event belongs to
+                      const overlappingGroup = overlappingGroups.find((group) =>
+                        group.some((e) => e.id === event.id)
+                      ) || [event];
+                      
+                      const style = calculateEventPosition(event, currentDate, overlappingGroup);
+                      
+                      // Check for touching events (check all day events, not just overlapping ones)
+                      let touchingTop = false;
+                      let touchingBottom = false;
+                      for (const otherEvent of timedEvents) {
+                        if (otherEvent.id === event.id) continue;
+                        const touch = eventsTouch(event, otherEvent, currentDate);
+                        if (touch.top) touchingTop = true;
+                        if (touch.bottom) touchingBottom = true;
+                      }
+                      
                       return (
                         <AnimatedCalendarEvent
                           key={event.id}
@@ -283,6 +307,7 @@ export function DailyCalendarView({
                           timeFormat={timeFormat}
                           onClick={onEventClick}
                           currentDate={currentDate}
+                          touchingEvents={{ top: touchingTop, bottom: touchingBottom }}
                         />
                       );
                     })}

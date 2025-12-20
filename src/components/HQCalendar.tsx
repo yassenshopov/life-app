@@ -792,6 +792,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               currentMonth={currentDate}
               events={events}
               onNavigate={handleNavigate}
+              onEventClick={handleEventClick}
             />
           )}
           {viewMode === 'year' && (
@@ -807,6 +808,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               events={events}
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
+              onEventClick={handleEventClick}
             />
           )}
         </AnimatedCalendarView>

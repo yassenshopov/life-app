@@ -12,6 +12,8 @@ import {
   getAllDayEventsForDay,
   getTimedEventsForDay,
   calculateEventPosition,
+  groupOverlappingEvents,
+  eventsTouch,
   formatTime,
   formatEventTime,
   generateTimeSlots,
@@ -234,6 +236,9 @@ export function WeeklyCalendarView({
               {/* Day columns */}
               {weekDays.map((day, dayIndex) => {
                 const dayEvents = getTimedEventsForDay(events, day);
+                // Group overlapping events
+                const overlappingGroups = groupOverlappingEvents(dayEvents, day);
+                
                 return (
                   <div
                     key={dayIndex}
@@ -292,7 +297,23 @@ export function WeeklyCalendarView({
                     <div className="absolute inset-0 pointer-events-none">
                       <AnimatePresence>
                         {dayEvents.map((event) => {
-                          const style = calculateEventPosition(event, day);
+                          // Find the overlapping group this event belongs to
+                          const overlappingGroup = overlappingGroups.find((group) =>
+                            group.some((e) => e.id === event.id)
+                          ) || [event];
+                          
+                          const style = calculateEventPosition(event, day, overlappingGroup);
+                          
+                          // Check for touching events (check all day events, not just overlapping ones)
+                          let touchingTop = false;
+                          let touchingBottom = false;
+                          for (const otherEvent of dayEvents) {
+                            if (otherEvent.id === event.id) continue;
+                            const touch = eventsTouch(event, otherEvent, day);
+                            if (touch.top) touchingTop = true;
+                            if (touch.bottom) touchingBottom = true;
+                          }
+                          
                           return (
                             <AnimatedCalendarEvent
                               key={`${event.id}-${day.toISOString().split('T')[0]}`}
@@ -301,6 +322,7 @@ export function WeeklyCalendarView({
                               timeFormat={timeFormat}
                               onClick={onEventClick}
                               currentDate={day}
+                              touchingEvents={{ top: touchingTop, bottom: touchingBottom }}
                             />
                           );
                         })}
