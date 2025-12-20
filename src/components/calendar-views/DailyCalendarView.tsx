@@ -13,6 +13,7 @@ import {
   formatTime,
   formatEventTime,
   generateTimeSlots,
+  PIXELS_PER_MINUTE,
 } from '@/lib/calendar-utils';
 import { CurrentTimeIndicator } from '@/components/calendar/CurrentTimeIndicator';
 import { AnimatedCalendarEvent } from '@/components/calendar/AnimatedCalendarEvent';
@@ -24,6 +25,9 @@ interface DailyCalendarViewProps {
   events: CalendarEvent[];
   timeFormat: TimeFormat;
   onNavigate: (date: Date) => void;
+  onEventClick?: (event: CalendarEvent) => void;
+  onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
+  onEmptySpaceClick?: (date: Date, time: Date) => void;
 }
 
 export function DailyCalendarView({
@@ -31,6 +35,9 @@ export function DailyCalendarView({
   events,
   timeFormat,
   onNavigate,
+  onEventClick,
+  onEventUpdate,
+  onEmptySpaceClick,
 }: DailyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
@@ -181,7 +188,7 @@ export function DailyCalendarView({
               </div>
               {/* All-day events */}
               {allDayEvents.length > 0 && (
-                <AllDayEvents events={allDayEvents} className="flex-1" />
+                <AllDayEvents events={allDayEvents} className="flex-1" onEventClick={onEventClick} />
               )}
             </div>
           </div>
@@ -218,12 +225,42 @@ export function DailyCalendarView({
                   isToday(currentDate) && 'bg-blue-50/30 dark:bg-blue-950/10'
                 )}
               >
-                {/* Time slot grid */}
+                {/* Time slot grid - clickable for new events */}
                 {timeSlots.map((hour) => (
                   <div
                     key={hour}
-                    className="border-b h-[45px] relative"
+                    className="border-b h-[45px] relative cursor-pointer hover:bg-accent/30 transition-colors"
                     style={{ minHeight: '45px' }}
+                    onClick={(e) => {
+                      if (!onEmptySpaceClick) return;
+                      
+                      // Check if click is on empty space (not on an event)
+                      const target = e.target as HTMLElement;
+                      if (target.closest('.event-content') || target.closest('[style*="absolute"]')) {
+                        return;
+                      }
+
+                      // Get the column element
+                      const column = e.currentTarget.parentElement;
+                      if (!column) return;
+                      
+                      const columnRect = column.getBoundingClientRect();
+                      const scrollContainer = scrollContainerRef.current;
+                      const scrollTop = scrollContainer?.scrollTop || 0;
+                      
+                      // Calculate mouse position relative to column top, accounting for scroll
+                      const mouseY = e.clientY - columnRect.top + scrollTop;
+                      
+                      // Convert pixels to minutes (snap to 15-minute intervals)
+                      const minutes = Math.max(0, Math.round((mouseY / PIXELS_PER_MINUTE) / 15) * 15);
+                      
+                      // Create date with the clicked time
+                      const clickedTime = new Date(currentDate);
+                      clickedTime.setHours(0, 0, 0, 0);
+                      clickedTime.setMinutes(minutes);
+                      
+                      onEmptySpaceClick(currentDate, clickedTime);
+                    }}
                   />
                 ))}
 
@@ -241,6 +278,8 @@ export function DailyCalendarView({
                           event={event}
                           style={style}
                           timeFormat={timeFormat}
+                          onClick={onEventClick}
+                          currentDate={currentDate}
                         />
                       );
                     })}

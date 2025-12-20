@@ -118,6 +118,20 @@ export async function GET(req: Request) {
 
       const { data: cachedEvents, error: cacheError } = await cacheQuery;
 
+      // Debug: Check what columns are actually returned
+      if (cachedEvents && cachedEvents.length > 0) {
+        const firstEvent = cachedEvents[0];
+        console.log('Cache query - First event columns:', {
+          event_id: firstEvent.event_id,
+          has_location: 'location' in firstEvent,
+          location_value: firstEvent.location,
+          location_type: typeof firstEvent.location,
+          has_description: 'description' in firstEvent,
+          description_value: firstEvent.description,
+          all_keys: Object.keys(firstEvent),
+        });
+      }
+
       console.log('Cache query result:', {
         userId,
         timeRange: { min: timeMinParam.toISOString(), max: timeMaxParam.toISOString() },
@@ -150,7 +164,7 @@ export async function GET(req: Request) {
         }
 
         // Return cached events
-        const formattedEvents = filteredEvents.map((event) => {
+        const formattedEvents = filteredEvents.map((event: any) => {
           // Use is_all_day column if available, otherwise check event_data
           const isAllDay = event.is_all_day ?? (event.event_data?.isAllDay || false);
           
@@ -171,17 +185,102 @@ export async function GET(req: Request) {
             end = new Date(event.end_time);
           }
           
-          return {
+          // Parse JSON fields from database
+          let attendees = null;
+          let reminders = null;
+          let recurrence = null;
+          let conferenceData = null;
+          
+          try {
+            if (event.attendees) {
+              attendees = typeof event.attendees === 'string' ? JSON.parse(event.attendees) : event.attendees;
+            }
+            if (event.reminders) {
+              reminders = typeof event.reminders === 'string' ? JSON.parse(event.reminders) : event.reminders;
+            }
+            if (event.recurrence) {
+              recurrence = typeof event.recurrence === 'string' ? JSON.parse(event.recurrence) : event.recurrence;
+            }
+            if (event.conference_data) {
+              conferenceData = typeof event.conference_data === 'string' ? JSON.parse(event.conference_data) : event.conference_data;
+            }
+          } catch (e) {
+            console.warn('Error parsing JSON fields from cache:', e);
+          }
+          
+          // Fallback to event_data if columns are NULL (for events synced before migration)
+          // event_data is JSONB, so it should already be parsed by Supabase, but handle both cases
+          let eventDataFallback: any = {};
+          try {
+            if (event.event_data) {
+              if (typeof event.event_data === 'string') {
+                eventDataFallback = JSON.parse(event.event_data);
+              } else if (typeof event.event_data === 'object' && event.event_data !== null) {
+                eventDataFallback = event.event_data;
+              }
+            }
+          } catch (e) {
+            console.warn('Error parsing event_data:', e, event.event_data);
+            eventDataFallback = {};
+          }
+          
+          const eventData = {
             id: event.event_id,
             title: event.title,
             start,
             end,
             color: event.color || '#4285f4',
             calendar: event.organizer_display_name || event.calendar_id,
-            description: event.description,
-            location: event.location,
+            calendarId: event.calendar_id, // Include the actual calendar ID
+            // Use column value if available, otherwise fallback to event_data
+            // Check both null and undefined, and handle empty strings
+            description: (event.description != null && String(event.description).trim() !== '') 
+              ? event.description 
+              : (eventDataFallback.description != null && String(eventDataFallback.description).trim() !== '') 
+                ? eventDataFallback.description 
+                : null,
+            location: (event.location != null && String(event.location).trim() !== '') 
+              ? event.location 
+              : (eventDataFallback.location != null && String(eventDataFallback.location).trim() !== '') 
+                ? eventDataFallback.location 
+                : null,
+            htmlLink: event.html_link || eventDataFallback.htmlLink || null,
+            hangoutLink: event.hangout_link || eventDataFallback.hangoutLink || null,
             isAllDay,
+            organizer: (event.organizer_email || event.organizer_display_name || eventDataFallback.organizer) ? {
+              email: event.organizer_email || eventDataFallback.organizer?.email || undefined,
+              displayName: event.organizer_display_name || eventDataFallback.organizer?.displayName || undefined,
+            } : undefined,
+            attendees: attendees || eventDataFallback.attendees || null,
+            reminders: reminders || eventDataFallback.reminders || null,
+            recurrence: recurrence || eventDataFallback.recurrence || null,
+            status: event.status || eventDataFallback.status || null,
+            transparency: event.transparency || eventDataFallback.transparency || null,
+            visibility: event.visibility || eventDataFallback.visibility || null,
+            conferenceData: conferenceData || eventDataFallback.conferenceData || null,
+            created: event.created ? new Date(event.created) : (eventDataFallback.created ? new Date(eventDataFallback.created) : undefined),
+            updated: event.updated ? new Date(event.updated) : (eventDataFallback.updated ? new Date(eventDataFallback.updated) : undefined),
           };
+
+          // Debug logging for events with location to see what we're getting
+          if (event.location || eventDataFallback.location) {
+            console.log('Event with location data:', {
+              event_id: event.event_id,
+              title: event.title,
+              location_from_column: event.location,
+              location_from_column_type: typeof event.location,
+              location_from_fallback: eventDataFallback.location,
+              location_from_fallback_type: typeof eventDataFallback.location,
+              final_location: eventData.location,
+              has_event_data: !!event.event_data,
+              event_data_type: typeof event.event_data,
+              event_data_keys: event.event_data && typeof event.event_data === 'object' && event.event_data !== null ? Object.keys(event.event_data) : 'N/A',
+              raw_event_location: event.location,
+              raw_event_keys: Object.keys(event).filter(k => k.includes('location') || k.includes('description')),
+            });
+          }
+
+          return eventData;
         });
 
         console.log('Returning cached events:', {
@@ -266,8 +365,26 @@ export async function GET(req: Request) {
           orderBy: 'startTime',
         });
 
-        const calInfo = calendarListData?.items?.find((cal: any) => cal.id === calendarId);
-        const backgroundColor = calInfo?.backgroundColor || '#4285f4';
+        // Try to get calendar info from cached calendars first, then from API response
+        let calInfo = null;
+        let backgroundColor = '#4285f4';
+        
+        // Check cached calendars
+        const { data: cachedCalendar } = await supabase
+          .from('google_calendars')
+          .select('background_color, calendar_data')
+          .eq('user_id', userId)
+          .eq('calendar_id', calendarId)
+          .single();
+        
+        if (cachedCalendar?.calendar_data) {
+          calInfo = cachedCalendar.calendar_data;
+          backgroundColor = cachedCalendar.background_color || calInfo?.backgroundColor || '#4285f4';
+        } else if (calendarListData?.items) {
+          calInfo = calendarListData.items.find((cal: any) => cal.id === calendarId);
+          backgroundColor = calInfo?.backgroundColor || '#4285f4';
+        }
+        
         const color = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
 
         const events = (response.data.items || []).map((event: any) => {
@@ -329,6 +446,29 @@ export async function GET(req: Request) {
             last_synced_at: new Date().toISOString(),
           });
 
+          // Parse JSON fields if they're strings
+          let attendees = null;
+          let reminders = null;
+          let recurrence = null;
+          let conferenceData = null;
+          
+          try {
+            if (event.attendees) {
+              attendees = Array.isArray(event.attendees) ? event.attendees : JSON.parse(event.attendees);
+            }
+            if (event.reminders) {
+              reminders = typeof event.reminders === 'object' ? event.reminders : JSON.parse(event.reminders);
+            }
+            if (event.recurrence) {
+              recurrence = Array.isArray(event.recurrence) ? event.recurrence : JSON.parse(event.recurrence);
+            }
+            if (event.conferenceData) {
+              conferenceData = typeof event.conferenceData === 'object' ? event.conferenceData : JSON.parse(event.conferenceData);
+            }
+          } catch (e) {
+            console.warn('Error parsing JSON fields:', e);
+          }
+
           return {
             id: event.id || `event-${Date.now()}-${Math.random()}`,
             title: event.summary || 'No Title',
@@ -336,9 +476,25 @@ export async function GET(req: Request) {
             end,
             color,
             calendar: event.organizer?.displayName || calendarId,
+            calendarId: calendarId, // Include the actual calendar ID
             description: event.description,
             location: event.location,
+            htmlLink: event.htmlLink,
+            hangoutLink: event.hangoutLink,
             isAllDay,
+            organizer: event.organizer ? {
+              email: event.organizer.email,
+              displayName: event.organizer.displayName,
+            } : undefined,
+            attendees,
+            reminders,
+            recurrence,
+            status: event.status,
+            transparency: event.transparency,
+            visibility: event.visibility,
+            conferenceData,
+            created: event.created ? new Date(event.created) : undefined,
+            updated: event.updated ? new Date(event.updated) : undefined,
           };
         });
 

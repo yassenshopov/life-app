@@ -9,12 +9,13 @@ import { getContrastTextColor } from '@/lib/color-utils';
 interface AllDayEventsProps {
   events: CalendarEvent[];
   className?: string;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
 /**
  * Component to display all-day events in the calendar header
  */
-export function AllDayEvents({ events, className }: AllDayEventsProps) {
+export function AllDayEvents({ events, className, onEventClick }: AllDayEventsProps) {
   if (events.length === 0) {
     return null;
   }
@@ -34,6 +35,7 @@ export function AllDayEvents({ events, className }: AllDayEventsProps) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.15 }}
+              onClick={() => onEventClick?.(event)}
               className="flex-1 min-w-[100px] max-w-full rounded px-2 py-1 text-xs cursor-pointer hover:opacity-90 transition-opacity truncate"
               style={{
                 backgroundColor: bgColor,

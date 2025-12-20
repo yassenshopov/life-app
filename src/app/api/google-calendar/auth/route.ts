@@ -38,9 +38,10 @@ export async function GET() {
     const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
     // Generate the auth URL
+    // Include write permissions for updating events
     const scopes = [
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events.readonly',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events',
     ];
 
     const authUrl = oauth2Client.generateAuthUrl({

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MiniCalendar } from '@/components/MiniCalendar';
 import { RefreshCw } from 'lucide-react';
+import { getContrastTextColor } from '@/lib/color-utils';
 
 interface CalendarItem {
   id: string;
@@ -38,27 +39,55 @@ function CalendarItemComponent({ calendar, onToggle, onRefresh }: CalendarItemPr
     }
   };
 
+  const calendarColor = calendar.color || '#4285f4';
+  const isChecked = calendar.selected !== false;
+  const checkmarkColor = getContrastTextColor(calendarColor) === 'dark' ? '#1f2937' : '#ffffff';
+  
   return (
     <div className="flex items-center space-x-2 group">
-      <Checkbox
-        id={calendar.id}
-        checked={calendar.selected !== false}
-        onCheckedChange={(checked) => onToggle(calendar.id, checked as boolean)}
-      />
+      <div className="relative flex items-center">
+        <Checkbox
+          id={calendar.id}
+          checked={isChecked}
+          onCheckedChange={(checked) => onToggle(calendar.id, checked as boolean)}
+          className={cn(
+            'data-[state=checked]:border-2 data-[state=checked]:text-transparent',
+            !isChecked && 'border-2'
+          )}
+          style={{
+            borderColor: calendarColor,
+            ...(isChecked && {
+              backgroundColor: calendarColor,
+            }),
+          }}
+        />
+        {/* Custom checkmark with proper contrast - overlay on top */}
+        {isChecked && (
+          <div
+            className="absolute top-0 left-0 w-4 h-4 flex items-center justify-center pointer-events-none"
+            style={{ color: checkmarkColor }}
+          >
+            <svg
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={3}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+        )}
+      </div>
       <label
         htmlFor={calendar.id}
-        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center"
       >
-        <div className="flex items-center space-x-2">
-          <div
-            className={cn(
-              'w-3 h-3 rounded-full',
-              calendar.color ? `bg-[${calendar.color}]` : 'bg-blue-500'
-            )}
-            style={calendar.color ? { backgroundColor: calendar.color } : undefined}
-          />
-          <span className="truncate">{calendar.summary}</span>
-        </div>
+        <span className="truncate">{calendar.summary}</span>
       </label>
       <Button
         variant="ghost"
@@ -157,13 +186,20 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
       prev.map((cal) => (cal.id === calendarId ? { ...cal, selected: checked } : cal))
     );
 
-    // TODO: Save preference to backend/localStorage
+    // Save preference to backend
     try {
-      await fetch('/api/google-calendar/calendars/preferences', {
+      const response = await fetch('/api/google-calendar/calendars/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ calendarId, selected: checked }),
       });
+      
+      if (response.ok) {
+        // Trigger a refresh of the calendar view to update visible events
+        window.dispatchEvent(new CustomEvent('calendar-refresh'));
+      } else {
+        throw new Error('Failed to save preference');
+      }
     } catch (error) {
       console.error('Error saving calendar preference:', error);
       // Revert on error

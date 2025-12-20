@@ -19,6 +19,8 @@ import { MonthlyCalendarView } from '@/components/calendar-views/MonthlyCalendar
 import { AnnualCalendarView } from '@/components/calendar-views/AnnualCalendarView';
 import { ScheduleCalendarView } from '@/components/calendar-views/ScheduleCalendarView';
 import { AnimatedCalendarView } from '@/components/calendar/AnimatedCalendarView';
+import { EventDetailModal } from '@/components/calendar/EventDetailModal';
+import { NewEventModal } from '@/components/calendar/NewEventModal';
 import { motion } from 'framer-motion';
 
 // Calendar event interface
@@ -29,7 +31,43 @@ export interface CalendarEvent {
   end: Date;
   color: string;
   calendar?: string;
+  calendarId?: string; // The actual calendar ID for API calls
+  description?: string;
+  location?: string;
+  htmlLink?: string;
+  hangoutLink?: string;
   isAllDay?: boolean;
+  organizer?: {
+    email?: string;
+    displayName?: string;
+  };
+  attendees?: Array<{
+    email?: string;
+    displayName?: string;
+    responseStatus?: string;
+    organizer?: boolean;
+    self?: boolean;
+  }>;
+  reminders?: {
+    useDefault?: boolean;
+    overrides?: Array<{
+      method?: string;
+      minutes?: number;
+    }>;
+  };
+  recurrence?: string[];
+  status?: string;
+  transparency?: string;
+  visibility?: string;
+  conferenceData?: {
+    entryPoints?: Array<{
+      entryPointType?: string;
+      uri?: string;
+      label?: string;
+    }>;
+  };
+  created?: Date;
+  updated?: Date;
 }
 
 export type CalendarViewMode = 'daily' | 'weekly' | 'monthly' | 'year' | 'schedule';
@@ -42,6 +80,180 @@ interface HQCalendarProps {
 export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCalendarProps) {
   const [events, setEvents] = React.useState<CalendarEvent[]>(initialEvents);
   const [loadingEvents, setLoadingEvents] = React.useState(false);
+  const [selectedEvent, setSelectedEvent] = React.useState<CalendarEvent | null>(null);
+  const [isEventModalOpen, setIsEventModalOpen] = React.useState(false);
+  const [isNewEventModalOpen, setIsNewEventModalOpen] = React.useState(false);
+  const [newEventInitialTime, setNewEventInitialTime] = React.useState<Date | undefined>();
+  const [newEventInitialDate, setNewEventInitialDate] = React.useState<Date | undefined>();
+  const [availableCalendars, setAvailableCalendars] = React.useState<
+    Array<{ id: string; summary: string; color?: string }>
+  >([]);
+
+  const handleEventClick = (event: CalendarEvent) => {
+    console.log('handleEventClick - Event data:', {
+      id: event.id,
+      title: event.title,
+      hasLocation: !!event.location,
+      location: event.location,
+      hasDescription: !!event.description,
+      description: event.description,
+      fullEvent: event,
+    });
+    setSelectedEvent(event);
+    setIsEventModalOpen(true);
+  };
+
+  const handleCloseEventModal = () => {
+    setIsEventModalOpen(false);
+    setSelectedEvent(null);
+  };
+
+  const handleEmptySpaceClick = (date: Date, time: Date) => {
+    setNewEventInitialDate(date);
+    setNewEventInitialTime(time);
+    setIsNewEventModalOpen(true);
+  };
+
+  const handleEventCreate = async (eventData: {
+    title: string;
+    startTime: Date;
+    endTime: Date;
+    isAllDay: boolean;
+    description?: string;
+    location?: string;
+    calendarId: string;
+  }) => {
+    try {
+      const response = await fetch('/api/google-calendar/events/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: eventData.title,
+          startTime: eventData.startTime.toISOString(),
+          endTime: eventData.endTime.toISOString(),
+          isAllDay: eventData.isAllDay,
+          description: eventData.description,
+          location: eventData.location,
+          calendarId: eventData.calendarId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create event');
+      }
+
+      const data = await response.json();
+
+      // Add the new event to local state
+      const newEvent: CalendarEvent = {
+        id: data.event.id,
+        title: data.event.title,
+        start: new Date(data.event.start),
+        end: new Date(data.event.end),
+        color: data.event.color,
+        calendar: data.event.calendar,
+        calendarId: data.event.calendarId,
+        description: data.event.description,
+        location: data.event.location,
+        htmlLink: data.event.htmlLink,
+        hangoutLink: data.event.hangoutLink,
+        isAllDay: data.event.isAllDay,
+        organizer: data.event.organizer,
+        attendees: data.event.attendees,
+        reminders: data.event.reminders,
+        recurrence: data.event.recurrence,
+        status: data.event.status,
+        transparency: data.event.transparency,
+        visibility: data.event.visibility,
+        conferenceData: data.event.conferenceData,
+        created: data.event.created,
+        updated: data.event.updated,
+      };
+
+      setEvents((prevEvents) =>
+        [...prevEvents, newEvent].sort((a, b) => a.start.getTime() - b.start.getTime())
+      );
+
+      // Trigger a refresh to ensure everything is in sync
+      window.dispatchEvent(new CustomEvent('calendar-refresh'));
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error; // Re-throw to let the component handle it
+    }
+  };
+
+  // Fetch available calendars for new event modal
+  React.useEffect(() => {
+    const fetchCalendars = async () => {
+      try {
+        const response = await fetch('/api/google-calendar/calendars');
+        const data = await response.json();
+
+        if (response.ok && data.calendars && Array.isArray(data.calendars)) {
+          setAvailableCalendars(data.calendars);
+        }
+      } catch (error) {
+        console.error('Error fetching calendars:', error);
+      }
+    };
+
+    if (isNewEventModalOpen) {
+      fetchCalendars();
+    }
+  }, [isNewEventModalOpen]);
+
+  const handleEventUpdate = async (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date,
+    isAllDay?: boolean
+  ) => {
+    try {
+      const response = await fetch(`/api/google-calendar/events/${eventId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          calendarId,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          isAllDay: isAllDay,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update event');
+      }
+
+      const data = await response.json();
+
+      // Update the event in the local state
+      setEvents((prevEvents) =>
+        prevEvents.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                start: new Date(data.event.start),
+                end: new Date(data.event.end),
+                isAllDay: data.event.isAllDay,
+              }
+            : e
+        )
+      );
+
+      // Trigger a refresh to ensure everything is in sync
+      window.dispatchEvent(new CustomEvent('calendar-refresh'));
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error; // Re-throw to let the component handle it
+    }
+  };
 
   // Load view mode from localStorage
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>(() => {
@@ -136,15 +348,15 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       // Force refresh by clearing the stop retrying flag and triggering a refetch
       setShouldStopRetrying(false);
       fetchingRef.current = false;
-      // Trigger refetch by updating a dependency
-      setCurrentDate(new Date(currentDate));
+      // Trigger refetch by creating a new date object to force useEffect to run
+      setCurrentDate((prev) => new Date(prev.getTime()));
     };
 
     window.addEventListener('calendar-refresh', handleRefresh);
     return () => {
       window.removeEventListener('calendar-refresh', handleRefresh);
     };
-  }, [currentDate]);
+  }, []);
 
   // Fetch events from Google Calendar based on current view and date
   React.useEffect(() => {
@@ -229,6 +441,30 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               end: endDate,
               color: hexColor, // Store hex color, will be used with inline styles
               calendar: event.calendar,
+              calendarId: event.calendarId || event.calendar, // Use calendarId if available, fallback to calendar
+              description: event.description,
+              location: event.location,
+              htmlLink: event.htmlLink,
+              hangoutLink: event.hangoutLink,
+              isAllDay: event.isAllDay,
+              organizer: event.organizer,
+              attendees: event.attendees,
+              reminders: event.reminders,
+              recurrence: event.recurrence,
+              status: event.status,
+              transparency: event.transparency,
+              visibility: event.visibility,
+              conferenceData: event.conferenceData,
+              created: event.created
+                ? event.created instanceof Date
+                  ? event.created
+                  : new Date(event.created)
+                : undefined,
+              updated: event.updated
+                ? event.updated instanceof Date
+                  ? event.updated
+                  : new Date(event.updated)
+                : undefined,
             };
           });
 
@@ -506,6 +742,9 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               events={events}
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
+              onEventClick={handleEventClick}
+              onEventUpdate={handleEventUpdate}
+              onEmptySpaceClick={handleEmptySpaceClick}
             />
           )}
           {viewMode === 'weekly' && (
@@ -514,6 +753,9 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               events={events}
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
+              onEventClick={handleEventClick}
+              onEventUpdate={handleEventUpdate}
+              onEmptySpaceClick={handleEmptySpaceClick}
             />
           )}
           {viewMode === 'monthly' && (
@@ -545,6 +787,30 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         onOpenChange={setSettingsOpen}
         timeFormat={timeFormat}
         onTimeFormatChange={setTimeFormat}
+      />
+
+      {/* Event Detail Modal */}
+      <EventDetailModal
+        event={selectedEvent}
+        isOpen={isEventModalOpen}
+        onClose={handleCloseEventModal}
+        timeFormat={timeFormat}
+        onEventUpdate={handleEventUpdate}
+      />
+
+      {/* New Event Modal */}
+      <NewEventModal
+        isOpen={isNewEventModalOpen}
+        onClose={() => {
+          setIsNewEventModalOpen(false);
+          setNewEventInitialTime(undefined);
+          setNewEventInitialDate(undefined);
+        }}
+        timeFormat={timeFormat}
+        initialStartTime={newEventInitialTime}
+        initialDate={newEventInitialDate}
+        onEventCreate={handleEventCreate}
+        availableCalendars={availableCalendars}
       />
     </Card>
   );
