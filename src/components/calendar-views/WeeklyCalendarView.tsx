@@ -7,6 +7,7 @@ import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import {
   isToday,
   isSameDay,
+  eventOverlapsDay,
   getEventsForDay,
   getAllDayEventsForDay,
   getTimedEventsForDay,
@@ -291,10 +292,10 @@ export function WeeklyCalendarView({
                     <div className="absolute inset-0 pointer-events-none">
                       <AnimatePresence>
                         {dayEvents.map((event) => {
-                          const style = calculateEventPosition(event);
+                          const style = calculateEventPosition(event, day);
                           return (
                             <AnimatedCalendarEvent
-                              key={event.id}
+                              key={`${event.id}-${day.toISOString().split('T')[0]}`}
                               event={event}
                               style={style}
                               timeFormat={timeFormat}
@@ -304,11 +305,11 @@ export function WeeklyCalendarView({
                           );
                         })}
                         {/* Preview event */}
-                        {previewEvent && !previewEvent.isAllDay && isSameDay(previewEvent.start, day) && (
+                        {previewEvent && !previewEvent.isAllDay && eventOverlapsDay(previewEvent, day) && (
                           <AnimatedCalendarEvent
-                            key={previewEvent.id}
+                            key={`${previewEvent.id}-preview-${day.toISOString().split('T')[0]}`}
                             event={previewEvent}
-                            style={calculateEventPosition(previewEvent)}
+                            style={calculateEventPosition(previewEvent, day)}
                             timeFormat={timeFormat}
                             currentDate={day}
                             isPreview={true}

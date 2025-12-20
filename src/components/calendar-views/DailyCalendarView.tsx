@@ -274,7 +274,7 @@ export function DailyCalendarView({
                 <div className="absolute inset-0 pointer-events-none">
                   <AnimatePresence>
                     {timedEvents.map((event) => {
-                      const style = calculateEventPosition(event);
+                      const style = calculateEventPosition(event, currentDate);
                       return (
                         <AnimatedCalendarEvent
                           key={event.id}
@@ -291,7 +291,7 @@ export function DailyCalendarView({
                       <AnimatedCalendarEvent
                         key={previewEvent.id}
                         event={previewEvent}
-                        style={calculateEventPosition(previewEvent)}
+                        style={calculateEventPosition(previewEvent, currentDate)}
                         timeFormat={timeFormat}
                         currentDate={currentDate}
                         isPreview={true}

@@ -254,13 +254,50 @@ export function EntryPeekModal({
 
                   {isTitle ? (
                     <div className="space-y-2">
-                      <Textarea
-                        value={value || ''}
-                        onChange={(e) => handleFieldChange(propertyKey, e.target.value)}
-                        placeholder="Untitled"
-                        className="text-lg font-semibold min-h-[60px] resize-none border-none shadow-none focus-visible:ring-1"
-                        onBlur={handleSave}
-                      />
+                      <div className="relative">
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={(e) => {
+                            const text = e.currentTarget.textContent || '';
+                            handleFieldChange(propertyKey, text);
+                          }}
+                          onFocus={(e) => {
+                            // Remove line clamp when focused to allow full editing
+                            e.currentTarget.style.display = 'block';
+                            e.currentTarget.style.WebkitLineClamp = 'unset';
+                            e.currentTarget.style.maxHeight = 'none';
+                            e.currentTarget.style.overflow = 'auto';
+                          }}
+                          onBlur={(e) => {
+                            // Re-apply line clamp when not focused
+                            e.currentTarget.style.display = '-webkit-box';
+                            e.currentTarget.style.WebkitLineClamp = '2';
+                            e.currentTarget.style.maxHeight = '60px';
+                            e.currentTarget.style.overflow = 'hidden';
+                            const text = e.currentTarget.textContent || '';
+                            handleFieldChange(propertyKey, text);
+                            handleSave();
+                          }}
+                          className="text-lg font-semibold min-h-[60px] px-3 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 break-words relative z-10"
+                          style={{
+                            maxHeight: '60px',
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            textOverflow: 'ellipsis',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {value || ''}
+                        </div>
+                        {!value && (
+                          <div className="absolute top-2 left-3 pointer-events-none text-lg font-semibold text-muted-foreground z-0">
+                            Untitled
+                          </div>
+                        )}
+                      </div>
                       {hasChanges && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <div className="w-2 h-2 bg-orange-500 rounded-full" />

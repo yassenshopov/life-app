@@ -38,8 +38,19 @@ export function AnimatedCalendarEvent({
     }
   };
 
-  const displayStart = event.start;
-  const displayEnd = event.end;
+  // Calculate the actual display times for this day (handles multi-day events)
+  const currentDay = currentDate || new Date(event.start);
+  const dayStart = new Date(currentDay);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(currentDay);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const eventStart = new Date(event.start);
+  const eventEnd = new Date(event.end);
+
+  // For multi-day events, show only the portion visible on this day
+  const displayStart = eventStart > dayStart ? eventStart : dayStart;
+  const displayEnd = eventEnd < dayEnd ? eventEnd : dayEnd;
 
   return (
     <motion.div

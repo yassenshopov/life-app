@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
+import { getEventsForDay } from '@/lib/calendar-utils';
 
 interface MonthlyCalendarViewProps {
   currentMonth: Date;
@@ -47,17 +48,6 @@ export function MonthlyCalendarView({
 
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-  const getEventsForDay = (day: Date | null) => {
-    if (!day) return [];
-    return events.filter((event) => {
-      const eventDate = new Date(event.start);
-      return (
-        eventDate.getDate() === day.getDate() &&
-        eventDate.getMonth() === day.getMonth() &&
-        eventDate.getFullYear() === day.getFullYear()
-      );
-    });
-  };
 
   const isToday = (date: Date | null) => {
     if (!date) return false;
@@ -105,7 +95,7 @@ export function MonthlyCalendarView({
             <div className="grid relative" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {weeks.map((week, weekIndex) =>
                 week.map((day, dayIndex) => {
-                  const dayEvents = getEventsForDay(day);
+                  const dayEvents = day ? getEventsForDay(events, day) : [];
                   return (
                     <div
                       key={`${weekIndex}-${dayIndex}`}

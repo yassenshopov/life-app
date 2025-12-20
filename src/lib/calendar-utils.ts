@@ -32,35 +32,46 @@ export function isSameDay(date1: Date, date2: Date): boolean {
 }
 
 /**
- * Get events for a specific day
+ * Check if an event overlaps with a specific day
  */
-export function getEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events.filter((event) => {
-    const eventDate = new Date(event.start);
-    return isSameDay(eventDate, day);
-  });
+export function eventOverlapsDay(event: CalendarEvent, day: Date): boolean {
+  const dayStart = new Date(day);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(day);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const eventStart = new Date(event.start);
+  const eventEnd = new Date(event.end);
+
+  // Event overlaps if it starts before day ends and ends after day starts
+  return eventStart <= dayEnd && eventEnd >= dayStart;
 }
 
 /**
- * Get all-day events for a specific day
+ * Get events for a specific day (including multi-day events)
+ */
+export function getEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
+  return events.filter((event) => eventOverlapsDay(event, day));
+}
+
+/**
+ * Get all-day events for a specific day (including multi-day all-day events)
  */
 export function getAllDayEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
   return events.filter((event) => {
     if (!event.isAllDay) return false;
-    const eventDate = new Date(event.start);
-    return isSameDay(eventDate, day);
+    return eventOverlapsDay(event, day);
   });
 }
 
 /**
- * Get timed events (non-all-day) for a specific day
+ * Get timed events (non-all-day) for a specific day (including multi-day events)
  */
 export function getTimedEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
   return events.filter((event) => {
     // Exclude all-day events from timed events
     if (event.isAllDay) return false;
-    const eventDate = new Date(event.start);
-    return isSameDay(eventDate, day);
+    return eventOverlapsDay(event, day);
   });
 }
 
@@ -72,18 +83,35 @@ export function isAllDayEvent(event: CalendarEvent): boolean {
 }
 
 /**
- * Calculate event position and height in pixels
+ * Calculate event position and height in pixels for a specific day
+ * Handles multi-day events by showing only the portion that overlaps with the day
  */
-export function calculateEventPosition(event: CalendarEvent): {
+export function calculateEventPosition(
+  event: CalendarEvent,
+  currentDay?: Date
+): {
   top: string;
   height: string;
 } {
-  const startMinutes = event.start.getHours() * 60 + event.start.getMinutes();
-  const endMinutes = event.end.getHours() * 60 + event.end.getMinutes();
-  const duration = endMinutes - startMinutes;
-  const startHour = 0; // First time slot (midnight)
+  const day = currentDay || new Date(event.start);
+  const dayStart = new Date(day);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(day);
+  dayEnd.setHours(23, 59, 59, 999);
 
-  const top = (startMinutes - startHour * 60) * PIXELS_PER_MINUTE;
+  const eventStart = new Date(event.start);
+  const eventEnd = new Date(event.end);
+
+  // Calculate the actual start and end times for this day
+  const displayStart = eventStart > dayStart ? eventStart : dayStart;
+  const displayEnd = eventEnd < dayEnd ? eventEnd : dayEnd;
+
+  // Calculate minutes from midnight
+  const startMinutes = displayStart.getHours() * 60 + displayStart.getMinutes();
+  const endMinutes = displayEnd.getHours() * 60 + displayEnd.getMinutes();
+  const duration = endMinutes - startMinutes;
+
+  const top = startMinutes * PIXELS_PER_MINUTE;
   const height = duration * PIXELS_PER_MINUTE;
 
   return {
