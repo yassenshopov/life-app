@@ -341,6 +341,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
   // Track if we should stop retrying (for auth errors)
   const [shouldStopRetrying, setShouldStopRetrying] = React.useState(false);
+  const [forceRefresh, setForceRefresh] = React.useState(false);
   const fetchingRef = React.useRef(false);
 
   // Listen for calendar refresh events
@@ -349,6 +350,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       // Force refresh by clearing the stop retrying flag and triggering a refetch
       setShouldStopRetrying(false);
       fetchingRef.current = false;
+      setForceRefresh(true);
       // Trigger refetch by creating a new date object to force useEffect to run
       setCurrentDate((prev) => new Date(prev.getTime()));
     };
@@ -411,8 +413,9 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           return;
         }
 
+        const forceRefreshParam = forceRefresh ? '&forceRefresh=true' : '';
         const response = await fetch(
-          `/api/google-calendar/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}`
+          `/api/google-calendar/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}${forceRefreshParam}`
         );
 
         const data = await response.json();
@@ -473,6 +476,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           setEvents(fetchedEvents);
           // Reset stop retrying flag on success
           setShouldStopRetrying(false);
+          // Reset force refresh flag after successful fetch
+          setForceRefresh(false);
         } else {
           // Handle auth errors - stop retrying
           if (response.status === 401 || response.status === 404) {
@@ -494,7 +499,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     };
 
     fetchEvents();
-  }, [viewMode, currentDate]); // Removed initialEvents from dependencies
+  }, [viewMode, currentDate, forceRefresh]); // Added forceRefresh to dependencies
 
   // Keyboard shortcuts for view mode switching
   React.useEffect(() => {
