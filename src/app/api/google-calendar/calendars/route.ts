@@ -64,11 +64,6 @@ export async function GET(req: Request) {
 
     const credentials: GoogleCalendarCredentials | null = user.google_calendar_credentials;
 
-    console.log('User credentials check:', {
-      hasCredentials: !!credentials,
-      hasAccessToken: !!credentials?.access_token,
-      userId,
-    });
 
     if (!credentials || !credentials.access_token) {
       return NextResponse.json(
@@ -94,7 +89,6 @@ export async function GET(req: Request) {
         const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
         if (oldestSync > oneHourAgo) {
-          console.log('Returning cached calendars:', cachedCalendars.length);
           const formattedCalendars = cachedCalendars.map((cal) => ({
             id: cal.calendar_id,
             summary: cal.summary,
@@ -208,7 +202,6 @@ export async function GET(req: Request) {
           await supabase.from('google_calendars').insert(batch);
         }
 
-        console.log('Cached calendars:', calendarsToInsert.length);
       }
 
       return NextResponse.json({ calendars: calendarsToReturn, fromCache: false });
@@ -224,7 +217,6 @@ export async function GET(req: Request) {
         .order('summary', { ascending: true });
 
       if (cachedCalendars && cachedCalendars.length > 0) {
-        console.log('API failed, returning cached calendars as fallback');
         const formattedCalendars = cachedCalendars.map((cal) => ({
           id: cal.calendar_id,
           summary: cal.summary,

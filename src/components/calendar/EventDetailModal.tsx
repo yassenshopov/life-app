@@ -180,29 +180,6 @@ export function EventDetailModal({
     return format(date, 'd MMM yyyy');
   };
 
-  // Debug logging
-  React.useEffect(() => {
-    if (event) {
-      console.log('EventDetailModal - Event data:', {
-        id: event.id,
-        title: event.title,
-        hasLocation: !!event.location,
-        location: event.location,
-        locationType: typeof event.location,
-        locationValue: event.location,
-        hasDescription: !!event.description,
-        description: event.description,
-        hasOrganizer: !!event.organizer,
-        organizer: event.organizer,
-        hasAttendees: !!event.attendees,
-        attendeesCount: event.attendees?.length,
-        hasReminders: !!event.reminders,
-        hasHtmlLink: !!event.htmlLink,
-        fullEvent: event,
-      });
-    }
-  }, [event]);
-
   const isAllDay = isAllDayEvent(event);
   const eventStartDate = new Date(event.start);
   const eventEndDate = new Date(event.end);

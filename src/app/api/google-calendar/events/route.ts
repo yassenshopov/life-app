@@ -145,28 +145,6 @@ export async function GET(req: Request) {
 
       const { data: cachedEvents, error: cacheError } = await cacheQuery;
 
-      // Debug: Check what columns are actually returned
-      if (cachedEvents && cachedEvents.length > 0) {
-        const firstEvent = cachedEvents[0];
-        console.log('Cache query - First event columns:', {
-          event_id: firstEvent.event_id,
-          has_location: 'location' in firstEvent,
-          location_value: firstEvent.location,
-          location_type: typeof firstEvent.location,
-          has_description: 'description' in firstEvent,
-          description_value: firstEvent.description,
-          all_keys: Object.keys(firstEvent),
-        });
-      }
-
-      console.log('Cache query result:', {
-        userId,
-        timeRange: { min: timeMinParam.toISOString(), max: timeMaxParam.toISOString() },
-        requestedCalendarIds: calendarIds,
-        calendarsToFetch,
-        cachedCount: cachedEvents?.length || 0,
-        error: cacheError?.message,
-      });
 
       if (!cacheError && cachedEvents && cachedEvents.length > 0) {
         // Filter by preferences if they exist and are meaningful
@@ -289,32 +267,10 @@ export async function GET(req: Request) {
             updated: event.updated ? new Date(event.updated) : (eventDataFallback.updated ? new Date(eventDataFallback.updated) : undefined),
           };
 
-          // Debug logging for events with location to see what we're getting
-          if (event.location || eventDataFallback.location) {
-            console.log('Event with location data:', {
-              event_id: event.event_id,
-              title: event.title,
-              location_from_column: event.location,
-              location_from_column_type: typeof event.location,
-              location_from_fallback: eventDataFallback.location,
-              location_from_fallback_type: typeof eventDataFallback.location,
-              final_location: eventData.location,
-              has_event_data: !!event.event_data,
-              event_data_type: typeof event.event_data,
-              event_data_keys: event.event_data && typeof event.event_data === 'object' && event.event_data !== null ? Object.keys(event.event_data) : 'N/A',
-              raw_event_location: event.location,
-              raw_event_keys: Object.keys(event).filter(k => k.includes('location') || k.includes('description')),
-            });
-          }
 
           return eventData;
         });
 
-        console.log('Returning cached events:', {
-          total: cachedEvents.length,
-          filtered: formattedEvents.length,
-          calendars: [...new Set(formattedEvents.map(e => e.calendar))],
-        });
         return NextResponse.json({ events: formattedEvents, fromCache: true });
       }
     }

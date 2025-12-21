@@ -18,7 +18,6 @@ interface CalendarItem {
 interface CalendarItemProps {
   calendar: CalendarItem;
   onToggle: (calendarId: string, checked: boolean) => void;
-  onRefresh: (calendarId: string) => Promise<void>;
 }
 
 interface CalendarSidebarProps {
@@ -26,25 +25,13 @@ interface CalendarSidebarProps {
   onDateSelect?: (date: Date) => void;
 }
 
-function CalendarItemComponent({ calendar, onToggle, onRefresh }: CalendarItemProps) {
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
-
-  const handleRefresh = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsRefreshing(true);
-    try {
-      await onRefresh(calendar.id);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
+function CalendarItemComponent({ calendar, onToggle }: CalendarItemProps) {
   const calendarColor = calendar.color || '#4285f4';
   const isChecked = calendar.selected !== false;
   const checkmarkColor = getContrastTextColor(calendarColor) === 'dark' ? '#1f2937' : '#ffffff';
   
   return (
-    <div className="flex items-center space-x-2 group">
+    <div className="flex items-center space-x-2">
       <div className="relative flex items-center">
         <Checkbox
           id={calendar.id}
@@ -89,16 +76,6 @@ function CalendarItemComponent({ calendar, onToggle, onRefresh }: CalendarItemPr
       >
         <span className="truncate">{calendar.summary}</span>
       </label>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={handleRefresh}
-        disabled={isRefreshing}
-        title="Refresh events"
-      >
-        <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
-      </Button>
     </div>
   );
 }
@@ -107,6 +84,7 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
   const [calendars, setCalendars] = React.useState<CalendarItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isConnecting, setIsConnecting] = React.useState(false);
+  const [isRefreshingAll, setIsRefreshingAll] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
     currentDate || new Date()
@@ -235,19 +213,31 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
     }
   };
 
-  const handleCalendarRefresh = async (calendarId: string) => {
+  const handleRefreshAll = async () => {
+    if (calendars.length === 0) return;
+    
+    setIsRefreshingAll(true);
     try {
-      const response = await fetch(`/api/google-calendar/events/refresh?calendarId=${calendarId}`, {
-        method: 'POST',
-      });
-      if (response.ok) {
+      // Refresh all calendars in parallel
+      const refreshPromises = calendars.map((calendar) =>
+        fetch(`/api/google-calendar/events/refresh?calendarId=${calendar.id}`, {
+          method: 'POST',
+        })
+      );
+      
+      const responses = await Promise.all(refreshPromises);
+      const allSuccessful = responses.every((response) => response.ok);
+      
+      if (allSuccessful) {
         // Trigger a refresh of the calendar view
         window.dispatchEvent(new CustomEvent('calendar-refresh'));
       } else {
-        console.error('Failed to refresh calendar events');
+        console.error('Some calendars failed to refresh');
       }
     } catch (error) {
-      console.error('Error refreshing calendar:', error);
+      console.error('Error refreshing calendars:', error);
+    } finally {
+      setIsRefreshingAll(false);
     }
   };
 
@@ -258,7 +248,21 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
 
       {/* My Calendars */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium px-1">My Calendars</h3>
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-sm font-medium">My Calendars</h3>
+          {calendars.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={handleRefreshAll}
+              disabled={isRefreshingAll}
+              title="Refresh all calendars"
+            >
+              <RefreshCw className={cn('h-3 w-3', isRefreshingAll && 'animate-spin')} />
+            </Button>
+          )}
+        </div>
         {loading ? (
           <div className="text-sm text-muted-foreground px-1">Loading calendars...</div>
         ) : error ? (
@@ -293,7 +297,6 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
                 key={calendar.id}
                 calendar={calendar}
                 onToggle={handleCalendarToggle}
-                onRefresh={handleCalendarRefresh}
               />
             ))
           )}
