@@ -5,7 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 // Dynamic import for googleapis
 let google: any;
 try {
-  google = require('googleapis').google;
+  const googleapis = await import('googleapis');
+  google = googleapis.google;
 } catch (error) {
   console.warn('googleapis package not installed');
 }
@@ -459,7 +460,7 @@ export async function GET(req: Request) {
             title: event.summary || 'No Title',
             start,
             end,
-            color,
+            color: eventColor,
             calendar: event.organizer?.displayName || calendarId,
             calendarId: calendarId, // Include the actual calendar ID
             description: event.description,

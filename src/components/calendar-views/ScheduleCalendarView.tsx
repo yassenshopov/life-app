@@ -6,6 +6,7 @@ import { CalendarEvent } from '../HQCalendar';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import { MapPin, Users, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { getContrastTextColor } from '@/lib/color-utils';
+import DOMPurify from 'dompurify';
 
 interface ScheduleCalendarViewProps {
   currentDate: Date;
@@ -105,6 +106,31 @@ export function ScheduleCalendarView({
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear()
     );
+  };
+
+  // Safely sanitize and format description text
+  const sanitizeDescription = (description: string | null | undefined): string => {
+    if (!description) {
+      return '';
+    }
+
+    // Sanitize HTML by stripping all tags and attributes
+    const sanitized = DOMPurify.sanitize(description, {
+      ALLOWED_TAGS: [],
+      ALLOWED_ATTR: [],
+    });
+
+    // Decode HTML entities
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = sanitized;
+    const decoded = textarea.value;
+
+    // Truncate to 100 characters
+    if (decoded.length > 100) {
+      return decoded.substring(0, 100) + '...';
+    }
+
+    return decoded;
   };
 
   const sortedDates = Array.from(groupedEvents.keys()).sort();
@@ -246,12 +272,9 @@ export function ScheduleCalendarView({
                           
                           {/* Description preview (truncated) */}
                           {event.description && (
-                            <div 
-                              className="text-xs text-muted-foreground line-clamp-2 mt-1"
-                              dangerouslySetInnerHTML={{ 
-                                __html: event.description.replace(/<[^>]*>/g, '').substring(0, 100) + (event.description.length > 100 ? '...' : '')
-                              }}
-                            />
+                            <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                              {sanitizeDescription(event.description)}
+                            </div>
                           )}
                         </div>
                       </div>

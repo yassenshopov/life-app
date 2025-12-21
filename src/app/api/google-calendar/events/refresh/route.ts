@@ -5,7 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 // Dynamic import for googleapis
 let google: any;
 try {
-  google = require('googleapis').google;
+  const googleapis = await import('googleapis');
+  google = googleapis.google;
 } catch (error) {
   console.warn('googleapis package not installed');
 }
