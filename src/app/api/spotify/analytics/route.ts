@@ -148,6 +148,84 @@ export async function GET(request: Request) {
       }
     }
 
+    // Get top tracks/artists from Spotify's top data (if available)
+    const { data: topTracksData } = await supabase
+      .from('spotify_top_tracks')
+      .select('track_id, time_range, rank')
+      .eq('user_id', userId)
+      .order('time_range', { ascending: true })
+      .order('rank', { ascending: true });
+
+    const { data: topArtistsData } = await supabase
+      .from('spotify_top_artists')
+      .select('artist_id, time_range, rank')
+      .eq('user_id', userId)
+      .order('time_range', { ascending: true })
+      .order('rank', { ascending: true });
+
+    // Get track/artist details for top data
+    const topTracksByTimeRange: Record<string, any[]> = {
+      short_term: [],
+      medium_term: [],
+      long_term: [],
+    };
+
+    if (topTracksData && topTracksData.length > 0) {
+      const trackIds = [...new Set(topTracksData.map(t => t.track_id))];
+      const { data: tracks } = await supabase
+        .from('spotify_tracks')
+        .select('*')
+        .in('id', trackIds);
+
+      const tracksMap = new Map(tracks?.map(t => [t.id, t]) || []);
+      
+      topTracksData.forEach(({ track_id, time_range, rank }) => {
+        const track = tracksMap.get(track_id);
+        if (track) {
+          topTracksByTimeRange[time_range].push({
+            ...track,
+            rank,
+          });
+        }
+      });
+
+      // Sort by rank
+      Object.keys(topTracksByTimeRange).forEach(range => {
+        topTracksByTimeRange[range].sort((a, b) => a.rank - b.rank);
+      });
+    }
+
+    const topArtistsByTimeRange: Record<string, any[]> = {
+      short_term: [],
+      medium_term: [],
+      long_term: [],
+    };
+
+    if (topArtistsData && topArtistsData.length > 0) {
+      const artistIds = [...new Set(topArtistsData.map(a => a.artist_id))];
+      const { data: artists } = await supabase
+        .from('spotify_artists')
+        .select('*')
+        .in('id', artistIds);
+
+      const artistsMap = new Map(artists?.map(a => [a.id, a]) || []);
+      
+      topArtistsData.forEach(({ artist_id, time_range, rank }) => {
+        const artist = artistsMap.get(artist_id);
+        if (artist) {
+          topArtistsByTimeRange[time_range].push({
+            ...artist,
+            rank,
+          });
+        }
+      });
+
+      // Sort by rank
+      Object.keys(topArtistsByTimeRange).forEach(range => {
+        topArtistsByTimeRange[range].sort((a, b) => a.rank - b.rank);
+      });
+    }
+
     return NextResponse.json({
       totalMinutes: Math.round(totalMinutes),
       totalPlays: allRecords?.length || 0,
@@ -158,6 +236,10 @@ export async function GET(request: Request) {
       listeningByHour: hourCounts,
       listeningByDay: dayCounts,
       timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
+      // Add top data from Spotify's aggregated endpoints
+      topTracksByTimeRange,
+      topArtistsByTimeRange,
+      hasTopData: Object.values(topTracksByTimeRange).some(arr => arr.length > 0),
     });
   } catch (error: any) {
     console.error('Error fetching analytics:', error);

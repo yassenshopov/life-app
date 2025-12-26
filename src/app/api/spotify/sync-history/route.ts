@@ -23,10 +23,12 @@ export async function POST() {
 
     // Fetch all available history using pagination
     while (hasMore && pageCount < maxPages) {
+      console.log(`Fetching page ${pageCount + 1} with URL: ${nextUrl}`);
       const response = await spotifyApiRequest(nextUrl!);
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: { message: 'Failed to fetch history' } }));
+        console.log(`Page ${pageCount + 1} failed:`, error);
         // If we got some data before the error, continue with what we have
         if (allItems.length === 0) {
           return NextResponse.json(
@@ -40,7 +42,16 @@ export async function POST() {
       const data = await response.json();
       const items = data.items || [];
       
+      console.log(`Page ${pageCount + 1} results:`, {
+        itemsCount: items.length,
+        hasNext: !!data.next,
+        nextUrl: data.next,
+        oldestTimestamp: items.length > 0 ? items[items.length - 1].played_at : null,
+        newestTimestamp: items.length > 0 ? items[0].played_at : null
+      });
+      
       if (items.length === 0) {
+        console.log('No items returned, stopping pagination');
         hasMore = false;
         break;
       }
@@ -48,40 +59,56 @@ export async function POST() {
       allItems.push(...items);
       pageCount++;
 
-      // Spotify pagination: Check for 'next' field or use 'before' parameter
-      // The response may include a 'next' field with the next page URL
+      // Spotify pagination: Use the 'next' field if available, otherwise construct URL with 'before'
       if (data.next) {
-        // Extract the URL from the 'next' field (it's a full URL, we need just the path)
+        // Spotify provides the next URL - extract the path and query
         try {
           const nextUrlObj = new URL(data.next);
-          nextUrl = nextUrlObj.pathname + nextUrlObj.search;
-        } catch {
-          // If parsing fails, try to extract the 'before' parameter manually
-          const oldestItem = items[items.length - 1];
-          const oldestTimestamp = Math.floor(new Date(oldestItem.played_at).getTime());
-          nextUrl = `/me/player/recently-played?limit=50&before=${oldestTimestamp}`;
+          // Remove /v1 prefix since spotifyApiRequest adds it
+          let path = nextUrlObj.pathname;
+          if (path.startsWith('/v1')) {
+            path = path.substring(3); // Remove '/v1'
+          }
+          nextUrl = path + nextUrlObj.search;
+          console.log(`Using Spotify's next URL: ${nextUrl}`);
+        } catch (error) {
+          console.log('Failed to parse next URL, constructing manually');
+          // Fallback to manual construction
+          if (items.length === 50) {
+            const oldestItem = items[items.length - 1];
+            // Subtract 1ms to ensure we get items before this timestamp
+            const oldestTimestamp = Math.floor(new Date(oldestItem.played_at).getTime()) - 1;
+            nextUrl = `/me/player/recently-played?limit=50&before=${oldestTimestamp}`;
+            console.log(`Continuing to next page with before=${oldestTimestamp}`);
+          } else {
+            hasMore = false;
+          }
         }
       } else if (items.length === 50) {
-        // If we got a full page but no 'next' field, try using 'before' parameter
+        // No 'next' field but we got a full page - construct URL manually
         const oldestItem = items[items.length - 1];
-        const oldestTimestamp = Math.floor(new Date(oldestItem.played_at).getTime());
+        // Subtract 1ms to ensure we get items before this timestamp
+        const oldestTimestamp = Math.floor(new Date(oldestItem.played_at).getTime()) - 1;
         nextUrl = `/me/player/recently-played?limit=50&before=${oldestTimestamp}`;
+        console.log(`No next URL, constructing manually with before=${oldestTimestamp}`);
       } else {
         // If we got less than 50 items and no 'next' field, we've reached the end
+        console.log(`Got less than 50 items (${items.length}) and no next URL, stopping pagination`);
         hasMore = false;
       }
       
-      // Safety check: if we're getting duplicate timestamps, we've likely reached the end
+      // Safety check: prevent infinite loops by checking for duplicate data
       if (allItems.length > 50) {
-        const lastTwoTimestamps = [
-          allItems[allItems.length - 1].played_at,
-          allItems[allItems.length - 2].played_at
-        ];
-        if (lastTwoTimestamps[0] === lastTwoTimestamps[1]) {
+        const last50Timestamps = allItems.slice(-50).map(item => item.played_at);
+        const uniqueTimestamps = new Set(last50Timestamps);
+        if (uniqueTimestamps.size < 10) {
+          console.log('Detected too many duplicate timestamps, stopping pagination');
           hasMore = false;
         }
       }
     }
+    
+    console.log(`Pagination complete: ${pageCount} pages, ${allItems.length} total items`);
 
     if (allItems.length === 0) {
       return NextResponse.json({ message: 'No tracks to sync', synced: 0, total: 0 });
@@ -197,7 +224,9 @@ export async function POST() {
         newest: newestDate?.toISOString(),
         daysBack
       },
-      note: daysBack >= 49 ? 'Note: Spotify API only provides data for the last ~50 days. Sync regularly to build a complete history over time.' : undefined
+      note: daysBack >= 49 
+        ? 'Note: Spotify API only provides the last 50 tracks via recently-played. Use "Sync Top Data" to get insights from top tracks/artists across different time ranges (4 weeks, 6 months, several years).' 
+        : undefined
     });
   } catch (error: any) {
     console.error('Error syncing history:', error);

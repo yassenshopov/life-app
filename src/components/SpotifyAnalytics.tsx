@@ -58,6 +58,11 @@ export function SpotifyAnalytics() {
       const response = await fetch('/api/spotify/sync-history', { method: 'POST' });
       if (response.ok) {
         const data = await response.json();
+        console.log('Sync result:', data);
+        // Show a brief message about what was synced
+        if (data.note) {
+          console.info(data.note);
+        }
         // Refresh analytics after syncing
         await fetchAnalytics();
       }
@@ -65,6 +70,25 @@ export function SpotifyAnalytics() {
       console.error('Error syncing history:', error);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const [syncingTop, setSyncingTop] = React.useState(false);
+
+  const syncTopData = async () => {
+    setSyncingTop(true);
+    try {
+      const response = await fetch('/api/spotify/sync-top-data', { method: 'POST' });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Top data sync result:', data);
+        // Refresh analytics after syncing
+        await fetchAnalytics();
+      }
+    } catch (error) {
+      console.error('Error syncing top data:', error);
+    } finally {
+      setSyncingTop(false);
     }
   };
 
@@ -130,7 +154,7 @@ export function SpotifyAnalytics() {
             <option value={90}>Last 90 days</option>
             <option value={365}>Last year</option>
           </select>
-          <Button onClick={syncHistory} disabled={syncing} variant="outline">
+          <Button onClick={syncHistory} disabled={syncing} variant="outline" title="Sync recently played tracks (last 50)">
             {syncing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -139,7 +163,20 @@ export function SpotifyAnalytics() {
             ) : (
               <>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Sync
+                Sync History
+              </>
+            )}
+          </Button>
+          <Button onClick={syncTopData} disabled={syncingTop} variant="outline" title="Sync top tracks/artists (4 weeks, 6 months, several years)">
+            {syncingTop ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Sync Top Data
               </>
             )}
           </Button>
@@ -269,34 +306,44 @@ export function SpotifyAnalytics() {
         <Card>
           <CardHeader>
             <CardTitle>Top Tracks</CardTitle>
-            <CardDescription>Your most played songs</CardDescription>
+            <CardDescription>
+              {analytics.hasTopData 
+                ? 'From your listening history (sync top data for Spotify\'s aggregated rankings)' 
+                : 'Your most played songs'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {analytics.topTracks.map((item, index) => (
-                <div
-                  key={item.track.id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="w-8 text-center font-bold text-muted-foreground">
-                    {index + 1}
+              {analytics.topTracks.length > 0 ? (
+                analytics.topTracks.map((item, index) => (
+                  <div
+                    key={item.track.id}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="w-8 text-center font-bold text-muted-foreground">
+                      {index + 1}
+                    </div>
+                    {item.track.image && (
+                      <img
+                        src={item.track.image}
+                        alt={item.track.name}
+                        className="w-12 h-12 rounded"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold truncate">{item.track.name}</h4>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {item.track.artists.join(', ')}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{item.count} plays</Badge>
                   </div>
-                  {item.track.image && (
-                    <img
-                      src={item.track.image}
-                      alt={item.track.name}
-                      className="w-12 h-12 rounded"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold truncate">{item.track.name}</h4>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {item.track.artists.join(', ')}
-                    </p>
-                  </div>
-                  <Badge variant="secondary">{item.count} plays</Badge>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No track data available. Sync your history to see top tracks.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -304,29 +351,108 @@ export function SpotifyAnalytics() {
         <Card>
           <CardHeader>
             <CardTitle>Top Artists</CardTitle>
-            <CardDescription>Your most listened artists</CardDescription>
+            <CardDescription>
+              {analytics.hasTopData 
+                ? 'From your listening history (sync top data for Spotify\'s aggregated rankings)' 
+                : 'Your most listened artists'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {analytics.topArtists.map((artist, index) => (
-                <div
-                  key={artist.name}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="w-8 text-center font-bold text-muted-foreground">
-                    {index + 1}
+              {analytics.topArtists.length > 0 ? (
+                analytics.topArtists.map((artist, index) => (
+                  <div
+                    key={artist.name}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="w-8 text-center font-bold text-muted-foreground">
+                      {index + 1}
+                    </div>
+                    <Users className="w-8 h-8 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold truncate">{artist.name}</h4>
+                    </div>
+                    <Badge variant="secondary">{artist.count} plays</Badge>
                   </div>
-                  <Users className="w-8 h-8 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold truncate">{artist.name}</h4>
-                  </div>
-                  <Badge variant="secondary">{artist.count} plays</Badge>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No artist data available. Sync your history to see top artists.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Spotify's Top Data by Time Range */}
+      {analytics.hasTopData && (analytics.topTracksByTimeRange || analytics.topArtistsByTimeRange) && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-bold mb-2">Spotify's Top Rankings</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Aggregated data from Spotify across different time periods
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {(['short_term', 'medium_term', 'long_term'] as const).map((timeRange) => {
+              const rangeLabels = {
+                short_term: 'Last 4 Weeks',
+                medium_term: 'Last 6 Months',
+                long_term: 'All Time',
+              };
+
+              const tracks = analytics.topTracksByTimeRange?.[timeRange] || [];
+              const artists = analytics.topArtistsByTimeRange?.[timeRange] || [];
+
+              if (tracks.length === 0 && artists.length === 0) return null;
+
+              return (
+                <Card key={timeRange}>
+                  <CardHeader>
+                    <CardTitle>{rangeLabels[timeRange]}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {tracks.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Top Tracks</h4>
+                        <div className="space-y-2">
+                          {tracks.slice(0, 5).map((track) => (
+                            <div
+                              key={track.id}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <span className="w-6 text-muted-foreground">#{track.rank}</span>
+                              <span className="flex-1 truncate">{track.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {artists.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2">Top Artists</h4>
+                        <div className="space-y-2">
+                          {artists.slice(0, 5).map((artist) => (
+                            <div
+                              key={artist.id}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <span className="w-6 text-muted-foreground">#{artist.rank}</span>
+                              <span className="flex-1 truncate">{artist.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
