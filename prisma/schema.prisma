@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                        String    @id
+  email                     String?
+  first_name                String?
+  last_name                 String?
+  image_url                 String?
+  created_at                DateTime? @db.Timestamptz(6)
+  updated_at                DateTime? @updatedAt @db.Timestamptz(6)
+  isDeleted                 Boolean?  @default(false) @map("isdeleted")
+  notion_databases          Json[]    @default([])
+  google_calendar_credentials Json?
+  calendar_preferences      Json?
+
+  // Relationships
+  dailyTracking             daily_tracking[]
+  stravaCredentials         strava_credentials?
+  userPreferences           user_preferences?
+  googleCalendarEvents      google_calendar_events[]
+  people                    people[]
+
+  @@map("users")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model daily_tracking {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String
+  date         DateTime @db.Date
+  mood         Int?
+  energy_level Int?
+  notes        String?
+  created_at   DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  updated_at   DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+
+  // Relationships
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, date])
+  @@index([date], map: "idx_daily_tracking_date")
+  @@index([user_id], map: "idx_daily_tracking_user_id")
+  @@map("daily_tracking")
+}
+
+model strava_credentials {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @unique
+  access_token  String
+  refresh_token String
+  expires_at    DateTime @db.Timestamptz(6)
+  created_at    DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  updated_at    DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+
+  // Relationships
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "idx_strava_credentials_user_id")
+  @@map("strava_credentials")
+}
+
+model user_preferences {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @unique
+  timezone   String?  @default("UTC")
+  created_at DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  updated_at DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+
+  // Relationships
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "idx_user_preferences_user_id")
+  @@map("user_preferences")
+}
+
+model google_calendar_events {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String
+  calendar_id   String
+  event_id      String
+  title         String
+  start_time    DateTime @db.Timestamptz(6)
+  end_time      DateTime @db.Timestamptz(6)
+  color         String?
+  description   String?
+  location      String?
+  event_data    Json?
+  last_synced_at DateTime @default(now()) @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relationships
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, calendar_id, event_id], map: "unique_user_calendar_event")
+  @@index([user_id], map: "idx_google_calendar_events_user_id")
+  @@index([calendar_id], map: "idx_google_calendar_events_calendar_id")
+  @@index([start_time], map: "idx_google_calendar_events_start_time")
+  @@index([user_id, calendar_id], map: "idx_google_calendar_events_user_calendar")
+  @@map("google_calendar_events")
+}
+
+model people {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String
+  notion_page_id        String
+  notion_database_id    String
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime  @updatedAt @db.Timestamptz(6)
+  last_synced_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  name                  String
+  origin_of_connection   String[]
+  star_sign             String?
+  image                 Json?
+  currently_at          String?
+  age                   Json?
+  tier                  String[]
+  occupation            String?
+  birthday              Json?
+  contact_freq          String?
+  from_location         String?   @map("from_location")
+  birth_date            DateTime? @db.Date
+
+  // Relationships
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_people_user_id")
+  @@index([notion_page_id], map: "idx_people_notion_page_id")
+  @@index([notion_database_id], map: "idx_people_notion_database_id")
+  @@index([birth_date], map: "idx_people_birth_date")
+  @@map("people")
+}
