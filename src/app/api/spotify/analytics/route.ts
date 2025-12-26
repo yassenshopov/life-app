@@ -7,34 +7,51 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const timeRange = new URLSearchParams(new URL(await import('url').then(m => m.default)).search).get('range') || '30';
-    const days = parseInt(timeRange);
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const { searchParams } = new URL(request.url);
+    const timeRange = searchParams.get('range') || 'all';
+    
+    // If 'all', don't filter by date - get all stored history
+    let startDate: Date | null = null;
+    if (timeRange !== 'all') {
+      const days = parseInt(timeRange);
+      if (!isNaN(days)) {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+      }
+    }
 
     // Get total listening time
-    const { data: totalTime } = await supabase
+    let totalTimeQuery = supabase
       .from('spotify_listening_history')
       .select('duration_ms')
-      .eq('user_id', userId)
-      .gte('played_at', startDate.toISOString());
+      .eq('user_id', userId);
+    
+    if (startDate) {
+      totalTimeQuery = totalTimeQuery.gte('played_at', startDate.toISOString());
+    }
+    
+    const { data: totalTime } = await totalTimeQuery;
 
     const totalMinutes = totalTime?.reduce((sum, record) => sum + (record.duration_ms || 0), 0) / 60000 || 0;
 
     // Get most played tracks
-    const { data: topTracks } = await supabase
+    let topTracksQuery = supabase
       .from('spotify_listening_history')
       .select('track_id, track_name, artist_names, album_image_url, played_at')
-      .eq('user_id', userId)
-      .gte('played_at', startDate.toISOString())
-      .order('played_at', { ascending: false });
+      .eq('user_id', userId);
+    
+    if (startDate) {
+      topTracksQuery = topTracksQuery.gte('played_at', startDate.toISOString());
+    }
+    
+    const { data: topTracks } = await topTracksQuery.order('played_at', { ascending: false });
 
     const trackCounts = new Map<string, { count: number; track: any; lastPlayed: Date }>();
     topTracks?.forEach((record) => {
@@ -81,11 +98,16 @@ export async function GET() {
       .slice(0, 10);
 
     // Get listening patterns by hour
-    const { data: allRecords } = await supabase
+    let allRecordsQuery = supabase
       .from('spotify_listening_history')
       .select('played_at')
-      .eq('user_id', userId)
-      .gte('played_at', startDate.toISOString());
+      .eq('user_id', userId);
+    
+    if (startDate) {
+      allRecordsQuery = allRecordsQuery.gte('played_at', startDate.toISOString());
+    }
+    
+    const { data: allRecords } = await allRecordsQuery;
 
     const hourCounts = new Array(24).fill(0);
     allRecords?.forEach((record) => {
@@ -135,7 +157,7 @@ export async function GET() {
       topArtists: topArtistsList,
       listeningByHour: hourCounts,
       listeningByDay: dayCounts,
-      timeRange: days,
+      timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
     });
   } catch (error: any) {
     console.error('Error fetching analytics:', error);

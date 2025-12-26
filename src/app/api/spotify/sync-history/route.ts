@@ -15,28 +15,82 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch recently played tracks from Spotify
-    const response = await spotifyApiRequest('/me/player/recently-played?limit=50');
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: { message: 'Failed to fetch history' } }));
-      return NextResponse.json(
-        { error: error.error?.message || 'Failed to fetch listening history' },
-        { status: response.status }
-      );
+    let allItems: any[] = [];
+    let nextUrl: string | null = '/me/player/recently-played?limit=50';
+    let hasMore = true;
+    let pageCount = 0;
+    const maxPages = 100; // Safety limit to prevent infinite loops
+
+    // Fetch all available history using pagination
+    while (hasMore && pageCount < maxPages) {
+      const response = await spotifyApiRequest(nextUrl!);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Failed to fetch history' } }));
+        // If we got some data before the error, continue with what we have
+        if (allItems.length === 0) {
+          return NextResponse.json(
+            { error: error.error?.message || 'Failed to fetch listening history' },
+            { status: response.status }
+          );
+        }
+        break;
+      }
+
+      const data = await response.json();
+      const items = data.items || [];
+      
+      if (items.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allItems.push(...items);
+      pageCount++;
+
+      // Spotify pagination: Check for 'next' field or use 'before' parameter
+      // The response may include a 'next' field with the next page URL
+      if (data.next) {
+        // Extract the URL from the 'next' field (it's a full URL, we need just the path)
+        try {
+          const nextUrlObj = new URL(data.next);
+          nextUrl = nextUrlObj.pathname + nextUrlObj.search;
+        } catch {
+          // If parsing fails, try to extract the 'before' parameter manually
+          const oldestItem = items[items.length - 1];
+          const oldestTimestamp = Math.floor(new Date(oldestItem.played_at).getTime());
+          nextUrl = `/me/player/recently-played?limit=50&before=${oldestTimestamp}`;
+        }
+      } else if (items.length === 50) {
+        // If we got a full page but no 'next' field, try using 'before' parameter
+        const oldestItem = items[items.length - 1];
+        const oldestTimestamp = Math.floor(new Date(oldestItem.played_at).getTime());
+        nextUrl = `/me/player/recently-played?limit=50&before=${oldestTimestamp}`;
+      } else {
+        // If we got less than 50 items and no 'next' field, we've reached the end
+        hasMore = false;
+      }
+      
+      // Safety check: if we're getting duplicate timestamps, we've likely reached the end
+      if (allItems.length > 50) {
+        const lastTwoTimestamps = [
+          allItems[allItems.length - 1].played_at,
+          allItems[allItems.length - 2].played_at
+        ];
+        if (lastTwoTimestamps[0] === lastTwoTimestamps[1]) {
+          hasMore = false;
+        }
+      }
     }
 
-    const data = await response.json();
-    const items = data.items || [];
-
-    if (items.length === 0) {
-      return NextResponse.json({ message: 'No new tracks to sync', synced: 0 });
+    if (allItems.length === 0) {
+      return NextResponse.json({ message: 'No tracks to sync', synced: 0, total: 0 });
     }
 
     let syncedCount = 0;
 
     // Process each track
-    for (const item of items) {
+    for (const item of allItems) {
       const track = item.track;
       const playedAt = new Date(item.played_at);
 
@@ -121,10 +175,29 @@ export async function POST() {
       }
     }
 
+    // Get the date range of fetched data
+    const oldestDate = allItems.length > 0 
+      ? new Date(allItems[allItems.length - 1].played_at)
+      : null;
+    const newestDate = allItems.length > 0 
+      ? new Date(allItems[0].played_at)
+      : null;
+    
+    const daysBack = oldestDate && newestDate
+      ? Math.ceil((newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
     return NextResponse.json({ 
-      message: `Synced ${syncedCount} new tracks`,
+      message: `Synced ${syncedCount} new tracks from ${allItems.length} total fetched`,
       synced: syncedCount,
-      total: items.length 
+      total: allItems.length,
+      pages: pageCount,
+      dateRange: {
+        oldest: oldestDate?.toISOString(),
+        newest: newestDate?.toISOString(),
+        daysBack
+      },
+      note: daysBack >= 49 ? 'Note: Spotify API only provides data for the last ~50 days. Sync regularly to build a complete history over time.' : undefined
     });
   } catch (error: any) {
     console.error('Error syncing history:', error);

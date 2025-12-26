@@ -27,19 +27,20 @@ interface AnalyticsData {
   }>;
   listeningByHour: number[];
   listeningByDay: number[];
-  timeRange: number;
+  timeRange: number | 'all';
 }
 
 export function SpotifyAnalytics() {
   const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [syncing, setSyncing] = React.useState(false);
-  const [timeRange, setTimeRange] = React.useState(30);
+  const [timeRange, setTimeRange] = React.useState<number | 'all'>(30);
 
   const fetchAnalytics = React.useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/spotify/analytics?range=${timeRange}`);
+      const rangeParam = timeRange === 'all' ? 'all' : timeRange.toString();
+      const response = await fetch(`/api/spotify/analytics?range=${rangeParam}`);
       if (response.ok) {
         const data = await response.json();
         setAnalytics(data);
@@ -120,9 +121,10 @@ export function SpotifyAnalytics() {
         <div className="flex items-center gap-2">
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(Number(e.target.value))}
+            onChange={(e) => setTimeRange(e.target.value === 'all' ? 'all' : Number(e.target.value))}
             className="text-sm border rounded px-3 py-1.5 bg-background"
           >
+            <option value="all">All time</option>
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
@@ -190,9 +192,13 @@ export function SpotifyAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {Math.round(analytics.totalPlays / timeRange)}
+              {analytics.timeRange === 'all' 
+                ? analytics.totalPlays 
+                : Math.round(analytics.totalPlays / analytics.timeRange)}
             </div>
-            <p className="text-xs text-muted-foreground">plays per day</p>
+            <p className="text-xs text-muted-foreground">
+              {analytics.timeRange === 'all' ? 'total plays' : 'plays per day'}
+            </p>
           </CardContent>
         </Card>
       </div>
