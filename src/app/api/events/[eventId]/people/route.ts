@@ -138,13 +138,23 @@ export async function POST(
       );
     }
 
+    // Handle the nested people object (Supabase returns it as an object when using .single())
+    const peopleData = Array.isArray(data.people) ? data.people[0] : data.people;
+    
+    if (!peopleData) {
+      return NextResponse.json(
+        { error: 'Failed to fetch person data' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       person: {
-        id: data.people.id,
-        name: data.people.name,
-        image: data.people.image,
-        nicknames: data.people.nicknames,
+        id: peopleData.id,
+        name: peopleData.name,
+        image: peopleData.image,
+        nicknames: peopleData.nicknames,
         linkId: data.id,
       },
     });

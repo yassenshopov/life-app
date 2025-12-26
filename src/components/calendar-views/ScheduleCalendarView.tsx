@@ -7,7 +7,7 @@ import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import { MapPin, Users, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { getContrastTextColor } from '@/lib/color-utils';
 import DOMPurify from 'dompurify';
-import { Person } from '@/lib/people-matching';
+import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
 
 interface ScheduleCalendarViewProps {

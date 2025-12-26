@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch events from Google Calendar API
     const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
-    const allEvents: any[] = [];
+    const allEvents: Array<{ event: any; calendarId: string }> = [];
 
     for (const calendarId of calendarsToFetch) {
       try {
@@ -184,7 +184,8 @@ export async function POST(request: NextRequest) {
           });
 
           const items = response.data.items || [];
-          allEvents.push(...items);
+          // Store events with their calendar ID
+          allEvents.push(...items.map((event: any) => ({ event, calendarId })));
           pageToken = response.data.nextPageToken;
         } while (pageToken);
       } catch (error: any) {
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Format events to match the expected structure
-    const events = allEvents.map((event: any) => {
+    const events = allEvents.map(({ event, calendarId: eventCalendarId }) => {
       const startDate = event.start?.dateTime
         ? new Date(event.start.dateTime)
         : event.start?.date
@@ -205,9 +206,6 @@ export async function POST(request: NextRequest) {
         : event.end?.date
         ? new Date(event.end.date + 'T00:00:00')
         : new Date();
-
-      // Extract calendar ID from the event
-      const eventCalendarId = event.organizer?.email || calendarId;
 
       return {
         id: event.id,
