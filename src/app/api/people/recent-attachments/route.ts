@@ -10,8 +10,9 @@ const supabase = createClient(
 );
 
 /**
- * Get the most recent event_people attachment date for each person
- * This is used to sort people by most recently attached to an event
+ * Get the most recent event date for each person (when they were last at an event)
+ * This is used to sort people by most recently interacted with
+ * Returns the actual event start_time, not when the relationship was created
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,29 +21,50 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the most recent created_at for each person from event_people table
-    const { data: eventPeople, error } = await supabase
+    // First, get all event_people relationships
+    const { data: eventPeople, error: epError } = await supabase
       .from('event_people')
-      .select('person_id, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .select('person_id, event_id')
+      .eq('user_id', userId);
 
-    if (error) {
-      console.error('Error fetching recent attachments:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch recent attachments' },
-        { status: 500 }
-      );
+    if (epError || !eventPeople || eventPeople.length === 0) {
+      return NextResponse.json({ recentDates: {} });
     }
 
-    // Group by person_id and get the most recent date for each
+    // Get unique event IDs
+    const eventIds = [...new Set(eventPeople.map((ep: any) => ep.event_id))];
+
+    // Fetch event start times from google_calendar_events
+    const { data: events, error: eventsError } = await supabase
+      .from('google_calendar_events')
+      .select('event_id, start_time')
+      .eq('user_id', userId)
+      .in('event_id', eventIds);
+
+    if (eventsError) {
+      console.error('Error fetching events:', eventsError);
+      return NextResponse.json({ recentDates: {} });
+    }
+
+    // Create a map of event_id -> start_time
+    const eventDateMap = new Map<string, Date>();
+    (events || []).forEach((event: any) => {
+      if (event.start_time) {
+        eventDateMap.set(event.event_id, new Date(event.start_time));
+      }
+    });
+
+    // Group by person_id and get the most recent event date for each
     const recentDates = new Map<string, Date>();
-    (eventPeople || []).forEach((ep: any) => {
+    eventPeople.forEach((ep: any) => {
       const personId = ep.person_id;
-      const createdAt = new Date(ep.created_at);
-      const existing = recentDates.get(personId);
-      if (!existing || createdAt > existing) {
-        recentDates.set(personId, createdAt);
+      const eventDate = eventDateMap.get(ep.event_id);
+      
+      if (eventDate) {
+        const existing = recentDates.get(personId);
+        if (!existing || eventDate > existing) {
+          recentDates.set(personId, eventDate);
+        }
       }
     });
 
@@ -61,4 +83,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

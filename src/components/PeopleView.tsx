@@ -777,36 +777,60 @@ export function PeopleView() {
                               <div className="space-y-2">
                                 <div className="text-sm font-medium mb-2">Connected Calendar Events</div>
                                 <div className="space-y-1">
-                                  {events.map((event: any) => (
-                                    <Link
-                                      key={event.id}
-                                      href={`/hq?date=${new Date(event.start).toISOString().split('T')[0]}`}
-                                      className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors group"
-                                    >
-                                      <div
-                                        className="w-2 h-2 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: event.color || '#4285f4' }}
-                                      />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium truncate">{event.title}</div>
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                                          <div className="flex items-center gap-1">
-                                            <Clock className="w-3 h-3" />
-                                            <span>
-                                              {format(new Date(event.start), 'MMM d, yyyy')} at{' '}
-                                              {format(new Date(event.start), 'h:mm a')}
-                                            </span>
-                                          </div>
-                                          {event.location && (
+                                  {events.map((event: any) => {
+                                    // Parse event start date - handle Google Calendar API format
+                                    let eventStart: Date | null = null;
+                                    if (event.start?.dateTime) {
+                                      eventStart = new Date(event.start.dateTime);
+                                    } else if (event.start?.date) {
+                                      eventStart = new Date(event.start.date + 'T00:00:00');
+                                    } else if (event.start) {
+                                      // Try to parse as ISO string or timestamp
+                                      eventStart = new Date(event.start);
+                                    }
+                                    
+                                    // Skip invalid events
+                                    if (!eventStart || isNaN(eventStart.getTime())) {
+                                      console.warn('Invalid event date:', event);
+                                      return null;
+                                    }
+                                    
+                                    const dateStr = eventStart.toISOString().split('T')[0];
+                                    const isAllDay = event.start?.date || !event.start?.dateTime;
+                                    
+                                    return (
+                                      <Link
+                                        key={event.id}
+                                        href={`/hq?date=${dateStr}`}
+                                        className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors group"
+                                      >
+                                        <div
+                                          className="w-2 h-2 rounded-full flex-shrink-0"
+                                          style={{ backgroundColor: event.color || '#4285f4' }}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-sm font-medium truncate">{event.summary || event.title || 'Untitled Event'}</div>
+                                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                                             <div className="flex items-center gap-1">
-                                              <MapPin className="w-3 h-3" />
-                                              <span className="truncate">{event.location}</span>
+                                              <Clock className="w-3 h-3" />
+                                              <span>
+                                                {isAllDay 
+                                                  ? format(eventStart, 'MMM d, yyyy')
+                                                  : `${format(eventStart, 'MMM d, yyyy')} at ${format(eventStart, 'h:mm a')}`
+                                                }
+                                              </span>
                                             </div>
-                                          )}
+                                            {event.location && (
+                                              <div className="flex items-center gap-1">
+                                                <MapPin className="w-3 h-3" />
+                                                <span className="truncate">{event.location}</span>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    </Link>
-                                  ))}
+                                      </Link>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </TableCell>

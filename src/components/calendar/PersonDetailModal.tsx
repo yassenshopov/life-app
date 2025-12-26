@@ -144,6 +144,9 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{person.name}</DialogTitle>
+        </DialogHeader>
         <div className="p-8">
           {/* Header with large avatar and name */}
           <div className="flex items-end gap-4 mb-8">
