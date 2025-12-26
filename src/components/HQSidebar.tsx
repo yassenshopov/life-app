@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Target, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
+import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Outfit } from 'next/font/google';
@@ -45,6 +45,7 @@ export default function HQSidebar() {
   }, [isCollapsed]);
 
   const isActive = pathname === '/hq';
+  const isPeopleActive = pathname === '/people';
 
   return (
     <div
@@ -100,7 +101,7 @@ export default function HQSidebar() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-4 space-y-1">
         <Link
           href="/hq"
           className={cn(
@@ -112,6 +113,18 @@ export default function HQSidebar() {
         >
           <Target className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Mission HQ</span>}
+        </Link>
+        <Link
+          href="/people"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            'hover:bg-accent hover:text-accent-foreground',
+            isPeopleActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+        >
+          <Users className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">People</span>}
         </Link>
       </div>
 
@@ -173,4 +186,5 @@ export default function HQSidebar() {
     </div>
   );
 }
+
 

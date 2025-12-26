@@ -7,6 +7,8 @@ import { CalendarEvent } from '@/components/HQCalendar';
 import { formatEventTime } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import { getContrastTextColor } from '@/lib/color-utils';
+import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
+import { PersonAvatar } from './PersonAvatar';
 
 interface AnimatedCalendarEventProps {
   event: CalendarEvent;
@@ -19,6 +21,8 @@ interface AnimatedCalendarEventProps {
     top?: boolean; // Event touches this one from above
     bottom?: boolean; // Event touches this one from below
   };
+  people?: Person[];
+  onPersonClick?: (person: Person) => void;
 }
 
 /**
@@ -32,6 +36,8 @@ export function AnimatedCalendarEvent({
   currentDate,
   isPreview = false,
   touchingEvents,
+  people = [],
+  onPersonClick,
 }: AnimatedCalendarEventProps) {
   const bgColor = event.color || '#4285f4';
   const textColor = getContrastTextColor(bgColor);
@@ -63,6 +69,17 @@ export function AnimatedCalendarEvent({
   // Calculate event duration in minutes to determine if we should show description/location
   const durationMinutes = (displayEnd.getTime() - displayStart.getTime()) / (1000 * 60);
   const showExtraInfo = durationMinutes > 60; // Only show if > 1 hour (not exactly 1 hour)
+
+  // Use linked people from database (if available), otherwise fall back to title matching
+  const matchedPeople = React.useMemo(() => {
+    // Prefer linked people from database
+    if (event.linkedPeople && event.linkedPeople.length > 0) {
+      return event.linkedPeople;
+    }
+    // Fallback to title matching
+    if (!people || people.length === 0) return [];
+    return getMatchedPeopleFromEvent(event.title, people);
+  }, [event.linkedPeople, event.title, people]);
 
   return (
     <motion.div
@@ -108,7 +125,7 @@ export function AnimatedCalendarEvent({
       <div className="event-content overflow-hidden">
         <div 
           className={cn(
-            "font-medium",
+            "font-medium flex items-center gap-1.5",
             showExtraInfo 
               ? "text-xs break-words" // Allow wrapping for >1hr events
               : "text-[10px] truncate" // Single line truncate for <=1hr events
@@ -119,7 +136,28 @@ export function AnimatedCalendarEvent({
             overflowWrap: showExtraInfo ? 'break-word' : undefined,
           }}
         >
-          {event.title}
+          {/* Person avatars - to the left of the title, overlapping */}
+          {matchedPeople.length > 0 && (
+            <div className="flex items-center flex-shrink-0" style={{ marginRight: '4px' }}>
+              {matchedPeople.map((person, index) => (
+                <div
+                  key={person.id}
+                  style={{
+                    marginLeft: index > 0 ? '-8px' : '0',
+                    zIndex: matchedPeople.length - index,
+                  }}
+                  className="relative"
+                >
+                  <PersonAvatar
+                    person={person}
+                    size="sm"
+                    onClick={() => onPersonClick?.(person)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <span className={cn(showExtraInfo ? '' : 'truncate', 'flex-1')}>{event.title}</span>
         </div>
         <div 
           className={cn("opacity-90 truncate", showExtraInfo ? "text-[10px]" : "text-[9px]")} 

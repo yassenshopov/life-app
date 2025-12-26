@@ -7,6 +7,8 @@ import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import { MapPin, Users, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { getContrastTextColor } from '@/lib/color-utils';
 import DOMPurify from 'dompurify';
+import { Person } from '@/lib/people-matching';
+import { PersonAvatar } from '@/components/calendar/PersonAvatar';
 
 interface ScheduleCalendarViewProps {
   currentDate: Date;
@@ -14,6 +16,8 @@ interface ScheduleCalendarViewProps {
   timeFormat: TimeFormat;
   onNavigate: (date: Date) => void;
   onEventClick?: (event: CalendarEvent) => void;
+  people?: Person[];
+  onPersonClick?: (person: Person) => void;
 }
 
 export function ScheduleCalendarView({
@@ -22,6 +26,8 @@ export function ScheduleCalendarView({
   timeFormat,
   onNavigate,
   onEventClick,
+  people = [],
+  onPersonClick,
 }: ScheduleCalendarViewProps) {
   // Get events for the next 30 days, grouped by day
   const groupedEvents = React.useMemo(() => {
@@ -163,6 +169,7 @@ export function ScheduleCalendarView({
                     const textColor = getContrastTextColor(eventColor);
                     const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
                     const isAllDay = event.isAllDay || false;
+                    const matchedPeople = getMatchedPeopleFromEvent(event.title, people);
                     
                     // Calculate duration
                     const durationMs = event.end.getTime() - event.start.getTime();
@@ -219,7 +226,29 @@ export function ScheduleCalendarView({
                           {/* Title and calendar */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm truncate">{event.title}</div>
+                              <div className="font-semibold text-sm truncate flex items-center gap-1.5">
+                                {matchedPeople.length > 0 && (
+                                  <div className="flex items-center flex-shrink-0" style={{ marginRight: '4px' }}>
+                                    {matchedPeople.map((person: Person, index: number) => (
+                                      <div
+                                        key={person.id}
+                                        style={{
+                                          marginLeft: index > 0 ? '-8px' : '0',
+                                          zIndex: matchedPeople.length - index,
+                                        }}
+                                        className="relative"
+                                      >
+                                        <PersonAvatar
+                                          person={person}
+                                          size="sm"
+                                          onClick={() => onPersonClick?.(person)}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <span className="truncate flex-1">{event.title}</span>
+                              </div>
                               {event.calendar && (
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <CalendarIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />

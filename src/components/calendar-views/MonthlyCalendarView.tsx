@@ -1,16 +1,20 @@
 'use client';
 
-import * as React from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
 import { getEventsForDay } from '@/lib/calendar-utils';
 import { getContrastTextColor } from '@/lib/color-utils';
+import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
+import { PersonAvatar } from '@/components/calendar/PersonAvatar';
 
 interface MonthlyCalendarViewProps {
   currentMonth: Date;
   events: CalendarEvent[];
-  onNavigate: (date: Date) => void;
+  onNavigate: (date: Date, switchToWeekly?: boolean) => void;
   onEventClick?: (event: CalendarEvent) => void;
+  people?: Person[];
+  onPersonClick?: (person: Person) => void;
 }
 
 export function MonthlyCalendarView({
@@ -18,6 +22,8 @@ export function MonthlyCalendarView({
   events,
   onNavigate,
   onEventClick,
+  people = [],
+  onPersonClick,
 }: MonthlyCalendarViewProps) {
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -41,13 +47,16 @@ export function MonthlyCalendarView({
     return days;
   };
 
-  const days = React.useMemo(() => getDaysInMonth(currentMonth), [currentMonth]);
+  const days = useMemo(() => getDaysInMonth(currentMonth), [currentMonth]);
 
   // Group days into weeks
-  const weeks: (Date | null)[][] = [];
-  for (let i = 0; i < days.length; i += 7) {
-    weeks.push(days.slice(i, i + 7));
-  }
+  const weeks = useMemo(() => {
+    const result: (Date | null)[][] = [];
+    for (let i = 0; i < days.length; i += 7) {
+      result.push(days.slice(i, i + 7));
+    }
+    return result;
+  }, [days]);
 
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -128,11 +137,15 @@ export function MonthlyCalendarView({
                           const eventColor = event.color || '#4285f4';
                           const textColor = getContrastTextColor(eventColor);
                           const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
+                          // Use linked people from database, fallback to title matching
+                          const matchedPeople = event.linkedPeople && event.linkedPeople.length > 0
+                            ? event.linkedPeople
+                            : (people.length > 0 ? getMatchedPeopleFromEvent(event.title, people) : []);
                           
                           return (
                             <div
                               key={event.id}
-                              className="text-xs px-2 py-0.5 rounded truncate cursor-pointer hover:opacity-90"
+                              className="text-xs px-2 py-0.5 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1"
                               style={{ 
                                 backgroundColor: eventColor,
                                 color: textColorValue,
@@ -146,7 +159,27 @@ export function MonthlyCalendarView({
                                 onEventClick?.(event);
                               }}
                             >
-                              {event.title}
+                              {matchedPeople.length > 0 && (
+                                <div className="flex items-center flex-shrink-0">
+                                  {matchedPeople.map((person: Person, index: number) => (
+                                    <div
+                                      key={person.id}
+                                      style={{
+                                        marginLeft: index > 0 ? '-8px' : '0',
+                                        zIndex: matchedPeople.length - index,
+                                      }}
+                                      className="relative"
+                                    >
+                                      <PersonAvatar
+                                        person={person}
+                                        size="sm"
+                                        onClick={() => onPersonClick?.(person)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <span className="truncate flex-1">{event.title}</span>
                             </div>
                           );
                         })}

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreVertical, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,7 +21,11 @@ import { ScheduleCalendarView } from '@/components/calendar-views/ScheduleCalend
 import { AnimatedCalendarView } from '@/components/calendar/AnimatedCalendarView';
 import { EventDetailModal } from '@/components/calendar/EventDetailModal';
 import { NewEventModal } from '@/components/calendar/NewEventModal';
+import { KeyboardShortcutsDialog } from '@/components/calendar/KeyboardShortcutsDialog';
+import { PersonDetailModal } from '@/components/calendar/PersonDetailModal';
 import { motion } from 'framer-motion';
+import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
+import { fetchEventPeople } from '@/lib/fetch-event-people';
 
 // Calendar event interface
 export interface CalendarEvent {
@@ -68,6 +72,7 @@ export interface CalendarEvent {
   };
   created?: Date;
   updated?: Date;
+  linkedPeople?: Array<{ id: string; name: string; image?: any }>; // People linked to this event
 }
 
 export type CalendarViewMode = 'daily' | 'weekly' | 'monthly' | 'year' | 'schedule';
@@ -89,6 +94,16 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     Array<{ id: string; summary: string; color?: string }>
   >([]);
   const [previewEvent, setPreviewEvent] = React.useState<CalendarEvent | null>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = React.useState(false);
+  const [people, setPeople] = React.useState<Person[]>([]);
+  const [selectedPerson, setSelectedPerson] = React.useState<Person | null>(null);
+  const [isPersonModalOpen, setIsPersonModalOpen] = React.useState(false);
+
+  const handlePersonClick = (person: Person) => {
+    setSelectedPerson(person);
+    setIsPersonModalOpen(true);
+  };
 
   const handleEventClick = (event: CalendarEvent) => {
     console.log('handleEventClick - Event data:', {
@@ -205,6 +220,23 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       fetchCalendars();
     }
   }, [isNewEventModalOpen]);
+
+  // Fetch people data for matching
+  React.useEffect(() => {
+    const fetchPeople = async () => {
+      try {
+        const response = await fetch('/api/people');
+        const data = await response.json();
+        if (response.ok && data.people && Array.isArray(data.people)) {
+          setPeople(data.people);
+        }
+      } catch (error) {
+        console.error('Error fetching people:', error);
+      }
+    };
+
+    fetchPeople();
+  }, []);
 
   const handleEventUpdate = async (
     eventId: string,
@@ -473,7 +505,18 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           });
 
           console.log('Formatted events:', fetchedEvents.length, fetchedEvents.slice(0, 3));
-          setEvents(fetchedEvents);
+          
+          // Fetch linked people for all events
+          const eventIds = fetchedEvents.map(e => e.id);
+          const eventPeopleMap = await fetchEventPeople(eventIds);
+          
+          // Attach linked people to events
+          const eventsWithPeople = fetchedEvents.map(event => ({
+            ...event,
+            linkedPeople: eventPeopleMap[event.id] || [],
+          }));
+          
+          setEvents(eventsWithPeople);
           // Reset stop retrying flag on success
           setShouldStopRetrying(false);
           // Reset force refresh flag after successful fetch
@@ -501,12 +544,28 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     fetchEvents();
   }, [viewMode, currentDate, forceRefresh]); // Added forceRefresh to dependencies
 
+  const toggleFullscreen = React.useCallback(() => {
+    setIsFullscreen((prev) => !prev);
+  }, []);
+
   // Keyboard shortcuts for view mode switching
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input, textarea, or contenteditable
       const target = event.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      // Handle Escape key to exit fullscreen (only if fullscreen is active and no modals are open)
+      if (event.key === 'Escape' && isFullscreen && !isEventModalOpen && !isNewEventModalOpen && !settingsOpen && !isShortcutsDialogOpen) {
+        setIsFullscreen(false);
+        return;
+      }
+
+      // Handle ? key to open shortcuts dialog
+      if (event.key === '?' && !isEventModalOpen && !isNewEventModalOpen && !settingsOpen) {
+        setIsShortcutsDialogOpen(true);
         return;
       }
 
@@ -558,6 +617,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
             setCurrentDate(date);
           }
           break;
+        case 'f':
+          // Toggle fullscreen with 'f' key
+          toggleFullscreen();
+          break;
       }
     };
 
@@ -565,7 +628,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [viewMode]);
+  }, [viewMode, isFullscreen, isEventModalOpen, isNewEventModalOpen, settingsOpen, isShortcutsDialogOpen, toggleFullscreen]);
 
   const goToToday = () => {
     const today = new Date();
@@ -717,7 +780,13 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   };
 
   return (
-    <Card className="w-full">
+    <Card
+      className={cn(
+        'w-full transition-all duration-300',
+        isFullscreen &&
+          'fixed inset-0 z-[9999] m-0 rounded-none h-screen w-screen max-w-none flex flex-col'
+      )}
+    >
       <CardHeader className="pb-4">
         <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
@@ -753,6 +822,28 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
             <Button
               variant="ghost"
               size="icon"
+              onClick={toggleFullscreen}
+              className="ml-2"
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsShortcutsDialogOpen(true)}
+              className="ml-2"
+              title="Keyboard shortcuts (?)"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSettingsOpen(true)}
               className="ml-2"
             >
@@ -761,7 +852,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-0 overflow-hidden relative">
+      <CardContent className={cn('p-0 overflow-hidden relative flex-1', isFullscreen && 'min-h-0')}>
         {/* Loading overlay */}
         {loadingEvents && (
           <motion.div
@@ -786,9 +877,11 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onPersonClick={handlePersonClick}
               onEventUpdate={handleEventUpdate}
               onEmptySpaceClick={handleEmptySpaceClick}
               previewEvent={previewEvent}
+              people={people}
             />
           )}
           {viewMode === 'weekly' && (
@@ -798,9 +891,11 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onPersonClick={handlePersonClick}
               onEventUpdate={handleEventUpdate}
               onEmptySpaceClick={handleEmptySpaceClick}
               previewEvent={previewEvent}
+              people={people}
             />
           )}
           {viewMode === 'monthly' && (
@@ -809,6 +904,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               events={events}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              people={people}
+              onPersonClick={handlePersonClick}
             />
           )}
           {viewMode === 'year' && (
@@ -825,6 +922,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onPersonClick={handlePersonClick}
+              people={people}
             />
           )}
         </AnimatedCalendarView>
@@ -836,6 +935,12 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         onTimeFormatChange={setTimeFormat}
       />
 
+      {/* Keyboard Shortcuts Dialog */}
+      <KeyboardShortcutsDialog
+        open={isShortcutsDialogOpen}
+        onOpenChange={setIsShortcutsDialogOpen}
+      />
+
       {/* Event Detail Modal */}
       <EventDetailModal
         event={selectedEvent}
@@ -843,6 +948,18 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         onClose={handleCloseEventModal}
         timeFormat={timeFormat}
         onEventUpdate={handleEventUpdate}
+        people={people}
+        onPersonClick={handlePersonClick}
+        onPeopleChange={(eventId, updatedPeople) => {
+          // Optimistically update the event in the events array
+          setEvents((prevEvents) =>
+            prevEvents.map((e) =>
+              e.id === eventId
+                ? { ...e, linkedPeople: updatedPeople }
+                : e
+            )
+          );
+        }}
       />
 
       {/* New Event Modal */}
@@ -859,6 +976,18 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         initialDate={newEventInitialDate}
         onEventCreate={handleEventCreate}
         availableCalendars={availableCalendars}
+        people={people}
+        onPersonClick={handlePersonClick}
+        onPeopleChange={(eventId, updatedPeople) => {
+          // Optimistically update the event in the events array
+          setEvents((prevEvents) =>
+            prevEvents.map((e) =>
+              e.id === eventId
+                ? { ...e, linkedPeople: updatedPeople }
+                : e
+            )
+          );
+        }}
         onPreviewChange={(preview) => {
           if (!preview) {
             setPreviewEvent(null);
@@ -876,6 +1005,14 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           };
           setPreviewEvent(calendarEvent);
         }}
+      />
+      <PersonDetailModal
+        isOpen={isPersonModalOpen}
+        onClose={() => {
+          setIsPersonModalOpen(false);
+          setSelectedPerson(null);
+        }}
+        person={selectedPerson}
       />
     </Card>
   );

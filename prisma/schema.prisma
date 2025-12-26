@@ -24,6 +24,7 @@ model User {
   stravaCredentials         strava_credentials?
   userPreferences           user_preferences?
   googleCalendarEvents      google_calendar_events[]
+  people                    people[]
 
   @@map("users")
 }
@@ -104,4 +105,37 @@ model google_calendar_events {
   @@index([start_time], map: "idx_google_calendar_events_start_time")
   @@index([user_id, calendar_id], map: "idx_google_calendar_events_user_calendar")
   @@map("google_calendar_events")
+}
+
+model people {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String
+  notion_page_id        String
+  notion_database_id    String
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime  @updatedAt @db.Timestamptz(6)
+  last_synced_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  name                  String
+  origin_of_connection   String[]?
+  star_sign             String?
+  image                 Json?
+  currently_at          String?
+  age                   Json?
+  tier                  String[]?
+  occupation            String?
+  birthday              Json?
+  contact_freq          String?
+  from_location         String?   @map("from_location")
+  birth_date            DateTime? @db.Date
+
+  // Relationships
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_people_user_id")
+  @@index([notion_page_id], map: "idx_people_notion_page_id")
+  @@index([notion_database_id], map: "idx_people_notion_database_id")
+  @@index([birth_date], map: "idx_people_birth_date")
+  @@map("people")
 }

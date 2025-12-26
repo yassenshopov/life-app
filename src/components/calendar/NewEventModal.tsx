@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
-import { Calendar, Clock, MapPin, Save, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Save, X, Users, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,9 @@ import {
 import { LocationAutocomplete } from './LocationAutocomplete';
 import { formatTimeForInput, parseTimeInput } from '@/lib/time-format-utils';
 import { TimePicker } from '@/components/ui/time-picker';
+import { PersonAvatar } from './PersonAvatar';
+import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
+import { renderTitleWithAvatars } from '@/lib/render-title-with-avatars';
 
 interface NewEventModalProps {
   isOpen: boolean;
@@ -55,6 +58,9 @@ interface NewEventModalProps {
     calendarId: string;
     color?: string;
   } | null) => void;
+  people?: Person[];
+  onPersonClick?: (person: Person) => void;
+  onPeopleChange?: (eventId: string, people: Person[]) => void;
 }
 
 /**
@@ -69,6 +75,9 @@ export function NewEventModal({
   onEventCreate,
   availableCalendars = [],
   onPreviewChange,
+  people = [],
+  onPersonClick,
+  onPeopleChange,
 }: NewEventModalProps) {
   const [title, setTitle] = React.useState('');
   const [isAllDay, setIsAllDay] = React.useState(false);
@@ -81,6 +90,70 @@ export function NewEventModal({
   const [selectedCalendarId, setSelectedCalendarId] = React.useState<string>('');
   const [isCreating, setIsCreating] = React.useState(false);
   const titleRef = React.useRef<HTMLHeadingElement | null>(null);
+  const [showPeopleSelector, setShowPeopleSelector] = React.useState(false);
+  const [personSearchQuery, setPersonSearchQuery] = React.useState('');
+  const [peopleWithRecentDates, setPeopleWithRecentDates] = React.useState<Map<string, Date>>(new Map());
+  const [selectedPeopleIds, setSelectedPeopleIds] = React.useState<string[]>([]);
+
+  // Match people from title
+  const matchedPeople = React.useMemo(() => {
+    if (!title || !people || people.length === 0) return [];
+    return getMatchedPeopleFromEvent(title, people);
+  }, [title, people]);
+
+  // Fetch most recent attachment date for each person (when they were last attached to an event)
+  React.useEffect(() => {
+    const fetchRecentDates = async () => {
+      if (!showPeopleSelector || people.length === 0) return;
+      
+      try {
+        const response = await fetch('/api/people/recent-attachments');
+        if (response.ok) {
+          const data = await response.json();
+          const recentDates = data.recentDates || {};
+          const dateMap = new Map<string, Date>();
+          Object.entries(recentDates).forEach(([personId, dateStr]) => {
+            dateMap.set(personId, new Date(dateStr as string));
+          });
+          setPeopleWithRecentDates(dateMap);
+        }
+      } catch (error) {
+        // Silently fail
+      }
+    };
+
+    fetchRecentDates();
+  }, [showPeopleSelector, people]);
+
+  // Get filtered and sorted people
+  const availablePeopleForSelection = React.useMemo(() => {
+    let filtered = [...people];
+    
+    // Filter by search query
+    if (personSearchQuery.trim()) {
+      const query = personSearchQuery.toLowerCase();
+      filtered = filtered.filter((p) => 
+        p.name.toLowerCase().includes(query) ||
+        (p.nicknames && p.nicknames.some(n => n.toLowerCase().includes(query)))
+      );
+    }
+    
+    // Sort by most recently attached to an event
+    filtered.sort((a, b) => {
+      const dateA = peopleWithRecentDates.get(a.id);
+      const dateB = peopleWithRecentDates.get(b.id);
+      
+      // People with recent attachments come first
+      if (dateA && !dateB) return -1;
+      if (!dateA && dateB) return 1;
+      if (!dateA && !dateB) return 0;
+      
+      // Sort by most recent attachment first
+      return dateB!.getTime() - dateA!.getTime();
+    });
+    
+    return filtered;
+  }, [people, personSearchQuery, peopleWithRecentDates]);
 
   // Initialize with initial time or current time
   React.useEffect(() => {
@@ -226,7 +299,7 @@ export function NewEventModal({
 
     setIsCreating(true);
     try {
-      await onEventCreate({
+      const eventData = {
         title: title.trim(),
         startTime: newStart,
         endTime: newEnd,
@@ -234,12 +307,77 @@ export function NewEventModal({
         description: description.trim() || undefined,
         location: location.trim() || undefined,
         calendarId: selectedCalendarId,
-      });
+      };
+      
+      await onEventCreate(eventData);
+      
+      // Link selected people to the event after creation
+      // We need to get the event ID from the response or fetch it
+      // For now, we'll link them after a short delay to allow the event to be created
+      if (selectedPeopleIds.length > 0) {
+        // Wait a bit for the event to be created, then link people
+        setTimeout(async () => {
+          // Fetch the most recent event with this title to get its ID
+          try {
+            const timeMin = newStart.toISOString();
+            const timeMax = new Date(newEnd.getTime() + 24 * 60 * 60 * 1000).toISOString();
+            const response = await fetch(`/api/google-calendar/events?timeMin=${timeMin}&timeMax=${timeMax}`);
+            if (response.ok) {
+              const data = await response.json();
+              const events = data.events || [];
+              // Find the event we just created (same title and time)
+              const createdEvent = events.find((e: any) => 
+                e.title === title.trim() &&
+                Math.abs(new Date(e.start).getTime() - newStart.getTime()) < 60000 // Within 1 minute
+              );
+              
+              if (createdEvent) {
+                // Optimistically update - get person objects
+                const linkedPeople = selectedPeopleIds
+                  .map(id => people.find(p => p.id === id))
+                  .filter((p): p is Person => p !== undefined);
+                
+                // Optimistically update parent component
+                onPeopleChange?.(createdEvent.id, linkedPeople);
+                
+                // Link all selected people
+                await Promise.all(
+                  selectedPeopleIds.map(async (personId) => {
+                    try {
+                      const response = await fetch(`/api/events/${encodeURIComponent(createdEvent.id)}/people`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ personId }),
+                      });
+                      if (!response.ok) {
+                        // Revert optimistic update on error
+                        const currentPeople = linkedPeople.filter(p => p.id !== personId);
+                        onPeopleChange?.(createdEvent.id, currentPeople);
+                      }
+                    } catch (error) {
+                      console.error('Error linking person:', error);
+                      // Revert optimistic update on error
+                      const currentPeople = linkedPeople.filter(p => p.id !== personId);
+                      onPeopleChange?.(createdEvent.id, currentPeople);
+                    }
+                  })
+                );
+              }
+            }
+          } catch (error) {
+            console.error('Error linking people to new event:', error);
+          }
+        }, 1000);
+      }
+      
       // Reset form
       setTitle('');
       setDescription('');
       setLocation('');
       setIsAllDay(false);
+      setSelectedPeopleIds([]);
+      setShowPeopleSelector(false);
+      setPersonSearchQuery('');
       onClose();
     } catch (error) {
       console.error('Error creating event:', error);
@@ -254,6 +392,10 @@ export function NewEventModal({
     setDescription('');
     setLocation('');
     setIsAllDay(false);
+    setSelectedPeopleIds([]);
+    setShowPeopleSelector(false);
+    setPersonSearchQuery('');
+    setPeopleWithRecentDates(new Map());
     onClose();
   };
 
@@ -275,27 +417,41 @@ export function NewEventModal({
             {/* Hidden DialogTitle for accessibility */}
             <DialogTitle className="sr-only">New Event</DialogTitle>
             {/* Editable title - H1 style */}
-            <h1
-              ref={titleRef}
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => {
-                const text = e.currentTarget.textContent || '';
-                setTitle(text);
-                // Clear if empty to show placeholder
-                if (!text.trim() && e.currentTarget.textContent) {
-                  e.currentTarget.textContent = '';
-                }
-                updatePreview();
-              }}
-              onInput={(e) => {
-                const text = e.currentTarget.textContent || '';
-                setTitle(text);
-                updatePreview();
-              }}
-              className="text-3xl font-semibold mb-2 outline-none focus:outline-none focus:ring-0 min-h-[2.5rem] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground"
-              data-placeholder="Add title..."
-            />
+            <div className="mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1
+                  ref={titleRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => {
+                    const text = e.currentTarget.textContent || '';
+                    setTitle(text);
+                    // Clear if empty to show placeholder
+                    if (!text.trim() && e.currentTarget.textContent) {
+                      e.currentTarget.textContent = '';
+                    }
+                    updatePreview();
+                  }}
+                  onInput={(e) => {
+                    const text = e.currentTarget.textContent || '';
+                    setTitle(text);
+                    updatePreview();
+                  }}
+                  className="text-3xl font-semibold outline-none focus:outline-none focus:ring-0 min-h-[2.5rem] flex-1 empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground"
+                  data-placeholder="Add title..."
+                />
+              </div>
+              {/* Show title with avatars below editable input */}
+              {title && matchedPeople.length > 0 && (
+                <div className="mt-2 text-3xl font-semibold">
+                  {renderTitleWithAvatars({
+                    title,
+                    people: matchedPeople,
+                    onAvatarClick: onPersonClick,
+                  })}
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="space-y-6">
@@ -471,6 +627,103 @@ export function NewEventModal({
                 />
               </div>
             </div>
+
+            {/* People */}
+            {people.length > 0 && (
+              <div className="flex items-start gap-4">
+                <div className="mt-1">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      People
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPeopleSelector(!showPeopleSelector)}
+                      className="h-7 px-2"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {/* Selected people */}
+                  {selectedPeopleIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {selectedPeopleIds.map((personId) => {
+                        const person = people.find(p => p.id === personId);
+                        if (!person) return null;
+                        return (
+                          <div
+                            key={personId}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
+                          >
+                            <PersonAvatar
+                              person={person}
+                              size="sm"
+                              onClick={() => onPersonClick?.(person)}
+                            />
+                            <span className="text-sm">{person.name}</span>
+                            <button
+                              onClick={() => setSelectedPeopleIds(prev => prev.filter(id => id !== personId))}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
+                              title="Remove person"
+                            >
+                              <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* People selector dropdown */}
+                  {showPeopleSelector && (
+                    <div className="border rounded-md bg-background shadow-lg">
+                      {/* Search bar */}
+                      <div className="p-2 border-b">
+                        <Input
+                          placeholder="Search people..."
+                          value={personSearchQuery}
+                          onChange={(e) => setPersonSearchQuery(e.target.value)}
+                          className="h-8 text-sm"
+                          autoFocus
+                        />
+                      </div>
+                      {/* People list */}
+                      <div className="max-h-48 overflow-y-auto">
+                        {availablePeopleForSelection.length > 0 ? (
+                          availablePeopleForSelection
+                            .filter(p => !selectedPeopleIds.includes(p.id))
+                            .map((person) => (
+                              <button
+                                key={person.id}
+                                onClick={() => setSelectedPeopleIds(prev => [...prev, person.id])}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
+                              >
+                                <PersonAvatar person={person} size="sm" onClick={undefined} />
+                                <span className="text-sm">{person.name}</span>
+                                {peopleWithRecentDates.has(person.id) && (
+                                  <span className="text-xs text-muted-foreground ml-auto">
+                                    {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                        ) : (
+                          <div className="p-4 text-sm text-muted-foreground text-center">
+                            {personSearchQuery.trim() ? 'No people found' : 'No people available'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             <div className="flex items-start gap-4">

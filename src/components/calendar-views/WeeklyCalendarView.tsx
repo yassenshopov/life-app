@@ -35,6 +35,8 @@ interface WeeklyCalendarViewProps {
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
   previewEvent?: CalendarEvent | null;
+  people?: Array<{ id: string; name: string; nicknames?: string[] | null; image?: any }>;
+  onPersonClick?: (person: { id: string; name: string; nicknames?: string[] | null; image?: any }) => void;
 }
 
 export function WeeklyCalendarView({
@@ -46,6 +48,8 @@ export function WeeklyCalendarView({
   onEventUpdate,
   onEmptySpaceClick,
   previewEvent,
+  people = [],
+  onPersonClick,
 }: WeeklyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
@@ -323,6 +327,8 @@ export function WeeklyCalendarView({
                               onClick={onEventClick}
                               currentDate={day}
                               touchingEvents={{ top: touchingTop, bottom: touchingBottom }}
+                              people={people}
+                              onPersonClick={onPersonClick}
                             />
                           );
                         })}
@@ -334,6 +340,7 @@ export function WeeklyCalendarView({
                             style={calculateEventPosition(previewEvent, day)}
                             timeFormat={timeFormat}
                             currentDate={day}
+                            people={people}
                             isPreview={true}
                           />
                         )}

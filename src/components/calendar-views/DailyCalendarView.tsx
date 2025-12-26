@@ -32,6 +32,8 @@ interface DailyCalendarViewProps {
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
   previewEvent?: CalendarEvent | null;
+  people?: Array<{ id: string; name: string; nicknames?: string[] | null; image?: any }>;
+  onPersonClick?: (person: { id: string; name: string; nicknames?: string[] | null; image?: any }) => void;
 }
 
 export function DailyCalendarView({
@@ -43,6 +45,8 @@ export function DailyCalendarView({
   onEventUpdate,
   onEmptySpaceClick,
   previewEvent,
+  people = [],
+  onPersonClick,
 }: DailyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
@@ -308,6 +312,8 @@ export function DailyCalendarView({
                           onClick={onEventClick}
                           currentDate={currentDate}
                           touchingEvents={{ top: touchingTop, bottom: touchingBottom }}
+                          people={people}
+                          onPersonClick={onPersonClick}
                         />
                       );
                     })}

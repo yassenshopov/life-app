@@ -10,7 +10,7 @@ import {
 import { CalendarEvent } from '@/components/HQCalendar';
 import { formatEventTime, isAllDayEvent } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
-import { Calendar, Clock, MapPin, User, Link as LinkIcon, Bell, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Link as LinkIcon, Bell, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { formatTimeForInput } from '@/lib/time-format-utils';
 import { TimePicker } from '@/components/ui/time-picker';
+import { PersonAvatar } from './PersonAvatar';
+import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 
 interface EventDetailModalProps {
   event: CalendarEvent | null;
@@ -26,6 +28,9 @@ interface EventDetailModalProps {
   onClose: () => void;
   timeFormat: TimeFormat;
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date, isAllDay?: boolean) => Promise<void>;
+  people?: Person[];
+  onPersonClick?: (person: Person) => void;
+  onPeopleChange?: (eventId: string, people: Person[]) => void;
 }
 
 /**
@@ -37,6 +42,9 @@ export function EventDetailModal({
   onClose,
   timeFormat,
   onEventUpdate,
+  people = [],
+  onPersonClick,
+  onPeopleChange,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
   const [isEditing, setIsEditing] = React.useState(false);
@@ -70,6 +78,200 @@ export function EventDetailModal({
       setEndTime(formatTimeForInput(end));
     }
   }, [event, isEditing]);
+
+  // State for linked people (from database)
+  const [linkedPeople, setLinkedPeople] = React.useState<Array<Person & { linkId?: string }>>([]);
+  const [isLoadingLinkedPeople, setIsLoadingLinkedPeople] = React.useState(false);
+  const [isAddingPerson, setIsAddingPerson] = React.useState(false);
+  const [showPersonSelector, setShowPersonSelector] = React.useState(false);
+  const [personSearchQuery, setPersonSearchQuery] = React.useState('');
+  const [peopleWithRecentDates, setPeopleWithRecentDates] = React.useState<Map<string, Date>>(new Map());
+
+  // Use linked people from database (if available), otherwise fall back to title matching
+  const matchedPeople = React.useMemo(() => {
+    if (!event) return [];
+    // Prefer linked people from database
+    if (event.linkedPeople && event.linkedPeople.length > 0) {
+      return event.linkedPeople;
+    }
+    // Fallback to title matching
+    if (!people || people.length === 0) return [];
+    return getMatchedPeopleFromEvent(event.title, people);
+  }, [event?.linkedPeople, event?.title, people]);
+
+  // Fetch linked people when event changes
+  React.useEffect(() => {
+    if (event?.id) {
+      fetchLinkedPeople();
+    } else {
+      setLinkedPeople([]);
+    }
+  }, [event?.id]);
+
+  const fetchLinkedPeople = async () => {
+    if (!event?.id) return;
+    
+    setIsLoadingLinkedPeople(true);
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(event.id)}/people`);
+      const data = await response.json();
+      if (response.ok) {
+        setLinkedPeople(data.people || []);
+      }
+    } catch (error) {
+      console.error('Error fetching linked people:', error);
+    } finally {
+      setIsLoadingLinkedPeople(false);
+    }
+  };
+
+  const handleAddPerson = async (personId: string) => {
+    if (!event?.id) return;
+    
+    // Optimistically update
+    const person = people.find(p => p.id === personId);
+    if (person) {
+      const optimisticPerson = { ...person, linkId: `temp-${Date.now()}` };
+      setLinkedPeople((prev) => [...prev, optimisticPerson]);
+      setShowPersonSelector(false);
+      setPersonSearchQuery('');
+      
+      // Optimistically update parent component
+      const updatedPeople = [...linkedPeople, optimisticPerson];
+      onPeopleChange?.(event.id, updatedPeople);
+    }
+    
+    setIsAddingPerson(true);
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(event.id)}/people`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personId }),
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        // Replace optimistic update with real data
+        setLinkedPeople((prev) => 
+          prev.map(p => p.id === personId && p.linkId?.startsWith('temp-') ? data.person : p)
+        );
+        // Update parent with real data
+        const updatedPeople = linkedPeople
+          .filter(p => !p.linkId?.startsWith('temp-'))
+          .concat(data.person);
+        onPeopleChange?.(event.id, updatedPeople);
+      } else {
+        // Revert optimistic update on error
+        setLinkedPeople((prev) => prev.filter(p => p.id !== personId || !p.linkId?.startsWith('temp-')));
+        const revertedPeople = linkedPeople.filter(p => p.id !== personId);
+        onPeopleChange?.(event.id, revertedPeople);
+        alert(data.error || 'Failed to add person');
+      }
+    } catch (error) {
+      console.error('Error adding person:', error);
+      // Revert optimistic update on error
+      setLinkedPeople((prev) => prev.filter(p => p.id !== personId || !p.linkId?.startsWith('temp-')));
+      const revertedPeople = linkedPeople.filter(p => p.id !== personId);
+      onPeopleChange?.(event.id, revertedPeople);
+      alert('Failed to add person');
+    } finally {
+      setIsAddingPerson(false);
+    }
+  };
+
+  const handleRemovePerson = async (personId: string) => {
+    if (!event?.id) return;
+    
+    // Optimistically update
+    const personToRemove = linkedPeople.find(p => p.id === personId);
+    setLinkedPeople((prev) => prev.filter((p) => p.id !== personId));
+    
+    // Optimistically update parent component
+    const updatedPeople = linkedPeople.filter(p => p.id !== personId);
+    onPeopleChange?.(event.id, updatedPeople);
+    
+    try {
+      const response = await fetch(
+        `/api/events/${encodeURIComponent(event.id)}/people?personId=${personId}`,
+        { method: 'DELETE' }
+      );
+      
+      if (!response.ok) {
+        // Revert optimistic update on error
+        if (personToRemove) {
+          setLinkedPeople((prev) => [...prev, personToRemove]);
+          onPeopleChange?.(event.id, linkedPeople);
+        }
+        const data = await response.json();
+        alert(data.error || 'Failed to remove person');
+      }
+    } catch (error) {
+      console.error('Error removing person:', error);
+      // Revert optimistic update on error
+      if (personToRemove) {
+        setLinkedPeople((prev) => [...prev, personToRemove]);
+        onPeopleChange?.(event.id, linkedPeople);
+      }
+      alert('Failed to remove person');
+    }
+  };
+
+  // Fetch most recent attachment date for each person (when they were last attached to an event)
+  React.useEffect(() => {
+    const fetchRecentDates = async () => {
+      if (!showPersonSelector || people.length === 0) return;
+      
+      try {
+        const response = await fetch('/api/people/recent-attachments');
+        if (response.ok) {
+          const data = await response.json();
+          const recentDates = data.recentDates || {};
+          const dateMap = new Map<string, Date>();
+          Object.entries(recentDates).forEach(([personId, dateStr]) => {
+            dateMap.set(personId, new Date(dateStr as string));
+          });
+          setPeopleWithRecentDates(dateMap);
+        }
+      } catch (error) {
+        // Silently fail
+      }
+    };
+
+    if (showPersonSelector) {
+      fetchRecentDates();
+    }
+  }, [showPersonSelector, people]);
+
+  // Get available people (not already linked), filtered and sorted
+  const availablePeople = React.useMemo(() => {
+    const linkedIds = new Set(linkedPeople.map((p) => p.id));
+    let filtered = people.filter((p) => !linkedIds.has(p.id));
+    
+    // Filter by search query
+    if (personSearchQuery.trim()) {
+      const query = personSearchQuery.toLowerCase();
+      filtered = filtered.filter((p) => 
+        p.name.toLowerCase().includes(query) ||
+        (p.nicknames && p.nicknames.some(n => n.toLowerCase().includes(query)))
+      );
+    }
+    
+    // Sort by most recently attached to an event
+    filtered.sort((a, b) => {
+      const dateA = peopleWithRecentDates.get(a.id);
+      const dateB = peopleWithRecentDates.get(b.id);
+      
+      // People with recent attachments come first
+      if (dateA && !dateB) return -1;
+      if (!dateA && dateB) return 1;
+      if (!dateA && !dateB) return 0; // Both have no attachments, keep original order
+      
+      // Sort by most recent attachment first
+      return dateB!.getTime() - dateA!.getTime();
+    });
+    
+    return filtered;
+  }, [people, linkedPeople, personSearchQuery, peopleWithRecentDates]);
 
   // Early return after all hooks
   if (!event) return null;
@@ -231,8 +433,29 @@ export function EventDetailModal({
         
         <div className="p-8">
           <DialogHeader className="mb-6">
-            <DialogTitle className="text-3xl font-semibold mb-2">
-              {event.title}
+            <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
+              {/* Person avatars - to the left of the title, overlapping */}
+              {matchedPeople.length > 0 && (
+                <div className="flex items-center flex-shrink-0">
+                  {matchedPeople.map((person: Person, index: number) => (
+                    <div
+                      key={person.id}
+                      style={{
+                        marginLeft: index > 0 ? '-8px' : '0',
+                        zIndex: matchedPeople.length - index,
+                      }}
+                      className="relative"
+                    >
+                      <PersonAvatar
+                        person={person}
+                        size="md"
+                        onClick={() => onPersonClick?.(person)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <span className="flex-1">{event.title}</span>
             </DialogTitle>
           </DialogHeader>
 
@@ -479,6 +702,101 @@ export function EventDetailModal({
                 </div>
               </div>
             )}
+
+            {/* People */}
+            <div className="flex items-start gap-4">
+              <div className="mt-1">
+                <Users className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-muted-foreground">
+                    People
+                  </div>
+                  {availablePeople.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPersonSelector(!showPersonSelector)}
+                      className="h-7 px-2"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  )}
+                </div>
+                
+                {isLoadingLinkedPeople ? (
+                  <div className="text-sm text-muted-foreground">Loading...</div>
+                ) : linkedPeople.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {linkedPeople.map((person) => (
+                      <div
+                        key={person.id}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
+                      >
+                        <PersonAvatar
+                          person={person}
+                          size="sm"
+                          onClick={() => onPersonClick?.(person)}
+                        />
+                        <span className="text-sm">{person.name}</span>
+                        <button
+                          onClick={() => handleRemovePerson(person.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
+                          title="Remove person"
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No people linked</div>
+                )}
+
+                {/* Person selector dropdown */}
+                {showPersonSelector && (
+                  <div className="mt-2 border rounded-md bg-background shadow-lg">
+                    {/* Search bar */}
+                    <div className="p-2 border-b">
+                      <Input
+                        placeholder="Search people..."
+                        value={personSearchQuery}
+                        onChange={(e) => setPersonSearchQuery(e.target.value)}
+                        className="h-8 text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    {/* People list */}
+                    <div className="max-h-48 overflow-y-auto">
+                      {availablePeople.length > 0 ? (
+                        availablePeople.map((person) => (
+                          <button
+                            key={person.id}
+                            onClick={() => handleAddPerson(person.id)}
+                            disabled={isAddingPerson}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
+                          >
+                            <PersonAvatar person={person} size="sm" onClick={undefined} />
+                            <span className="text-sm">{person.name}</span>
+                            {peopleWithRecentDates.has(person.id) && (
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-4 text-sm text-muted-foreground text-center">
+                          {personSearchQuery.trim() ? 'No people found' : 'No people available'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Organizer */}
             {event.organizer && (event.organizer.email || event.organizer.displayName) && (

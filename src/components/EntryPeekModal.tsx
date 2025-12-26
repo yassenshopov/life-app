@@ -309,14 +309,14 @@ export function EntryPeekModal({
                           onFocus={(e) => {
                             // Remove line clamp when focused to allow full editing
                             e.currentTarget.style.display = 'block';
-                            e.currentTarget.style.WebkitLineClamp = 'unset';
+                            e.currentTarget.style.webkitLineClamp = 'unset';
                             e.currentTarget.style.maxHeight = 'none';
                             e.currentTarget.style.overflow = 'auto';
                           }}
                           onBlur={(e) => {
                             // Re-apply line clamp when not focused
                             e.currentTarget.style.display = '-webkit-box';
-                            e.currentTarget.style.WebkitLineClamp = '2';
+                            e.currentTarget.style.webkitLineClamp = '2';
                             e.currentTarget.style.maxHeight = '60px';
                             e.currentTarget.style.overflow = 'hidden';
                             const text = e.currentTarget.textContent || '';
