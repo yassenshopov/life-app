@@ -322,6 +322,31 @@ export function SpotifyPlayer() {
     }
   };
 
+  const handleSkip = async (direction: 'next' | 'previous', e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening modal
+    if (isToggling) return;
+    
+    setIsToggling(true);
+    try {
+      const endpoint = direction === 'next' ? '/api/spotify/next' : '/api/spotify/previous';
+      const response = await fetch(endpoint, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      
+      if (response.ok) {
+        // Refetch after a short delay to get the new track
+        setTimeout(() => {
+          fetchCurrentlyPlaying();
+        }, 500);
+      } else if (data.needsReconnect) {
+        alert('Playback control requires additional permissions. Please disconnect and reconnect to Spotify on the Spotify page to enable this feature.');
+      }
+    } catch {
+      // Silently handle errors
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
 
   if (!isConnected) {
     return null; // Don't show widget if not connected
@@ -363,24 +388,42 @@ export function SpotifyPlayer() {
                     {track.artists.map((a) => a.name).join(', ')}
                   </p>
                 </div>
-                {/* Play/Pause button */}
-                <button
-                  onClick={handlePlayPause}
-                  disabled={isToggling}
-                  className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
-                  aria-label={isPlaying ? 'Pause' : 'Play'}
-                >
-                  {isToggling ? (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  ) : isPlaying ? (
-                    <Pause className="w-4 h-4 text-white fill-white" />
-                  ) : (
-                    <Play className="w-4 h-4 text-white fill-white" />
-                  )}
-                </button>
                 {/* Waveform on same row */}
                 <div className="flex-shrink-0 w-20">
                   <SpotifyWaveform isPlaying={isPlaying} compact />
+                </div>
+                {/* Controls: Previous, Play/Pause, Next */}
+                <div className="flex-shrink-0 flex items-center gap-1">
+                  <button
+                    onClick={(e) => handleSkip('previous', e)}
+                    disabled={isToggling}
+                    className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                    aria-label="Previous track"
+                  >
+                    <SkipBack className="w-3.5 h-3.5 text-white" />
+                  </button>
+                  <button
+                    onClick={handlePlayPause}
+                    disabled={isToggling}
+                    className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {isToggling ? (
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    ) : isPlaying ? (
+                      <Pause className="w-4 h-4 text-white fill-white" />
+                    ) : (
+                      <Play className="w-4 h-4 text-white fill-white" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => handleSkip('next', e)}
+                    disabled={isToggling}
+                    className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                    aria-label="Next track"
+                  >
+                    <SkipForward className="w-3.5 h-3.5 text-white" />
+                  </button>
                 </div>
               </div>
             ) : (
@@ -417,6 +460,7 @@ export function SpotifyPlayer() {
             backgroundImage: `linear-gradient(135deg, ${bgColor}ee, ${bgColor}cc)`,
           } as React.CSSProperties}
         >
+          <DialogTitle className="sr-only">Now Playing</DialogTitle>
           {track ? (
             <div className="flex h-full">
               {/* Left: Album Art */}
@@ -452,6 +496,14 @@ export function SpotifyPlayer() {
                 {/* Actions */}
                 <div className="flex gap-3">
                   <button
+                    onClick={(e) => handleSkip('previous', e)}
+                    disabled={isToggling}
+                    className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                    aria-label="Previous track"
+                  >
+                    <SkipBack className="w-5 h-5 text-white" />
+                  </button>
+                  <button
                     onClick={handlePlayPause}
                     disabled={isToggling}
                     className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
@@ -464,6 +516,14 @@ export function SpotifyPlayer() {
                     ) : (
                       <Play className="w-6 h-6 text-white fill-white" />
                     )}
+                  </button>
+                  <button
+                    onClick={(e) => handleSkip('next', e)}
+                    disabled={isToggling}
+                    className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                    aria-label="Next track"
+                  >
+                    <SkipForward className="w-5 h-5 text-white" />
                   </button>
                   <Button
                     className="flex-1 bg-white/20 hover:bg-white/30 text-white border-white/30"

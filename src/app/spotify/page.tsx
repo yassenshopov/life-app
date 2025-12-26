@@ -1,22 +1,20 @@
 'use client';
 
 import * as React from 'react';
+import HQSidebar from '@/components/HQSidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Music,
-  User,
-  Play,
-  TrendingUp,
-  Clock,
-  ListMusic,
-  Sparkles,
   LogOut,
-  ExternalLink,
   Loader2,
 } from 'lucide-react';
+import { Outfit } from 'next/font/google';
+import { SpotifyAnalytics } from '@/components/SpotifyAnalytics';
+
+const outfit = Outfit({ subsets: ['latin'] });
 
 interface SpotifyProfile {
   id: string;
@@ -72,14 +70,6 @@ export default function SpotifyPage() {
   const [isConnected, setIsConnected] = React.useState(false);
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [profile, setProfile] = React.useState<SpotifyProfile | null>(null);
-  const [currentlyPlaying, setCurrentlyPlaying] = React.useState<CurrentlyPlaying | null>(null);
-  const [topTracks, setTopTracks] = React.useState<Track[]>([]);
-  const [topArtists, setTopArtists] = React.useState<Artist[]>([]);
-  const [recentlyPlayed, setRecentlyPlayed] = React.useState<Track[]>([]);
-  const [playlists, setPlaylists] = React.useState<Playlist[]>([]);
-  const [recommendations, setRecommendations] = React.useState<Track[]>([]);
-  const [loading, setLoading] = React.useState<Record<string, boolean>>({});
-  const [timeRange, setTimeRange] = React.useState<'short_term' | 'medium_term' | 'long_term'>('medium_term');
 
   React.useEffect(() => {
     // Check for OAuth callback
@@ -137,12 +127,6 @@ export default function SpotifyPage() {
       if (response.ok) {
         setIsConnected(false);
         setProfile(null);
-        setCurrentlyPlaying(null);
-        setTopTracks([]);
-        setTopArtists([]);
-        setRecentlyPlayed([]);
-        setPlaylists([]);
-        setRecommendations([]);
       }
     } catch (error) {
       console.error('Error disconnecting from Spotify:', error);
@@ -150,7 +134,6 @@ export default function SpotifyPage() {
   };
 
   const fetchProfile = async () => {
-    setLoading((prev) => ({ ...prev, profile: true }));
     try {
       const response = await fetch('/api/spotify/profile');
       if (response.ok) {
@@ -159,214 +142,112 @@ export default function SpotifyPage() {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, profile: false }));
     }
   };
-
-  const fetchCurrentlyPlaying = async () => {
-    setLoading((prev) => ({ ...prev, currentlyPlaying: true }));
-    try {
-      const response = await fetch('/api/spotify/currently-playing');
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentlyPlaying(data);
-      }
-    } catch (error) {
-      console.error('Error fetching currently playing:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, currentlyPlaying: false }));
-    }
-  };
-
-  const fetchTopTracks = async () => {
-    setLoading((prev) => ({ ...prev, topTracks: true }));
-    try {
-      const response = await fetch(`/api/spotify/top-tracks?time_range=${timeRange}&limit=10`);
-      if (response.ok) {
-        const data = await response.json();
-        setTopTracks(data.items || []);
-      }
-    } catch (error) {
-      console.error('Error fetching top tracks:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, topTracks: false }));
-    }
-  };
-
-  const fetchTopArtists = async () => {
-    setLoading((prev) => ({ ...prev, topArtists: true }));
-    try {
-      const response = await fetch(`/api/spotify/top-artists?time_range=${timeRange}&limit=10`);
-      if (response.ok) {
-        const data = await response.json();
-        setTopArtists(data.items || []);
-      }
-    } catch (error) {
-      console.error('Error fetching top artists:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, topArtists: false }));
-    }
-  };
-
-  const fetchRecentlyPlayed = async () => {
-    setLoading((prev) => ({ ...prev, recentlyPlayed: true }));
-    try {
-      const response = await fetch('/api/spotify/recently-played?limit=10');
-      if (response.ok) {
-        const data = await response.json();
-        setRecentlyPlayed(
-          data.items?.map((item: any) => item.track).filter(Boolean) || []
-        );
-      }
-    } catch (error) {
-      console.error('Error fetching recently played:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, recentlyPlayed: false }));
-    }
-  };
-
-  const fetchPlaylists = async () => {
-    setLoading((prev) => ({ ...prev, playlists: true }));
-    try {
-      const response = await fetch('/api/spotify/playlists?limit=10');
-      if (response.ok) {
-        const data = await response.json();
-        setPlaylists(data.items || []);
-      }
-    } catch (error) {
-      console.error('Error fetching playlists:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, playlists: false }));
-    }
-  };
-
-  const fetchRecommendations = async () => {
-    setLoading((prev) => ({ ...prev, recommendations: true }));
-    try {
-      // Get seed tracks from top tracks
-      const seedTracks = topTracks.slice(0, 3).map((t) => t.id).join(',');
-      if (!seedTracks) {
-        // If no top tracks, fetch them first
-        await fetchTopTracks();
-        return;
-      }
-
-      const response = await fetch(
-        `/api/spotify/recommendations?seed_tracks=${seedTracks}&limit=10`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setRecommendations(data.tracks || []);
-      }
-    } catch (error) {
-      console.error('Error fetching recommendations:', error);
-    } finally {
-      setLoading((prev) => ({ ...prev, recommendations: false }));
-    }
-  };
-
-  React.useEffect(() => {
-    if (isConnected && topTracks.length > 0) {
-      fetchRecommendations();
-    }
-  }, [topTracks, isConnected]);
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-black dark:via-slate-950 dark:to-slate-900 flex items-center justify-center p-6">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-              <Music className="w-8 h-8 text-white" />
-            </div>
-            <CardTitle className="text-2xl">Connect to Spotify</CardTitle>
-            <CardDescription>
-              Connect your Spotify account to explore the full power of the Spotify Web API
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                View your listening history
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                See your top tracks and artists
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Get personalized recommendations
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Manage your playlists
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Track currently playing music
-              </li>
-            </ul>
-            <Button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="w-full bg-green-500 hover:bg-green-600 text-white"
-              size="lg"
-            >
-              {isConnecting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Music className="mr-2 h-4 w-4" />
-                  Connect with Spotify
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className={`flex h-screen bg-background ${outfit.className}`}>
+        <HQSidebar />
+        <main className="flex-1 overflow-y-auto">
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 flex items-center justify-center p-6">
+            <Card className="max-w-md w-full">
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-4 w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
+                  <Music className="w-8 h-8 text-white" />
+                </div>
+                <CardTitle className="text-2xl">Connect to Spotify</CardTitle>
+                <CardDescription>
+                  Connect your Spotify account to explore the full power of the Spotify Web API
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span>
+                    View your listening history
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span>
+                    See your top tracks and artists
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span>
+                    Get personalized recommendations
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span>
+                    Manage your playlists
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span>
+                    Track currently playing music
+                  </li>
+                </ul>
+                <Button
+                  onClick={handleConnect}
+                  disabled={isConnecting}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                  size="lg"
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Music className="mr-2 h-4 w-4" />
+                      Connect with Spotify
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-black dark:via-slate-950 dark:to-slate-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent">
-              Spotify API Showcase
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Explore what's possible with the Spotify Web API
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {profile && (
-              <div className="flex items-center gap-3">
-                {profile.images?.[0] && (
-                  <img
-                    src={profile.images[0].url}
-                    alt={profile.display_name}
-                    className="w-10 h-10 rounded-full"
-                  />
-                )}
-                <div>
-                  <p className="font-semibold">{profile.display_name}</p>
-                  <p className="text-sm text-muted-foreground">{profile.followers?.total} followers</p>
-                </div>
+    <div className={`flex h-screen bg-background ${outfit.className}`}>
+      <HQSidebar />
+      <main className="flex-1 overflow-y-auto">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 p-6 md:p-8">
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent">
+                  Spotify
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  Explore what's possible with the Spotify Web API
+                </p>
               </div>
-            )}
-            <Button variant="outline" onClick={handleDisconnect}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Disconnect
-            </Button>
-          </div>
-        </div>
+              <div className="flex items-center gap-4">
+                {profile && (
+                  <div className="flex items-center gap-3">
+                    {profile.images?.[0] && (
+                      <img
+                        src={profile.images[0].url}
+                        alt={profile.display_name}
+                        className="w-10 h-10 rounded-full"
+                      />
+                    )}
+                    <div>
+                      <p className="font-semibold">{profile.display_name}</p>
+                      <p className="text-sm text-muted-foreground">{profile.followers?.total} followers</p>
+                    </div>
+                  </div>
+                )}
+                <Button variant="outline" onClick={handleDisconnect}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Disconnect
+                </Button>
+              </div>
+            </div>
 
         {/* Currently Playing */}
         <Card>
@@ -786,7 +667,9 @@ export default function SpotifyPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
