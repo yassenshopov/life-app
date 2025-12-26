@@ -17,6 +17,7 @@ model User {
   isDeleted                 Boolean?  @default(false) @map("isdeleted")
   notion_databases          Json[]    @default([])
   google_calendar_credentials Json?
+  spotify_credentials       Json?
   calendar_preferences      Json?
 
   // Relationships

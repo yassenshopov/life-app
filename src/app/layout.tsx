@@ -6,6 +6,7 @@ import { Inter } from 'next/font/google';
 import { defaultMetadata } from './metadata';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { GlobalThemeToggle } from '@/components/GlobalThemeToggle';
+import { SpotifyPlayer } from '@/components/SpotifyPlayer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -35,6 +36,7 @@ export default function RootLayout({
             >
               <GlobalThemeToggle />
               {children}
+              <SpotifyPlayer />
               <SpeedInsights />
             </ThemeProvider>
           </QueryProvider>

@@ -1,0 +1,502 @@
+'use client';
+
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Music, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+
+// Extract dominant color from image
+function getDominantColor(imageUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    // Try to handle CORS - Spotify images should allow this
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve('#1DB954'); // Default Spotify green
+          return;
+        }
+        
+        // Limit canvas size for performance
+        const maxSize = 100;
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        let r = 0, g = 0, b = 0, count = 0;
+        const step = Math.max(1, Math.floor(data.length / 4 / 200)); // Sample 200 pixels
+        
+        for (let i = 0; i < data.length; i += step * 4) {
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          count++;
+        }
+        
+        if (count > 0) {
+          r = Math.floor(r / count);
+          g = Math.floor(g / count);
+          b = Math.floor(b / count);
+          
+          // Darken the color a bit for better contrast
+          r = Math.max(0, Math.floor(r * 0.7));
+          g = Math.max(0, Math.floor(g * 0.7));
+          b = Math.max(0, Math.floor(b * 0.7));
+          
+          resolve(`rgb(${r}, ${g}, ${b})`);
+        } else {
+          resolve('#1DB954');
+        }
+      } catch {
+        resolve('#1DB954');
+      }
+    };
+    
+    img.onerror = () => {
+      resolve('#1DB954');
+    };
+    
+    // Set timeout to avoid hanging
+    setTimeout(() => {
+      if (!img.complete) {
+        resolve('#1DB954');
+      }
+    }, 3000);
+    
+    img.src = imageUrl;
+  });
+}
+
+interface CurrentlyPlaying {
+  isPlaying: boolean;
+  item?: {
+    name: string;
+    artists: Array<{ name: string }>;
+    album: {
+      name: string;
+      images: Array<{ url: string }>;
+    };
+    external_urls: { spotify: string };
+  };
+  progress_ms?: number;
+  is_playing?: boolean;
+}
+
+// Spotify waveform animation component
+function SpotifyWaveform({ isPlaying, compact = false }: { isPlaying: boolean; compact?: boolean }) {
+  const barCount = compact ? 12 : 20;
+  const bars = Array.from({ length: barCount }, (_, i) => i);
+  const [heights, setHeights] = React.useState<number[]>(
+    Array.from({ length: barCount }, () => 20)
+  );
+
+  React.useEffect(() => {
+    if (!isPlaying) {
+      setHeights(Array.from({ length: barCount }, () => 20));
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setHeights(Array.from({ length: barCount }, () => Math.random() * 60 + 20));
+    }, 150);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, barCount]);
+
+  return (
+    <>
+      <style>{`
+        @keyframes waveform {
+          0%, 100% {
+            transform: scaleY(0.3);
+          }
+          50% {
+            transform: scaleY(1);
+          }
+        }
+      `}</style>
+      <div className={`flex items-end justify-center gap-0.5 ${compact ? 'h-6' : 'h-12'}`}>
+        {bars.map((_, i) => {
+          const duration = 0.5 + Math.random() * 0.5;
+          return (
+            <div
+              key={i}
+              className="w-0.5 bg-white/80 rounded-full transition-all duration-150"
+              style={{
+                height: `${heights[i] || 20}%`,
+                animationName: isPlaying ? 'waveform' : 'none',
+                animationDuration: isPlaying ? `${duration}s` : '0s',
+                animationTimingFunction: 'ease-in-out',
+                animationIterationCount: isPlaying ? 'infinite' : 1,
+                animationDelay: `${i * 0.05}s`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// Marquee text component - single line, horizontal scroll (autocue style)
+function MarqueeText({ text, className = '' }: { text: string; className?: string }) {
+  const [shouldScroll, setShouldScroll] = React.useState(false);
+  const textRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (textRef.current && containerRef.current) {
+      const textWidth = textRef.current.scrollWidth;
+      const containerWidth = containerRef.current.offsetWidth;
+      setShouldScroll(textWidth > containerWidth);
+    }
+  }, [text]);
+
+  return (
+    <div 
+      ref={containerRef} 
+      className={`overflow-hidden ${className}`}
+      style={{ 
+        height: '1.25rem',
+        lineHeight: '1.25rem',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      <div
+        ref={textRef}
+        className="whitespace-nowrap"
+        style={shouldScroll ? {
+          display: 'inline-block',
+          paddingLeft: '100%',
+          animation: 'marquee 20s linear infinite',
+        } : {
+          display: 'block',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {text}
+      </div>
+      <style>{`
+        @keyframes marquee {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export function SpotifyPlayer() {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [currentlyPlaying, setCurrentlyPlaying] = React.useState<CurrentlyPlaying | null>(null);
+  const [lastTrack, setLastTrack] = React.useState<CurrentlyPlaying['item'] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [isConnected, setIsConnected] = React.useState(false);
+  const [bgColor, setBgColor] = React.useState('#1DB954');
+  const [isToggling, setIsToggling] = React.useState(false);
+
+  // Check connection status
+  React.useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await fetch('/api/spotify/profile');
+        setIsConnected(response.ok);
+        if (response.ok) {
+          fetchCurrentlyPlaying();
+        }
+      } catch (error) {
+        setIsConnected(false);
+      }
+    };
+
+    checkConnection();
+  }, []);
+
+  // Poll for currently playing track - reduced frequency
+  React.useEffect(() => {
+    if (!isConnected) return;
+
+    const pollInterval = setInterval(() => {
+      fetchCurrentlyPlaying();
+    }, 5000); // Poll every 5 seconds (reduced from 3)
+
+    // Initial fetch
+    fetchCurrentlyPlaying();
+
+    return () => clearInterval(pollInterval);
+  }, [isConnected]);
+
+  // Extract background color from album art
+  React.useEffect(() => {
+    const track = currentlyPlaying?.item || lastTrack;
+    if (track?.album?.images && track.album.images.length > 0) {
+      // Use the largest available image for better color extraction
+      const imageUrl = track.album.images[0]?.url || track.album.images[1]?.url || track.album.images[2]?.url;
+      if (imageUrl) {
+        getDominantColor(imageUrl)
+          .then((color) => {
+            setBgColor(color);
+          })
+          .catch(() => {
+            setBgColor('#1DB954');
+          });
+      } else {
+        setBgColor('#1DB954');
+      }
+    } else if (!currentlyPlaying?.isPlaying && !currentlyPlaying?.is_playing && !lastTrack) {
+      // Reset to default when not playing and no last track
+      setBgColor('#1DB954');
+    }
+  }, [currentlyPlaying?.item?.album?.images, currentlyPlaying?.isPlaying, currentlyPlaying?.is_playing, lastTrack]);
+
+  const fetchCurrentlyPlaying = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/spotify/currently-playing');
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentlyPlaying(data);
+        // Store last track info if we have a track
+        if (data.item) {
+          setLastTrack(data.item);
+        }
+      }
+    } catch {
+      // Silently handle errors
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePlayPause = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening modal
+    if (isToggling) return;
+    
+    setIsToggling(true);
+    try {
+      const isCurrentlyPlaying = (currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item;
+      const endpoint = isCurrentlyPlaying ? '/api/spotify/pause' : '/api/spotify/play';
+      
+      const response = await fetch(endpoint, { method: 'PUT' });
+      const data = await response.json().catch(() => ({}));
+      
+      if (response.ok) {
+        // Immediately update local state for better UX
+        if (isCurrentlyPlaying) {
+          setCurrentlyPlaying(prev => prev ? { ...prev, is_playing: false, isPlaying: false } : null);
+        } else {
+          setCurrentlyPlaying(prev => prev ? { ...prev, is_playing: true, isPlaying: true } : null);
+        }
+        // Refetch after a short delay to get accurate state
+        setTimeout(() => {
+          fetchCurrentlyPlaying();
+        }, 500);
+      } else if (data.needsReconnect) {
+        // Show user-friendly message about needing to reconnect
+        alert('Playback control requires additional permissions. Please disconnect and reconnect to Spotify on the Spotify page to enable this feature.');
+      }
+    } catch {
+      // Silently handle errors
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+
+  if (!isConnected) {
+    return null; // Don't show widget if not connected
+  }
+
+  // Use the actual is_playing field from Spotify API, fallback to isPlaying
+  const isPlaying = (currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item;
+  // Use last track if paused, otherwise use current track
+  const track = currentlyPlaying?.item || lastTrack;
+
+  return (
+    <>
+      {/* Mini Widget - Fixed Width */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <div
+          className="w-80 rounded-lg shadow-2xl border border-white/10 transition-all duration-500 cursor-pointer overflow-hidden"
+          style={{
+            backgroundColor: bgColor || '#1DB954',
+            background: bgColor || '#1DB954',
+          } as React.CSSProperties}
+          onClick={() => setIsOpen(true)}
+        >
+          <div className="p-3">
+            {track ? (
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                  <img
+                    src={track.album.images[2]?.url || track.album.images[0]?.url}
+                    alt={track.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <MarqueeText
+                    text={track.name}
+                    className="text-white font-semibold text-sm"
+                  />
+                  <p className="text-white/80 text-xs truncate">
+                    {track.artists.map((a) => a.name).join(', ')}
+                  </p>
+                </div>
+                {/* Play/Pause button */}
+                <button
+                  onClick={handlePlayPause}
+                  disabled={isToggling}
+                  className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isToggling ? (
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="w-4 h-4 text-white fill-white" />
+                  ) : (
+                    <Play className="w-4 h-4 text-white fill-white" />
+                  )}
+                </button>
+                {/* Waveform on same row */}
+                <div className="flex-shrink-0 w-20">
+                  <SpotifyWaveform isPlaying={isPlaying} compact />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Music className="w-6 h-6 text-white/60" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold text-sm">
+                    {loading ? 'Loading...' : 'Not playing'}
+                  </p>
+                  <p className="text-white/80 text-xs">Click to expand</p>
+                </div>
+                {/* Waveform on same row - paused */}
+                <div className="flex-shrink-0 w-20">
+                  <SpotifyWaveform isPlaying={false} compact />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Modal - Fixed Height, Wider, Compact */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent 
+          className="sm:max-w-[700px] h-[500px] p-0 border-white/10 overflow-hidden"
+          style={{
+            backgroundColor: bgColor,
+            backgroundImage: `linear-gradient(135deg, ${bgColor}ee, ${bgColor}cc)`,
+          } as React.CSSProperties}
+        >
+          {track ? (
+            <div className="flex h-full">
+              {/* Left: Album Art */}
+              <div className="w-64 h-full flex-shrink-0 relative">
+                <img
+                  src={track.album.images[0]?.url}
+                  alt={track.album.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/20 to-black/40" />
+              </div>
+
+              {/* Right: Info */}
+              <div className="flex-1 flex flex-col p-6 text-white">
+                <div className="flex items-start mb-4">
+                  <div className="flex-1 min-w-0">
+                    <MarqueeText
+                      text={track.name}
+                      className="text-2xl font-bold mb-1"
+                    />
+                    <p className="text-white/90 text-lg mb-1">
+                      {track.artists.map((a) => a.name).join(', ')}
+                    </p>
+                    <p className="text-white/70 text-sm">{track.album.name}</p>
+                  </div>
+                </div>
+
+                {/* Waveform */}
+                <div className="flex-1 flex items-center py-4">
+                  <SpotifyWaveform isPlaying={isPlaying} />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handlePlayPause}
+                    disabled={isToggling}
+                    className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {isToggling ? (
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    ) : isPlaying ? (
+                      <Pause className="w-6 h-6 text-white fill-white" />
+                    ) : (
+                      <Play className="w-6 h-6 text-white fill-white" />
+                    )}
+                  </button>
+                  <Button
+                    className="flex-1 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                    onClick={() => window.open(track.external_urls.spotify, '_blank')}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open in Spotify
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center p-6">
+              <div className="text-center space-y-4">
+                <div className="mx-auto w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
+                  {loading ? (
+                    <Loader2 className="w-12 h-12 text-white animate-spin" />
+                  ) : (
+                    <Music className="w-12 h-12 text-white/60" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-white text-xl font-semibold">Nothing is playing</p>
+                  <p className="text-white/80 text-sm mt-2">
+                    Start playing something on Spotify
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+

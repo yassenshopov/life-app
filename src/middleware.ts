@@ -5,6 +5,8 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/api/webhook/clerk',
   '/api/notion/daily-tracking',
+  '/api/spotify/callback',
+  '/api/google-calendar/callback',
   '/login',
   '/signup',
   '/pricing',
