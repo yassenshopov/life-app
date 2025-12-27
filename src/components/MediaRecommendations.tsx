@@ -6,8 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Plus, ExternalLink, Book, Film } from 'lucide-react';
-import { Spinner } from '@/components/ui/spinner';
+import { Sparkles, Loader2, Plus, ExternalLink, Book, Film, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { MediaCreationPreview } from '@/components/MediaCreationPreview';
 
