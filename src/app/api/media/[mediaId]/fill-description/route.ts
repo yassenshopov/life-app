@@ -69,60 +69,66 @@ async function fetchIMDbData(imdbId: string) {
   };
 }
 
-// Extract book title from Goodreads URL
-async function extractBookTitleFromGoodreads(goodreadsId: string): Promise<string | null> {
-  try {
-    const response = await fetchWithTimeout(
-      `https://www.goodreads.com/book/show/${goodreadsId}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      },
-      10000
-    );
-    const html = await response.text();
-    const titleMatch = html.match(/<title>([^<]+)<\/title>/);
-    if (titleMatch && titleMatch[1]) {
-      // Remove " by Author | Goodreads" suffix
-      return titleMatch[1].split(' by ')[0].trim();
-    }
-    return null;
-  } catch (error) {
-    console.error('Error extracting book title from Goodreads:', error);
-    return null;
-  }
-}
-
 // Fetch book data using Google Books API
-async function fetchGoodreadsData(goodreadsId: string) {
-  // First, try to get the book title from Goodreads
-  const bookTitle = await extractBookTitleFromGoodreads(goodreadsId);
-  
-  if (!bookTitle) {
-    throw new Error('Could not extract book title from Goodreads');
+async function fetchBookDescription(bookTitle: string) {
+  if (!bookTitle || bookTitle.trim().length === 0) {
+    throw new Error('Book title is required');
   }
 
-  // Use Google Books API to get book details
-  const searchQuery = encodeURIComponent(bookTitle);
+  // Clean up the title - remove year in parentheses if present for better search results
+  // e.g., "Book Title (2023)" -> "Book Title"
+  const cleanTitle = bookTitle.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  
+  // Use Google Books API to search for the book
+  const googleBooksApiKey = process.env.GOOGLE_BOOKS_API_KEY;
+  const apiKeyParam = googleBooksApiKey ? `&key=${googleBooksApiKey}` : '';
+  
+  const searchQuery = encodeURIComponent(cleanTitle);
   const booksResponse = await fetchWithTimeout(
-    `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=1`,
+    `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=5${apiKeyParam}`,
     {},
     10000
   );
   
+  if (!booksResponse.ok) {
+    throw new Error(`Failed to fetch from Google Books API: ${booksResponse.status}`);
+  }
+  
   const booksData = await booksResponse.json();
   
   if (!booksData.items || booksData.items.length === 0) {
-    throw new Error('Book not found in Google Books API');
+    throw new Error(`No book found for "${cleanTitle}"`);
   }
 
-  const book = booksData.items[0].volumeInfo;
+  // Try to find the best match by comparing titles
+  let bestMatch = booksData.items[0];
+  const titleLower = cleanTitle.toLowerCase();
   
-  // Get description
-  const description = book.description 
-    ? book.description.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().substring(0, 500)
-    : null;
+  for (const item of booksData.items) {
+    const itemTitle = item.volumeInfo?.title?.toLowerCase() || '';
+    if (itemTitle === titleLower || itemTitle.includes(titleLower) || titleLower.includes(itemTitle)) {
+      bestMatch = item;
+      break;
+    }
+  }
+
+  const book = bestMatch.volumeInfo;
+  
+  // Get description - try different fields
+  let description = book.description || book.subtitle || null;
+  
+  if (description) {
+    // Clean HTML tags and normalize whitespace
+    description = description
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Limit length (keep it reasonable for synopsis)
+    if (description.length > 1000) {
+      description = description.substring(0, 1000) + '...';
+    }
+  }
 
   return {
     ai_synopsis: description,
@@ -147,7 +153,7 @@ export async function POST(
     // Get the media entry from Supabase
     const { data: mediaEntry, error: fetchError } = await supabase
       .from('media')
-      .select('id, notion_page_id, url, category, ai_synopsis')
+      .select('id, notion_page_id, url, category, ai_synopsis, name')
       .eq('id', mediaId)
       .eq('user_id', userId)
       .single();
@@ -178,22 +184,25 @@ export async function POST(
     const urlLower = mediaEntry.url.toLowerCase();
     let descriptionData: any;
 
-    // Fetch description based on URL type
+    // Fetch description based on URL type or category
     if (urlLower.includes('imdb.com')) {
       const imdbId = extractIMDbId(mediaEntry.url);
       if (!imdbId) {
         return NextResponse.json({ error: 'Invalid IMDb URL' }, { status: 400 });
       }
       descriptionData = await fetchIMDbData(imdbId);
-    } else if (urlLower.includes('goodreads.com')) {
-      const goodreadsId = extractGoodreadsId(mediaEntry.url);
-      if (!goodreadsId) {
-        return NextResponse.json({ error: 'Invalid Goodreads URL' }, { status: 400 });
+    } else if (urlLower.includes('goodreads.com') || mediaEntry.category === 'Book') {
+      // Use the book name from the media entry to search Google Books API
+      if (!mediaEntry.name || mediaEntry.name.trim().length === 0) {
+        return NextResponse.json(
+          { error: 'Book name is required to fetch description' },
+          { status: 400 }
+        );
       }
-      descriptionData = await fetchGoodreadsData(goodreadsId);
+      descriptionData = await fetchBookDescription(mediaEntry.name);
     } else {
       return NextResponse.json(
-        { error: 'URL must be from IMDb or Goodreads' },
+        { error: 'URL must be from IMDb or Goodreads, or entry must be a Book' },
         { status: 400 }
       );
     }

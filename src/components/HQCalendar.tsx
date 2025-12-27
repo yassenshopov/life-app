@@ -17,7 +17,7 @@ import { DailyCalendarView } from '@/components/calendar-views/DailyCalendarView
 import { WeeklyCalendarView } from '@/components/calendar-views/WeeklyCalendarView';
 import { MonthlyCalendarView } from '@/components/calendar-views/MonthlyCalendarView';
 import { AnnualCalendarView } from '@/components/calendar-views/AnnualCalendarView';
-import { ScheduleCalendarView } from '@/components/calendar-views/ScheduleCalendarView';
+import { ScheduleCalendarView, ScheduleCalendarViewRef } from '@/components/calendar-views/ScheduleCalendarView';
 import { AnimatedCalendarView } from '@/components/calendar/AnimatedCalendarView';
 import { EventDetailModal } from '@/components/calendar/EventDetailModal';
 import { NewEventModal } from '@/components/calendar/NewEventModal';
@@ -99,6 +99,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   const [people, setPeople] = React.useState<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = React.useState<Person | null>(null);
   const [isPersonModalOpen, setIsPersonModalOpen] = React.useState(false);
+  const scheduleViewRef = React.useRef<ScheduleCalendarViewRef>(null);
 
   const handlePersonClick = (person: Person) => {
     setSelectedPerson(person);
@@ -612,9 +613,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
             const date = new Date(today.getFullYear(), 0, 1);
             setCurrentDate(date);
           } else if (viewMode === 'schedule') {
-            const date = new Date(today);
-            date.setHours(0, 0, 0, 0);
-            setCurrentDate(date);
+            // For schedule view, just scroll to today instead of changing date
+            scheduleViewRef.current?.scrollToToday();
           }
           break;
         case 'f':
@@ -650,9 +650,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       const date = new Date(today.getFullYear(), 0, 1);
       setCurrentDate(date);
     } else if (viewMode === 'schedule') {
-      const date = new Date(today);
-      date.setHours(0, 0, 0, 0);
-      setCurrentDate(date);
+      // For schedule view, just scroll to today instead of changing date
+      scheduleViewRef.current?.scrollToToday();
     }
   };
 
@@ -917,6 +916,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           )}
           {viewMode === 'schedule' && (
             <ScheduleCalendarView
+              ref={scheduleViewRef}
               currentDate={currentDate}
               events={events}
               timeFormat={timeFormat}

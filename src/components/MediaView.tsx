@@ -277,15 +277,21 @@ function MediaDetailModal({
   const canNavigatePrev = currentIndex > 0;
   const canNavigateNext = currentIndex < mediaList.length - 1;
 
+  const [isNavigating, setIsNavigating] = React.useState(false);
+
   const handlePrev = () => {
-    if (canNavigatePrev) {
+    if (canNavigatePrev && !isNavigating) {
+      setIsNavigating(true);
       onNavigate(currentIndex - 1);
+      setTimeout(() => setIsNavigating(false), 300);
     }
   };
 
   const handleNext = () => {
-    if (canNavigateNext) {
+    if (canNavigateNext && !isNavigating) {
+      setIsNavigating(true);
       onNavigate(currentIndex + 1);
+      setTimeout(() => setIsNavigating(false), 300);
     }
   };
 
@@ -293,16 +299,18 @@ function MediaDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <AnimatePresence>
-        {isOpen && (
+      <AnimatePresence mode="wait">
+        {isOpen && item && (
               <DialogContent 
                 className="sm:max-w-[700px] h-[500px] p-0 border-white/10 overflow-hidden"
+                key={item.id}
               >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              key={item.id}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className="flex h-full w-full transition-all duration-500"
               style={{
                 backgroundColor: bgColor,
@@ -338,9 +346,10 @@ function MediaDetailModal({
               <div className="flex h-full w-full">
                 {/* Left: Thumbnail */}
                 <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
+                  key={`thumbnail-${item.id}`}
+                  initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.1, ease: [0.4, 0, 0.2, 1] }}
                   className="w-64 h-full flex-shrink-0 relative"
                 >
                   {thumbnailUrl ? (
@@ -364,9 +373,10 @@ function MediaDetailModal({
 
                 {/* Right: Info */}
                 <motion.div
+                  key={`info-${item.id}`}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
+                  transition={{ duration: 0.4, delay: 0.2, ease: [0.4, 0, 0.2, 1] }}
                   className="flex-1 flex flex-col p-6 text-white overflow-y-auto"
                 >
             <div className="flex items-start mb-4">
@@ -417,17 +427,19 @@ function MediaDetailModal({
                   </Button>
                 )}
               </div>
-              {item.ai_synopsis ? (
-                <p className="text-white/80 text-sm leading-relaxed">
-                  {shouldAnimateDescription ? (
-                    <TypedText text={item.ai_synopsis} delay={200} />
-                  ) : (
-                    item.ai_synopsis
-                  )}
-                </p>
-              ) : (
-                <p className="text-white/50 text-sm italic">No description available</p>
-              )}
+              <div className="h-32 max-h-32 overflow-y-auto pr-2">
+                {item.ai_synopsis ? (
+                  <p className="text-white/80 text-sm leading-relaxed">
+                    {shouldAnimateDescription ? (
+                      <TypedText text={item.ai_synopsis} delay={200} />
+                    ) : (
+                      item.ai_synopsis
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-white/50 text-sm italic">No description available</p>
+                )}
+              </div>
             </div>
 
             {/* Topics */}
