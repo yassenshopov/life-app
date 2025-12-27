@@ -391,7 +391,7 @@ export function SpotifyPlayer() {
   }
 
   // Use the actual is_playing field from Spotify API, fallback to isPlaying
-  const isPlaying = (currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item;
+  const isPlaying = Boolean((currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item);
   // Use last track if paused, otherwise use current track
   const track = currentlyPlaying?.item || lastTrack;
 
@@ -433,7 +433,7 @@ export function SpotifyPlayer() {
                 </div>
                 {/* Waveform on same row */}
                 <div className="flex-shrink-0 w-20">
-                  <SpotifyWaveform isPlaying={isPlaying} compact />
+                  <SpotifyWaveform isPlaying={isPlaying} compact={true} />
                 </div>
                 {/* Controls: Previous, Play/Pause, Next */}
                 <div className="flex-shrink-0 flex items-center gap-1">

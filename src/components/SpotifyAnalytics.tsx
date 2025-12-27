@@ -29,6 +29,16 @@ interface AnalyticsData {
   listeningByDay: number[];
   timeRange: number | 'all';
   hasTopData?: boolean;
+  topTracksByTimeRange?: Record<string, Array<{
+    id: string;
+    name: string;
+    rank: number;
+  }>>;
+  topArtistsByTimeRange?: Record<string, Array<{
+    id: string;
+    name: string;
+    rank: number;
+  }>>;
 }
 
 export function SpotifyAnalytics() {
