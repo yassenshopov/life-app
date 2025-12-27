@@ -31,7 +31,7 @@ function getDominantColor(imageUrl: string): Promise<string> {
     // Try to handle CORS - Spotify images should allow this
     img.crossOrigin = 'anonymous';
     const defaultColor = getDefaultBgColor();
-    
+
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -40,38 +40,41 @@ function getDominantColor(imageUrl: string): Promise<string> {
           resolve(defaultColor);
           return;
         }
-        
+
         // Limit canvas size for performance
         const maxSize = 100;
         const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
-        
+
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
+
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-        
-        let r = 0, g = 0, b = 0, count = 0;
+
+        let r = 0,
+          g = 0,
+          b = 0,
+          count = 0;
         const step = Math.max(1, Math.floor(data.length / 4 / 200)); // Sample 200 pixels
-        
+
         for (let i = 0; i < data.length; i += step * 4) {
           r += data[i];
           g += data[i + 1];
           b += data[i + 2];
           count++;
         }
-        
+
         if (count > 0) {
           r = Math.floor(r / count);
           g = Math.floor(g / count);
           b = Math.floor(b / count);
-          
+
           // Darken the color a bit for better contrast
           r = Math.max(0, Math.floor(r * 0.7));
           g = Math.max(0, Math.floor(g * 0.7));
           b = Math.max(0, Math.floor(b * 0.7));
-          
+
           resolve(`rgb(${r}, ${g}, ${b})`);
         } else {
           resolve(defaultColor);
@@ -80,18 +83,18 @@ function getDominantColor(imageUrl: string): Promise<string> {
         resolve(defaultColor);
       }
     };
-    
+
     img.onerror = () => {
       resolve(defaultColor);
     };
-    
+
     // Set timeout to avoid hanging
     setTimeout(() => {
       if (!img.complete) {
         resolve(defaultColor);
       }
     }, 3000);
-    
+
     img.src = imageUrl;
   });
 }
@@ -112,7 +115,13 @@ interface CurrentlyPlaying {
 }
 
 // Spotify waveform animation component
-function SpotifyWaveform({ isPlaying, compact = false }: { isPlaying: boolean; compact?: boolean }) {
+function SpotifyWaveform({
+  isPlaying,
+  compact = false,
+}: {
+  isPlaying: boolean;
+  compact?: boolean;
+}) {
   const barCount = compact ? 16 : 32;
   const bars = Array.from({ length: barCount }, (_, i) => i);
   const [heights, setHeights] = React.useState<number[]>(
@@ -141,25 +150,25 @@ function SpotifyWaveform({ isPlaying, compact = false }: { isPlaying: boolean; c
         animationRef.current = requestAnimationFrame(animate);
         return;
       }
-      
+
       lastUpdateRef.current = currentTime;
       timeRef.current += elapsed / 1000; // Convert to seconds
-      
+
       const baseSpeed = 0.5; // Slower, smoother animation
-      
+
       // Simplified waveform - single smooth sine wave with position offset
       // This creates synchronized adjacent bars that flow smoothly
       const newHeights = bars.map((_, i) => {
         const position = i / barCount; // Normalized position 0-1
-        
+
         // Single smooth wave that flows across bars
         // Adjacent bars are in sync, creating a realistic waveform
         const wave = Math.sin(timeRef.current * baseSpeed + position * Math.PI * 1.5);
-        
+
         // Normalize to 20-80% height range for smoother appearance
         const normalized = (wave + 1) / 2; // Convert from -1,1 to 0,1
         const height = 20 + normalized * 60; // Scale to 20-80%
-        
+
         return Math.max(20, Math.min(80, height));
       });
 
@@ -206,27 +215,31 @@ function MarqueeText({ text, className = '' }: { text: string; className?: strin
   }, [text]);
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={`overflow-hidden ${className}`}
-      style={{ 
+      style={{
         height: '1.25rem',
         lineHeight: '1.25rem',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
       }}
     >
       <div
         ref={textRef}
         className="whitespace-nowrap"
-        style={shouldScroll ? {
-          display: 'inline-block',
-          paddingLeft: '100%',
-          animation: 'marquee 20s linear infinite',
-        } : {
-          display: 'block',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
+        style={
+          shouldScroll
+            ? {
+                display: 'inline-block',
+                paddingLeft: '100%',
+                animation: 'marquee 20s linear infinite',
+              }
+            : {
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }
+        }
       >
         {text}
       </div>
@@ -289,7 +302,8 @@ export function SpotifyPlayer() {
     const track = currentlyPlaying?.item || lastTrack;
     if (track?.album?.images && track.album.images.length > 0) {
       // Use the largest available image for better color extraction
-      const imageUrl = track.album.images[0]?.url || track.album.images[1]?.url || track.album.images[2]?.url;
+      const imageUrl =
+        track.album.images[0]?.url || track.album.images[1]?.url || track.album.images[2]?.url;
       if (imageUrl) {
         getDominantColor(imageUrl)
           .then((color) => {
@@ -305,7 +319,12 @@ export function SpotifyPlayer() {
       // Reset to default when not playing and no last track
       setBgColor(getDefaultBgColor());
     }
-  }, [currentlyPlaying?.item?.album?.images, currentlyPlaying?.isPlaying, currentlyPlaying?.is_playing, lastTrack]);
+  }, [
+    currentlyPlaying?.item?.album?.images,
+    currentlyPlaying?.isPlaying,
+    currentlyPlaying?.is_playing,
+    lastTrack,
+  ]);
 
   const fetchCurrentlyPlaying = async () => {
     try {
@@ -329,21 +348,26 @@ export function SpotifyPlayer() {
   const handlePlayPause = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening modal
     if (isToggling) return;
-    
+
     setIsToggling(true);
     try {
-      const isCurrentlyPlaying = (currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item;
+      const isCurrentlyPlaying =
+        (currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item;
       const endpoint = isCurrentlyPlaying ? '/api/spotify/pause' : '/api/spotify/play';
-      
+
       const response = await fetch(endpoint, { method: 'PUT' });
       const data = await response.json().catch(() => ({}));
-      
+
       if (response.ok) {
         // Immediately update local state for better UX
         if (isCurrentlyPlaying) {
-          setCurrentlyPlaying(prev => prev ? { ...prev, is_playing: false, isPlaying: false } : null);
+          setCurrentlyPlaying((prev) =>
+            prev ? { ...prev, is_playing: false, isPlaying: false } : null
+          );
         } else {
-          setCurrentlyPlaying(prev => prev ? { ...prev, is_playing: true, isPlaying: true } : null);
+          setCurrentlyPlaying((prev) =>
+            prev ? { ...prev, is_playing: true, isPlaying: true } : null
+          );
         }
         // Refetch after a short delay to get accurate state
         setTimeout(() => {
@@ -351,7 +375,9 @@ export function SpotifyPlayer() {
         }, 500);
       } else if (data.needsReconnect) {
         // Show user-friendly message about needing to reconnect
-        alert('Playback control requires additional permissions. Please disconnect and reconnect to Spotify on the Spotify page to enable this feature.');
+        alert(
+          'Playback control requires additional permissions. Please disconnect and reconnect to Spotify on the Spotify page to enable this feature.'
+        );
       }
     } catch {
       // Silently handle errors
@@ -363,20 +389,22 @@ export function SpotifyPlayer() {
   const handleSkip = async (direction: 'next' | 'previous', e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening modal
     if (isToggling) return;
-    
+
     setIsToggling(true);
     try {
       const endpoint = direction === 'next' ? '/api/spotify/next' : '/api/spotify/previous';
       const response = await fetch(endpoint, { method: 'POST' });
       const data = await response.json().catch(() => ({}));
-      
+
       if (response.ok) {
         // Refetch after a short delay to get the new track
         setTimeout(() => {
           fetchCurrentlyPlaying();
         }, 500);
       } else if (data.needsReconnect) {
-        alert('Playback control requires additional permissions. Please disconnect and reconnect to Spotify on the Spotify page to enable this feature.');
+        alert(
+          'Playback control requires additional permissions. Please disconnect and reconnect to Spotify on the Spotify page to enable this feature.'
+        );
       }
     } catch {
       // Silently handle errors
@@ -385,13 +413,14 @@ export function SpotifyPlayer() {
     }
   };
 
-
   if (!isConnected) {
     return null; // Don't show widget if not connected
   }
 
   // Use the actual is_playing field from Spotify API, fallback to isPlaying
-  const isPlaying = Boolean((currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item);
+  const isPlaying = Boolean(
+    (currentlyPlaying?.is_playing ?? currentlyPlaying?.isPlaying) && currentlyPlaying?.item
+  );
   // Use last track if paused, otherwise use current track
   const track = currentlyPlaying?.item || lastTrack;
 
@@ -406,10 +435,12 @@ export function SpotifyPlayer() {
       <div className="fixed bottom-4 right-4 z-50">
         <div
           className="w-80 rounded-lg shadow-2xl border border-white/10 transition-all duration-500 cursor-pointer overflow-hidden"
-          style={{
-            backgroundColor: bgColor || getDefaultBgColor(),
-            background: bgColor || getDefaultBgColor(),
-          } as React.CSSProperties}
+          style={
+            {
+              backgroundColor: bgColor || getDefaultBgColor(),
+              background: bgColor || getDefaultBgColor(),
+            } as React.CSSProperties
+          }
           onClick={() => setIsOpen(true)}
         >
           <div className="p-3">
@@ -422,10 +453,7 @@ export function SpotifyPlayer() {
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <MarqueeText
-                  text={track.name}
-                  className="text-white font-semibold text-sm"
-                />
+                <MarqueeText text={track.name} className="text-white font-semibold text-sm" />
                 <p className="text-white/80 text-xs truncate">
                   {track.artists.map((a) => a.name).join(', ')}
                 </p>
@@ -474,12 +502,14 @@ export function SpotifyPlayer() {
 
       {/* Expanded Modal - Fixed Height, Wider, Compact */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-[700px] h-[500px] p-0 border-white/10 overflow-hidden"
-          style={{
-            backgroundColor: bgColor,
-            backgroundImage: `linear-gradient(135deg, ${bgColor}ee, ${bgColor}cc)`,
-          } as React.CSSProperties}
+          style={
+            {
+              backgroundColor: bgColor,
+              backgroundImage: `linear-gradient(135deg, ${bgColor}ee, ${bgColor}cc)`,
+            } as React.CSSProperties
+          }
         >
           <DialogTitle className="sr-only">Now Playing</DialogTitle>
           {track ? (
@@ -498,10 +528,7 @@ export function SpotifyPlayer() {
               <div className="flex-1 flex flex-col p-6 text-white">
                 <div className="flex items-start mb-4">
                   <div className="flex-1 min-w-0">
-                    <MarqueeText
-                      text={track.name}
-                      className="text-2xl font-bold mb-1"
-                    />
+                    <MarqueeText text={track.name} className="text-2xl font-bold mb-1" />
                     <p className="text-white/90 text-lg mb-1">
                       {track.artists.map((a) => a.name).join(', ')}
                     </p>
@@ -568,9 +595,7 @@ export function SpotifyPlayer() {
                 </div>
                 <div>
                   <p className="text-white text-xl font-semibold">Nothing is playing</p>
-                  <p className="text-white/80 text-sm mt-2">
-                    Start playing something on Spotify
-                  </p>
+                  <p className="text-white/80 text-sm mt-2">Start playing something on Spotify</p>
                 </div>
               </div>
             </div>
@@ -580,4 +605,3 @@ export function SpotifyPlayer() {
     </>
   );
 }
-

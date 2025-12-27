@@ -7,12 +7,276 @@ import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import { 
   MapPin, 
   Users, 
-  MoreVertical
+  MoreVertical,
+  Sparkles
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { getContrastTextColor } from '@/lib/color-utils';
 import DOMPurify from 'dompurify';
 import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
+import { MediaModal } from '@/components/media/MediaModal';
+
+// Typed text animation component
+function TypedText({ 
+  text, 
+  delay = 0, 
+  className = '',
+  onComplete
+}: { 
+  text: string; 
+  delay?: number; 
+  className?: string;
+  onComplete?: () => void;
+}) {
+  const [displayedText, setDisplayedText] = React.useState('');
+  const [isComplete, setIsComplete] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!text) return;
+    
+    setDisplayedText('');
+    setIsComplete(false);
+    
+    const timeout = setTimeout(() => {
+      let currentIndex = 0;
+      const typingInterval = setInterval(() => {
+        if (currentIndex < text.length) {
+          setDisplayedText(text.slice(0, currentIndex + 1));
+          currentIndex++;
+        } else {
+          setIsComplete(true);
+          clearInterval(typingInterval);
+          // Call onComplete after a brief delay to ensure state is updated
+          if (onComplete) {
+            setTimeout(() => onComplete(), 0);
+          }
+        }
+      }, 30); // Typing speed
+
+      return () => clearInterval(typingInterval);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [text, delay]); // Removed onComplete from dependencies to prevent resets
+
+  return (
+    <span className={className}>
+      {displayedText}
+      {!isComplete && <span className="animate-pulse">|</span>}
+    </span>
+  );
+}
+
+// Sequential typed text list component - types items one by one
+function SequentialTypedList({ 
+  items, 
+  mediaItems,
+  onMediaClick
+}: { 
+  items: string[];
+  mediaItems: Array<{ id: string; name: string; category: string | null }>;
+  onMediaClick: (mediaId: string) => void;
+}) {
+  const [activeIndex, setActiveIndex] = React.useState<number | null>(0); // null means none active, number is the index being typed
+  const [completedIndices, setCompletedIndices] = React.useState<Set<number>>(new Set());
+
+  const handleItemComplete = React.useCallback((index: number) => {
+    // Mark this item as completed
+    setCompletedIndices(prev => new Set([...prev, index]));
+    
+    // Start next item after a short delay
+    if (index < items.length - 1) {
+      setTimeout(() => {
+        setActiveIndex(index + 1);
+      }, 150); // Small delay between items
+    } else {
+      // All items completed - keep activeIndex at last index so all items show as completed
+      setActiveIndex(items.length);
+    }
+  }, [items.length]);
+
+  // Reset when items change
+  React.useEffect(() => {
+    setActiveIndex(0); // Start with first item
+    setCompletedIndices(new Set());
+  }, [items]);
+
+  // Parse text to find and make media references clickable
+  const parseTextWithMediaLinks = (text: string) => {
+    // If no media items, return original text
+    if (!mediaItems || mediaItems.length === 0) {
+      return [{ text, isLink: false }];
+    }
+    
+    const parts: Array<{ text: string; isLink: boolean; mediaId?: string }> = [];
+    const matches: Array<{ index: number; length: number; mediaId: string; originalText: string }> = [];
+    
+    // Find all media item matches in the text with very flexible matching
+    for (const mediaItem of mediaItems) {
+      const name = mediaItem.name.trim();
+      if (!name || name.length < 2) continue;
+      
+      // Escape special regex characters
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Try multiple patterns - search for the title in various contexts
+      // We'll search for the title and then extract it, handling quotes, "by", and "(year)"
+      const patterns = [
+        // 1. Quoted title - "The North Water" or "Interstellar"
+        `["']${escapedName}["']`,
+        // 2. Title with word boundaries
+        `\\b${escapedName}\\b`,
+        // 3. Title without word boundaries (most flexible)
+        escapedName,
+      ];
+      
+      for (const pattern of patterns) {
+        const regex = new RegExp(pattern, 'gi');
+        let match;
+        regex.lastIndex = 0; // Reset regex
+        
+        while ((match = regex.exec(text)) !== null) {
+          let matchText = match[0];
+          let matchIndex = match.index;
+          let titleText = name;
+          let titleIndex = matchIndex;
+          
+          // Handle quoted titles
+          if (matchText.startsWith('"') || matchText.startsWith("'")) {
+            // Extract just the title from quotes
+            titleText = matchText.slice(1, -1);
+            titleIndex = matchIndex + 1;
+          } else {
+            // Unquoted title - check if it's followed by "by" or "("
+            // Look ahead to see if there's "by Author" or "(year)" after the title
+            const afterMatch = text.substring(matchIndex + matchText.length);
+            const trimmedAfter = afterMatch.trim();
+            
+            // If followed by "by" or "(", use just the title part
+            if (trimmedAfter.startsWith('by ') || trimmedAfter.startsWith('(')) {
+              titleText = matchText.trim();
+              titleIndex = matchIndex;
+            } else {
+              // Simple match
+              titleText = matchText.trim();
+              titleIndex = matchIndex;
+            }
+          }
+          
+          // Ensure we have a valid title
+          if (!titleText || titleText.length < 2) continue;
+          
+          // Check if this match overlaps with an existing match
+          const overlaps = matches.some(m => {
+            const mEnd = m.index + m.length;
+            const matchEnd = titleIndex + titleText.length;
+            return (titleIndex < mEnd && matchEnd > m.index);
+          });
+          
+          if (!overlaps) {
+            matches.push({
+              index: titleIndex,
+              length: titleText.length,
+              mediaId: mediaItem.id,
+              originalText: titleText
+            });
+            // Break after first successful match to avoid duplicates
+            break;
+          }
+        }
+        
+        // If we found a match with this pattern, don't try less specific patterns
+        if (matches.some(m => m.mediaId === mediaItem.id)) {
+          break;
+        }
+      }
+    }
+    
+    // Sort matches by index
+    const sortedMatches = [...matches].sort((a, b) => a.index - b.index);
+    
+    // Build parts array from matches
+    let lastIndex = 0;
+    for (const match of sortedMatches) {
+      // Add text before match
+      if (match.index > lastIndex) {
+        parts.push({ text: text.substring(lastIndex, match.index), isLink: false });
+      }
+      // Add media link
+      parts.push({ 
+        text: match.originalText, 
+        isLink: true, 
+        mediaId: match.mediaId 
+      });
+      lastIndex = match.index + match.length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push({ text: text.substring(lastIndex), isLink: false });
+    }
+    
+    // If no media matches found, return original text
+    if (parts.length === 0) {
+      return [{ text, isLink: false }];
+    }
+    
+    return parts;
+  };
+
+
+  return (
+    <ul className="space-y-1.5">
+      {items.map((item, idx) => {
+        const isActive = activeIndex === idx;
+        const isCompleted = completedIndices.has(idx) || (activeIndex !== null && idx < activeIndex);
+        const isPending = activeIndex !== null && idx > activeIndex;
+        
+        return (
+          <li key={idx} className="text-xs text-foreground flex items-start gap-2">
+            <span className="text-muted-foreground mt-0.5 flex-shrink-0">•</span>
+            <span className="flex-1 min-w-0">
+              {isActive ? (
+                <TypedText
+                  text={item}
+                  delay={0}
+                  className="break-words"
+                  onComplete={() => handleItemComplete(idx)}
+                />
+              ) : isCompleted ? (
+                <span className="break-words">
+                  {(() => {
+                    const parsedParts = parseTextWithMediaLinks(item);
+                    return parsedParts.map((part, partIdx) => 
+                      part.isLink && part.mediaId ? (
+                        <button
+                          key={partIdx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMediaClick(part.mediaId!);
+                          }}
+                          className="text-foreground hover:text-foreground/80 underline cursor-pointer"
+                        >
+                          {part.text}
+                        </button>
+                      ) : (
+                        <span key={partIdx}>{part.text}</span>
+                      )
+                    );
+                  })()}
+                </span>
+              ) : (
+                <span className="opacity-0 break-words">{item}</span> // Reserve space for pending items
+              )}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 // Helper function to get matched people from event (prioritizes linkedPeople)
 const getEventPeople = (event: CalendarEvent, people: Person[]): Person[] => {
@@ -57,6 +321,11 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const todayElementRef = React.useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = React.useState(new Date());
+  const [suggestions, setSuggestions] = React.useState<string[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [mediaItems, setMediaItems] = React.useState<Array<{ id: string; name: string; category: string | null }>>([]);
+  const [selectedMediaItem, setSelectedMediaItem] = React.useState<any | null>(null);
+  const [isMediaModalOpen, setIsMediaModalOpen] = React.useState(false);
 
   // Update current time every minute to refresh active event highlighting
   React.useEffect(() => {
@@ -215,6 +484,174 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
     return events.some(event => isEventActive(event, date));
   };
 
+  // Gather context for AI suggestions
+  const gatherContextForSuggestions = (currentTime: Date, allEvents: CalendarEvent[]) => {
+    const today = new Date(currentTime);
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Filter events for today only
+    const todayEvents = allEvents.filter(event => {
+      const eventDate = new Date(event.start);
+      eventDate.setHours(0, 0, 0, 0);
+      return eventDate.getTime() === today.getTime() && !event.isAllDay;
+    }).sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    // Find recent past events (within last 4 hours)
+    const fourHoursAgo = new Date(currentTime.getTime() - 4 * 60 * 60 * 1000);
+    const recentEvents = todayEvents
+      .filter(event => event.end <= currentTime && event.end >= fourHoursAgo)
+      .slice(-3)
+      .map(event => ({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        location: event.location,
+      }));
+
+    // Find upcoming events (next 8 hours)
+    const eightHoursFromNow = new Date(currentTime.getTime() + 8 * 60 * 60 * 1000);
+    const upcomingEvents = todayEvents
+      .filter(event => event.start > currentTime && event.start <= eightHoursFromNow)
+      .slice(0, 5)
+      .map(event => ({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        location: event.location,
+      }));
+
+    // Calculate time until next event
+    const nextEvent = todayEvents.find(event => event.start > currentTime);
+    const timeUntilNextEvent = nextEvent
+      ? Math.floor((nextEvent.start.getTime() - currentTime.getTime()) / (1000 * 60))
+      : undefined;
+
+    // Calculate available time blocks (gaps between events)
+    const availableTimeBlocks: Array<{ start: Date; end: Date; durationMinutes: number }> = [];
+    
+    // Gap from current time to first upcoming event
+    if (nextEvent) {
+      const durationMinutes = Math.floor((nextEvent.start.getTime() - currentTime.getTime()) / (1000 * 60));
+      if (durationMinutes > 0) {
+        availableTimeBlocks.push({
+          start: new Date(currentTime),
+          end: new Date(nextEvent.start),
+          durationMinutes,
+        });
+      }
+    }
+
+    // Gaps between consecutive events
+    for (let i = 0; i < todayEvents.length - 1; i++) {
+      const currentEvent = todayEvents[i];
+      const nextEventInList = todayEvents[i + 1];
+      
+      if (currentEvent.end < nextEventInList.start) {
+        const durationMinutes = Math.floor((nextEventInList.start.getTime() - currentEvent.end.getTime()) / (1000 * 60));
+        if (durationMinutes > 0) {
+          availableTimeBlocks.push({
+            start: new Date(currentEvent.end),
+            end: new Date(nextEventInList.start),
+            durationMinutes,
+          });
+        }
+      }
+    }
+
+    return {
+      currentTime,
+      recentEvents,
+      upcomingEvents,
+      timeUntilNextEvent,
+      availableTimeBlocks,
+    };
+  };
+
+  // Fetch AI suggestions
+  const handleGetSuggestions = async () => {
+    setIsLoadingSuggestions(true);
+    setSuggestions([]);
+    setMediaItems([]);
+
+    try {
+      // Fetch media items first
+      let media: Array<{ id: string; name: string; category: string | null }> = [];
+      try {
+        const mediaResponse = await fetch('/api/media');
+        if (mediaResponse.ok) {
+          const mediaData = await mediaResponse.json();
+          media = (mediaData.media || []).map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+          }));
+          setMediaItems(media);
+        }
+      } catch (mediaError) {
+        console.error('Error fetching media:', mediaError);
+      }
+
+      const context = gatherContextForSuggestions(currentTime, events);
+      
+      const response = await fetch('/api/ai/suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentTime: context.currentTime.toISOString(),
+          recentEvents: context.recentEvents.map(e => ({
+            ...e,
+            start: e.start.toISOString(),
+            end: e.end.toISOString(),
+          })),
+          upcomingEvents: context.upcomingEvents.map(e => ({
+            ...e,
+            start: e.start.toISOString(),
+            end: e.end.toISOString(),
+          })),
+          timeUntilNextEvent: context.timeUntilNextEvent,
+          availableTimeBlocks: context.availableTimeBlocks.map(b => ({
+            ...b,
+            start: b.start.toISOString(),
+            end: b.end.toISOString(),
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch suggestions');
+      }
+
+      const data = await response.json();
+      setSuggestions(data.suggestions || []);
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      setSuggestions(['Unable to generate suggestions at this time.']);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  // Handle media item click - fetch full item and open modal
+  const handleMediaClick = React.useCallback(async (mediaId: string) => {
+    try {
+      const response = await fetch('/api/media');
+      if (response.ok) {
+        const data = await response.json();
+        const mediaItem = data.media?.find((item: any) => item.id === mediaId);
+        if (mediaItem) {
+          setSelectedMediaItem(mediaItem);
+          setIsMediaModalOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching media item:', error);
+    }
+  }, []);
+
   // Safely sanitize and format description text
   const sanitizeDescription = (description: string | null | undefined): string => {
     if (!description) {
@@ -345,8 +782,27 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                 <div className="relative">
                   {(() => {
                     const organizedEvents = organizeEvents(dayEvents);
+                    
+                    // Create unscheduled time block if needed (for today, when no event is active)
+                    let eventsToDisplay = [...organizedEvents];
+                    if (isTodayDate && !hasActiveEvent(organizedEvents, date)) {
+                      // Create a placeholder event for unscheduled time at current time
+                      const unscheduledEvent: CalendarEvent & { _isUnscheduled?: boolean } = {
+                        id: 'unscheduled-time',
+                        title: 'Unscheduled time',
+                        start: new Date(currentTime),
+                        end: new Date(currentTime),
+                        color: '#6b7280', // Gray color
+                        _isUnscheduled: true,
+                      };
+                      
+                      // Insert at correct chronological position
+                      eventsToDisplay.push(unscheduledEvent);
+                      eventsToDisplay.sort((a, b) => a.start.getTime() - b.start.getTime());
+                    }
+                    
                     // Show timeline only if there are 2+ top-level events (events without parents)
-                    const showTimeline = organizedEvents.length > 1;
+                    const showTimeline = eventsToDisplay.length > 1;
                     
                     return (
                       <>
@@ -364,30 +820,72 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                         )}
                         
                         <div className="space-y-4 relative" ref={scrollContainerRef}>
-                          {/* Show unscheduled time block if no event is active on today */}
-                          {isTodayDate && !hasActiveEvent(organizedEvents, date) && (
-                            <div className="flex items-start gap-4 relative">
-                              {/* Left side: Time and Icon */}
-                              <div className="flex-shrink-0 flex items-center gap-2">
-                                {/* Time */}
-                                <div className="text-xs font-medium text-muted-foreground w-16 text-right">
-                                  <span>{formatEventTime(currentTime)}</span>
+                          {eventsToDisplay.map((event, eventIndex) => {
+                            const isUnscheduled = (event as CalendarEvent & { _isUnscheduled?: boolean })._isUnscheduled;
+                            
+                            // Render unscheduled time block differently
+                            if (isUnscheduled) {
+                              return (
+                                <div key={event.id} className="flex items-start gap-4 relative">
+                                  {/* Left side: Time and Icon */}
+                                  <div className="flex-shrink-0 flex items-center gap-2">
+                                    {/* Time */}
+                                    <div className="text-xs font-medium text-muted-foreground w-16 text-right">
+                                      <span>{formatEventTime(currentTime)}</span>
+                                    </div>
+                                    
+                                    {/* Empty circle indicator */}
+                                    <div className="relative z-10 w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 bg-transparent" />
+                                  </div>
+                                  
+                                  {/* Right side: Unscheduled time block */}
+                                  <div className="flex-1 min-w-0 bg-muted/30 border border-dashed border-muted-foreground/30 rounded-lg p-3">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <div className="text-xs text-muted-foreground italic">
+                                        Unscheduled time
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleGetSuggestions();
+                                        }}
+                                        disabled={isLoadingSuggestions}
+                                        className="h-7 px-2 text-xs"
+                                      >
+                                        {isLoadingSuggestions ? (
+                                          <>
+                                            <Spinner size="sm" className="mr-1" />
+                                            Thinking...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Sparkles className="h-3 w-3 mr-1" />
+                                            Get suggestions
+                                          </>
+                                        )}
+                                      </Button>
+                                    </div>
+                                    
+                                    {/* Suggestions list */}
+                                    {suggestions.length > 0 && (
+                                      <div className="mt-3 pt-3 border-t border-muted-foreground/20">
+                                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                                          Suggestions:
+                                        </div>
+                                        <SequentialTypedList 
+                                          items={suggestions} 
+                                          mediaItems={mediaItems}
+                                          onMediaClick={handleMediaClick}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                
-                                {/* Empty circle indicator */}
-                                <div className="relative z-10 w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 bg-transparent" />
-                              </div>
-                              
-                              {/* Right side: Unscheduled time block */}
-                              <div className="flex-1 min-w-0 bg-muted/30 border border-dashed border-muted-foreground/30 rounded-lg p-3">
-                                <div className="text-xs text-muted-foreground italic">
-                                  Unscheduled time
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {organizedEvents.map((event, eventIndex) => {
+                              );
+                            }
+                            
                             const eventColor = event.color || '#4285f4';
                             const isAllDay = event.isAllDay || false;
                             // Use linked people from database (if available), otherwise fall back to title matching
@@ -591,7 +1089,19 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
           )}
         </div>
       </div>
+      
+      {/* Media Modal */}
+      <MediaModal
+        item={selectedMediaItem}
+        isOpen={isMediaModalOpen}
+        onClose={() => {
+          setIsMediaModalOpen(false);
+          setSelectedMediaItem(null);
+        }}
+      />
     </div>
   );
 });
+
+ScheduleCalendarView.displayName = 'ScheduleCalendarView';
 

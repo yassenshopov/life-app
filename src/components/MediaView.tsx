@@ -855,6 +855,23 @@ export function MediaView() {
     fetchMedia();
   }, []);
 
+  // Check for item query parameter and open modal
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && media.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const itemId = params.get('item');
+      if (itemId) {
+        const item = media.find(m => m.id === itemId);
+        if (item) {
+          setSelectedMedia(item);
+          setIsModalOpen(true);
+          // Clean up URL
+          window.history.replaceState({}, '', '/media');
+        }
+      }
+    }
+  }, [media]);
+
   // Sync from Notion
   const handleSync = async () => {
     setIsSyncing(true);
