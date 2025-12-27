@@ -72,7 +72,7 @@ export interface CalendarEvent {
   };
   created?: Date;
   updated?: Date;
-  linkedPeople?: Array<{ id: string; name: string; image?: any }>; // People linked to this event
+  linkedPeople?: Array<{ id: string; name: string; image?: any; image_url?: string | null }>; // People linked to this event
 }
 
 export type CalendarViewMode = 'daily' | 'weekly' | 'monthly' | 'year' | 'schedule';

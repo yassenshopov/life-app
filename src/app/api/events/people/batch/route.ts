@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
           id,
           name,
           image,
+          image_url,
           nicknames
         )
       `)
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
         id: ep.people.id,
         name: ep.people.name,
         image: ep.people.image,
+        image_url: ep.people.image_url,
         nicknames: ep.people.nicknames,
       });
     });

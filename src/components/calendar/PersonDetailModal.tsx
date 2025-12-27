@@ -28,8 +28,15 @@ const zodiacSymbols: Record<string, string> = {
   Pisces: '♓',
 };
 
-// Helper to extract image URL from Notion files JSONB
-function getImageUrl(imageData: any): string | null {
+// Helper to get image URL - prefer image_url from Supabase Storage, fallback to extracting from JSONB
+function getImageUrl(person: PersonWithDetails): string | null {
+  // Prefer Supabase Storage URL if available
+  if (person.image_url) {
+    return person.image_url;
+  }
+  
+  // Fallback to extracting from Notion JSONB (for backward compatibility)
+  const imageData = person.image;
   if (!imageData || !Array.isArray(imageData) || imageData.length === 0) {
     return null;
   }
@@ -76,6 +83,7 @@ interface PersonWithDetails extends Person {
   birth_date?: string | null;
   occupation?: string | null;
   contact_freq?: string | null;
+  image_url?: string | null;
   age?: any;
   birthday?: any;
 }
@@ -106,7 +114,7 @@ function formatBirthday(birthday: any): string {
 export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModalProps) {
   if (!person) return null;
 
-  const imageUrl = getImageUrl(person.image);
+  const imageUrl = getImageUrl(person);
   const zodiacSign = extractZodiacSign(person.star_sign);
   const zodiacSymbol = zodiacSign ? zodiacSymbols[zodiacSign] || '' : '';
   const fromLocation = extractFlag(person.from_location);

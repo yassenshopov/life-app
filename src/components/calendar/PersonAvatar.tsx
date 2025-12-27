@@ -9,14 +9,22 @@ interface PersonAvatarProps {
     id: string;
     name: string;
     image?: any;
+    image_url?: string | null;
   };
   size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
   onClick?: () => void;
 }
 
-// Helper to extract image URL from Notion files JSONB
-function getImageUrl(imageData: any): string | null {
+// Helper to get image URL - prefer image_url from Supabase Storage, fallback to extracting from JSONB
+function getImageUrl(person: PersonAvatarProps['person']): string | null {
+  // Prefer Supabase Storage URL if available
+  if (person.image_url) {
+    return person.image_url;
+  }
+  
+  // Fallback to extracting from Notion JSONB (for backward compatibility)
+  const imageData = person.image;
   if (!imageData || !Array.isArray(imageData) || imageData.length === 0) {
     return null;
   }
@@ -33,7 +41,7 @@ function getImageUrl(imageData: any): string | null {
 }
 
 export function PersonAvatar({ person, size = 'sm', className, onClick }: PersonAvatarProps) {
-  const imageUrl = getImageUrl(person.image);
+  const imageUrl = getImageUrl(person);
   const sizeClasses = {
     xs: 'w-4 h-4', // 16px
     sm: 'w-5 h-5', // 20px - bigger for better visibility

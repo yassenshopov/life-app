@@ -33,6 +33,7 @@ export async function GET(
           id,
           name,
           image,
+          image_url,
           nicknames
         )
       `)
@@ -52,6 +53,7 @@ export async function GET(
       id: ep.people.id,
       name: ep.people.name,
       image: ep.people.image,
+      image_url: ep.people.image_url,
       nicknames: ep.people.nicknames,
       linkId: ep.id, // The junction table ID for deletion
     }));
@@ -118,6 +120,7 @@ export async function POST(
           id,
           name,
           image,
+          image_url,
           nicknames
         )
       `)
@@ -154,6 +157,7 @@ export async function POST(
         id: peopleData.id,
         name: peopleData.name,
         image: peopleData.image,
+        image_url: peopleData.image_url,
         nicknames: peopleData.nicknames,
         linkId: data.id,
       },

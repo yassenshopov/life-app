@@ -42,6 +42,89 @@ function getPropertyValue(property: any, propertyType: string): any {
   }
 }
 
+// Helper function to extract image URL from Notion files JSONB
+function getImageUrl(imageData: any): string | null {
+  if (!imageData || !Array.isArray(imageData) || imageData.length === 0) {
+    return null;
+  }
+  const firstFile = imageData[0];
+  if (firstFile.type === 'external' && firstFile.external?.url) {
+    return firstFile.external.url;
+  }
+  if (firstFile.type === 'file' && firstFile.file?.url) {
+    return firstFile.file.url;
+  }
+  return null;
+}
+
+// Helper function to upload image to Supabase Storage
+async function uploadImageToStorage(
+  imageUrl: string,
+  userId: string,
+  personId: string
+): Promise<string | null> {
+  try {
+    // Download the image
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      console.warn(`Failed to download image from ${imageUrl}: ${imageResponse.status}`);
+      return null;
+    }
+
+    // Check if response is XML (error response from S3)
+    const contentType = imageResponse.headers.get('content-type') || '';
+    if (contentType.includes('xml') || contentType.includes('text')) {
+      console.warn(`Image URL returned XML/text instead of image: ${imageUrl}`);
+      return null;
+    }
+
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const buffer = Buffer.from(imageBuffer);
+
+    // Get file extension from URL or content-type
+    const urlPath = new URL(imageUrl).pathname;
+    const extension = urlPath.match(/\.(jpg|jpeg|png|gif|webp)$/i)?.[1]?.toLowerCase() || 
+                     (contentType.includes('jpeg') ? 'jpg' : 
+                      contentType.includes('png') ? 'png' : 
+                      contentType.includes('gif') ? 'gif' : 
+                      contentType.includes('webp') ? 'webp' : 'jpg');
+
+    // Upload to Supabase Storage
+    const fileName = `${userId}/${personId}.${extension}`;
+    const { data, error } = await supabase.storage
+      .from('people-images')
+      .upload(fileName, buffer, {
+        contentType: imageResponse.headers.get('content-type') || `image/${extension}`,
+        upsert: true, // Overwrite if exists
+      });
+
+    if (error) {
+      // If bucket doesn't exist, log it but don't fail the sync
+      if (error.message?.includes('Bucket not found') || error.message?.includes('not found')) {
+        console.warn('Storage bucket "people-images" not found. Please create it in Supabase dashboard.');
+      } else {
+        console.error(`Error uploading image to storage:`, error);
+      }
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('people-images')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error(`Error uploading image:`, error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user ID from Clerk
@@ -176,6 +259,9 @@ export async function POST(request: NextRequest) {
         last_synced_at: new Date().toISOString(),
       };
 
+      // Store original image data temporarily for upload
+      let _imageUrl: string | null = null;
+
       // Map each property
       Object.entries(properties).forEach(([key, prop]: [string, any]) => {
         const propertyValue = pageProperties[key];
@@ -196,6 +282,8 @@ export async function POST(request: NextRequest) {
             break;
           case 'Image':
             personData.image = value;
+            // Extract image URL for upload
+            _imageUrl = getImageUrl(value);
             break;
           case 'Currently at':
             personData.currently_at = value;
@@ -238,11 +326,39 @@ export async function POST(request: NextRequest) {
         }
       });
 
+      // Store image URL temporarily for upload after upsert
+      (personData as any)._imageUrl = _imageUrl;
+
       return personData;
     });
 
-    // Delete removed entries
+    // Delete removed entries (also delete their images from storage)
     if (removed.length > 0) {
+      // Get people to delete to clean up their images
+      const { data: peopleToDelete } = await supabase
+        .from('people')
+        .select('id, image_url')
+        .eq('user_id', userId)
+        .eq('notion_database_id', databaseId)
+        .in('notion_page_id', removed);
+
+      // Delete images from storage
+      if (peopleToDelete) {
+        for (const person of peopleToDelete) {
+          if (person.image_url) {
+            try {
+              const urlParts = person.image_url.split('/');
+              const fileName = urlParts.slice(-2).join('/'); // Get userId/personId.ext
+              await supabase.storage
+                .from('people-images')
+                .remove([fileName]);
+            } catch (error) {
+              console.warn(`Failed to delete image for person ${person.id}:`, error);
+            }
+          }
+        }
+      }
+
       const { error: deleteError } = await supabase
         .from('people')
         .delete()
@@ -255,11 +371,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upsert all people (insert or update)
+    // Upsert people first to get IDs
     if (peopleToUpsert.length > 0) {
       const { error: upsertError } = await supabase
         .from('people')
-        .upsert(peopleToUpsert, {
+        .upsert(peopleToUpsert.map(({ _imageUrl, ...data }) => data), {
           onConflict: 'user_id,notion_page_id',
         });
 
@@ -269,6 +385,35 @@ export async function POST(request: NextRequest) {
           { error: 'Failed to sync people' },
           { status: 500 }
         );
+      }
+    }
+
+    // Now upload images and update with Supabase Storage URLs
+    for (const personItem of peopleToUpsert) {
+      if (personItem._imageUrl) {
+        // Get the person ID from the database
+        const { data: existingPerson } = await supabase
+          .from('people')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('notion_page_id', personItem.notion_page_id)
+          .single();
+
+        if (existingPerson?.id) {
+          const storageUrl = await uploadImageToStorage(
+            personItem._imageUrl,
+            userId,
+            existingPerson.id
+          );
+
+          if (storageUrl) {
+            // Update with Supabase Storage URL
+            await supabase
+              .from('people')
+              .update({ image_url: storageUrl })
+              .eq('id', existingPerson.id);
+          }
+        }
       }
     }
 
