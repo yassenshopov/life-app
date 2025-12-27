@@ -961,7 +961,9 @@ export function MediaView() {
     // Handle array fields (by, topic) for multi-select filters
     if (Array.isArray(itemValue) && filter.propertyType === 'multi_select') {
       const itemArray = itemValue as string[];
-      const filterArray = Array.isArray(filterValue) ? filterValue as string[] : [filterValue];
+      const filterArray = Array.isArray(filterValue) 
+        ? (filterValue as (string | number | boolean)[]).map(v => String(v))
+        : [String(filterValue)];
       
       switch (filter.operator) {
         case 'contains':
