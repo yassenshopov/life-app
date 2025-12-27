@@ -27,6 +27,27 @@ function extractGoodreadsId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+// Helper function to fetch with timeout protection
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
 // Fetch IMDb data using OMDB API (free tier)
 async function fetchIMDbData(imdbId: string) {
   const omdbApiKey = process.env.OMDB_API_KEY;
@@ -34,8 +55,10 @@ async function fetchIMDbData(imdbId: string) {
     throw new Error('OMDB_API_KEY not configured');
   }
 
-  const response = await fetch(
-    `https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbApiKey}`
+  const response = await fetchWithTimeout(
+    `https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbApiKey}`,
+    {},
+    10000 // 10 second timeout
   );
   const data = await response.json();
 
@@ -68,13 +91,14 @@ async function fetchIMDbData(imdbId: string) {
 // Extract book title from Goodreads URL (minimal scraping just for title)
 async function extractBookTitleFromGoodreads(goodreadsId: string): Promise<string | null> {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://www.goodreads.com/book/show/${goodreadsId}`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
+      10000 // 10 second timeout
     );
 
     if (!response.ok) {
@@ -91,9 +115,8 @@ async function extractBookTitleFromGoodreads(goodreadsId: string): Promise<strin
       return title || null;
     }
     
-    // Fallback to HTML parsing
-    const titleMatch = html.match(/<h1[^>]*id="bookTitle"[^>]*>([^<]+)</i) ||
-                       html.match(/<h1[^>]*class="[^"]*bookTitle[^"]*"[^>]*>([^<]+)</i);
+    // Fallback to HTML parsing (updated selector for current Goodreads structure)
+    const titleMatch = html.match(/<h1[^>]*data-testid="bookTitle"[^>]*>([^<]+)</i);
     
     return titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : null;
   } catch (error) {
@@ -118,8 +141,10 @@ async function fetchGoodreadsData(goodreadsId: string) {
   const apiKeyParam = googleBooksApiKey ? `&key=${googleBooksApiKey}` : '';
   
   const searchQuery = encodeURIComponent(bookTitle);
-  const response = await fetch(
-    `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=1${apiKeyParam}`
+  const response = await fetchWithTimeout(
+    `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=1${apiKeyParam}`,
+    {},
+    10000 // 10 second timeout
   );
 
   if (!response.ok) {
@@ -306,11 +331,15 @@ export async function POST(request: NextRequest) {
         notionFileUploadId = await uploadImageUrlToNotion(mediaData.thumbnail, 'thumbnail.jpg');
         
         // Also upload to Supabase Storage (using a temp path, we'll update after page creation)
-        const imageResponse = await fetch(mediaData.thumbnail, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        const imageResponse = await fetchWithTimeout(
+          mediaData.thumbnail,
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
           },
-        });
+          15000 // 15 second timeout for image downloads
+        );
         
         if (imageResponse.ok) {
           const imageBuffer = await imageResponse.arrayBuffer();

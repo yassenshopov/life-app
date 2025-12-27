@@ -631,7 +631,15 @@ export function MediaView() {
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
       const saved = getCookie('media-collapsed-groups');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
+      if (saved) {
+        try {
+          return new Set(JSON.parse(saved));
+        } catch (error) {
+          console.warn('Failed to parse collapsed groups from cookie:', error);
+          return new Set();
+        }
+      }
+      return new Set();
     }
     return new Set();
   });

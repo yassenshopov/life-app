@@ -127,7 +127,7 @@ interface Person {
   occupation: string | null;
   contact_freq: string | null;
   image: any;
-  image_url: string | null;
+  image_url?: string | null;
   age: any;
   birthday: any;
 }

@@ -469,26 +469,6 @@ export function SpotifyPlayer() {
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 text-white animate-spin" />
-                  ) : (
-                    <Music className="w-6 h-6 text-white/60" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm">
-                    {loading ? 'Loading...' : 'Not playing'}
-                  </p>
-                  <p className="text-white/80 text-xs">Click to expand</p>
-                </div>
-                {/* Waveform on same row - paused */}
-                <div className="flex-shrink-0 w-20">
-                  <SpotifyWaveform isPlaying={false} compact />
-                </div>
-              </div>
             )}
           </div>
         </div>
