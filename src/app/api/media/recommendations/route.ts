@@ -238,6 +238,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get request body for custom counts and model
+    const body = await request.json().catch(() => ({}));
+    const bookCount = body.books || 0;
+    const movieCount = body.movies || 0;
+    const seriesCount = body.series || 0;
+    const selectedModel = body.model || DEFAULT_MODEL;
+
     // Fetch user's media library
     const { data: media, error: mediaError } = await supabase
       .from('media')
@@ -267,10 +274,23 @@ Movies in library (${libraryContext.movies.length}): ${libraryContext.movies.map
 Series in library (${libraryContext.series.length}): ${libraryContext.series.map(s => s.name).join(', ')}
 `;
 
-    const prompt = `Based on the following media library, suggest exactly 30 recommendations:
-- 10 Books
-- 10 Movies  
-- 10 Series
+    // Build category requirements string
+    const categoryRequirements: string[] = [];
+    if (bookCount > 0) categoryRequirements.push(`${bookCount} Books`);
+    if (movieCount > 0) categoryRequirements.push(`${movieCount} Movies`);
+    if (seriesCount > 0) categoryRequirements.push(`${seriesCount} Series`);
+
+    if (categoryRequirements.length === 0) {
+      return NextResponse.json(
+        { error: 'At least one category must be selected' },
+        { status: 400 }
+      );
+    }
+
+    const totalCount = bookCount + movieCount + seriesCount;
+
+    const prompt = `Based on the following media library, suggest exactly ${totalCount} recommendations:
+${categoryRequirements.map(req => `- ${req}`).join('\n')}
 
 Consider the user's preferences based on what they already have. Aim for variety within each category.
 
@@ -287,18 +307,10 @@ Format your response as a JSON array of objects, each with:
 - "type": "Book" | "Movie" | "Series"
 - "creator": "author or director name" (optional)
 
-Make sure to include exactly 10 of each type. Example structure:
-[
-  {"title": "The Seven Husbands of Evelyn Hugo", "type": "Book", "creator": "Taylor Jenkins Reid"},
-  {"title": "Project Hail Mary", "type": "Book", "creator": "Andy Weir"},
-  ... (8 more books) ...
-  {"title": "Inception", "type": "Movie", "creator": "Christopher Nolan"},
-  {"title": "The Matrix", "type": "Movie", "creator": "The Wachowskis"},
-  ... (8 more movies) ...
-  {"title": "Breaking Bad", "type": "Series", "creator": "Vince Gilligan"},
-  {"title": "The Crown", "type": "Series", "creator": "Peter Morgan"},
-  ... (8 more series) ...
-]
+Make sure to include exactly:
+${bookCount > 0 ? `- ${bookCount} Books` : ''}
+${movieCount > 0 ? `- ${movieCount} Movies` : ''}
+${seriesCount > 0 ? `- ${seriesCount} Series` : ''}
 
 Return ONLY the JSON array, no other text.`;
 
@@ -316,7 +328,7 @@ Return ONLY the JSON array, no other text.`;
             content: prompt,
           },
         ],
-        DEFAULT_MODEL,
+        selectedModel,
         {
           temperature: 0.8,
           max_tokens: 2000,
@@ -372,10 +384,10 @@ Return ONLY the JSON array, no other text.`;
       );
     }
 
-      // Ensure we have exactly 10 of each type (or as many as available)
-      const books = recommendations.filter(r => r.type === 'Book').slice(0, 10);
-      const movies = recommendations.filter(r => r.type === 'Movie').slice(0, 10);
-      const series = recommendations.filter(r => r.type === 'Series').slice(0, 10);
+      // Ensure we have the requested count of each type (or as many as available)
+      const books = recommendations.filter(r => r.type === 'Book').slice(0, bookCount);
+      const movies = recommendations.filter(r => r.type === 'Movie').slice(0, movieCount);
+      const series = recommendations.filter(r => r.type === 'Series').slice(0, seriesCount);
       
       // Combine in order: books, movies, series
       recommendations = [...books, ...movies, ...series];

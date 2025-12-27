@@ -13,6 +13,16 @@ const supabase = createClient(
 // Media Ground database ID
 const MEDIA_DATABASE_ID = '32638dcb058e4ebeaf325136ce8f3ec4';
 
+// Validate Google Books API key at startup (enforce in production)
+const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
+if (process.env.NODE_ENV === 'production' && !GOOGLE_BOOKS_API_KEY) {
+  const error = 'GOOGLE_BOOKS_API_KEY is required in production but is not configured';
+  console.error(`[FATAL] ${error}`);
+  throw new Error(error);
+} else if (!GOOGLE_BOOKS_API_KEY) {
+  console.warn('[WARNING] GOOGLE_BOOKS_API_KEY is not configured. Google Books API requests may be rate-limited.');
+}
+
 // Extract IMDb ID from URL
 function extractIMDbId(url: string): string | null {
   const match = url.match(/imdb\.com\/title\/(tt\d+)/);
@@ -46,6 +56,114 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000; // 1 second
+const MAX_RETRY_DELAY_MS = 30000; // 30 seconds
+
+// Check if an error is retryable (HTTP 429 or 5xx)
+function isRetryableError(status: number): boolean {
+  return status === 429 || (status >= 500 && status < 600);
+}
+
+// Get retry delay from Retry-After header or use exponential backoff
+function getRetryDelay(attempt: number, retryAfterHeader: string | null): number {
+  if (retryAfterHeader) {
+    const retryAfterSeconds = parseInt(retryAfterHeader, 10);
+    if (!isNaN(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return Math.min(retryAfterSeconds * 1000, MAX_RETRY_DELAY_MS);
+    }
+  }
+  // Exponential backoff: 1s, 2s, 4s, etc., capped at MAX_RETRY_DELAY_MS
+  return Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt), MAX_RETRY_DELAY_MS);
+}
+
+// Fetch with retry logic and exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 10000,
+  maxRetries: number = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
+  let lastStatus: number | null = null;
+  let retryAfterHeader: string | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options, timeoutMs);
+      const status = response.status;
+
+      // Success - return immediately
+      if (response.ok) {
+        return response;
+      }
+
+      // Non-retryable error - propagate immediately
+      if (!isRetryableError(status)) {
+        const errorText = await response.text().catch(() => 'Unable to read error response');
+        throw new Error(
+          `Non-retryable error from Google Books API: ${status} ${response.statusText}. ${errorText}`
+        );
+      }
+
+      // Retryable error - store info and retry if attempts remain
+      lastStatus = status;
+      lastResponse = response;
+      retryAfterHeader = response.headers.get('Retry-After');
+
+      if (attempt < maxRetries) {
+        const delay = getRetryDelay(attempt, retryAfterHeader);
+        const retryInfo = retryAfterHeader
+          ? `Retry-After: ${retryAfterHeader}s`
+          : `exponential backoff (attempt ${attempt + 1}/${maxRetries + 1})`;
+        
+        console.warn(
+          `[Google Books API] Retryable error ${status} on attempt ${attempt + 1}/${maxRetries + 1}. ` +
+          `Retrying in ${delay}ms (${retryInfo})`
+        );
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Exhausted retries - throw detailed error
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+
+      throw new Error(
+        `Google Books API request failed after ${maxRetries + 1} attempts. ` +
+        `Last status: ${status} ${response.statusText}. ` +
+        `Retry-After header: ${retryAfterHeader || 'not provided'}. ` +
+        `Response: ${errorText}. ` +
+        `Response headers: ${JSON.stringify(headers)}`
+      );
+    } catch (error: any) {
+      // Network errors or timeouts - retry if attempts remain
+      if (attempt < maxRetries && (error.message?.includes('timeout') || error.name === 'TypeError')) {
+        const delay = getRetryDelay(attempt, null);
+        console.warn(
+          `[Google Books API] Network error on attempt ${attempt + 1}/${maxRetries + 1}: ${error.message}. ` +
+          `Retrying in ${delay}ms`
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+        lastError = error;
+        continue;
+      }
+
+      // Non-retryable or final attempt - propagate error
+      throw error;
+    }
+  }
+
+  // Should never reach here, but TypeScript needs this
+  throw lastError || new Error('Unexpected error in fetchWithRetry');
+}
+
 // Fetch IMDb data using OMDB API
 async function fetchIMDbData(imdbId: string) {
   const omdbApiKey = process.env.OMDB_API_KEY;
@@ -75,26 +193,44 @@ async function fetchBookDescription(bookTitle: string) {
     throw new Error('Book title is required');
   }
 
+  // Validate API key is present (should have been checked at startup, but double-check here)
+  if (!GOOGLE_BOOKS_API_KEY) {
+    throw new Error('GOOGLE_BOOKS_API_KEY is required but not configured');
+  }
+
   // Clean up the title - remove year in parentheses if present for better search results
   // e.g., "Book Title (2023)" -> "Book Title"
   const cleanTitle = bookTitle.replace(/\s*\([^)]*\)\s*$/, '').trim();
   
-  // Use Google Books API to search for the book
-  const googleBooksApiKey = process.env.GOOGLE_BOOKS_API_KEY;
-  const apiKeyParam = googleBooksApiKey ? `&key=${googleBooksApiKey}` : '';
-  
+  // Use Google Books API to search for the book (always include API key)
   const searchQuery = encodeURIComponent(cleanTitle);
-  const booksResponse = await fetchWithTimeout(
-    `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=5${apiKeyParam}`,
-    {},
-    10000
-  );
+  const apiUrl = `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=5&key=${GOOGLE_BOOKS_API_KEY}`;
   
+  // Use fetchWithRetry for automatic retry with exponential backoff
+  const booksResponse = await fetchWithRetry(apiUrl, {}, 10000, MAX_RETRIES);
+  
+  // At this point, response should be ok (retry logic handles errors)
+  // But double-check for safety
   if (!booksResponse.ok) {
-    throw new Error(`Failed to fetch from Google Books API: ${booksResponse.status}`);
+    const errorText = await booksResponse.text().catch(() => 'Unable to read error response');
+    const headers: Record<string, string> = {};
+    booksResponse.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    throw new Error(
+      `Failed to fetch from Google Books API: ${booksResponse.status} ${booksResponse.statusText}. ` +
+      `Response: ${errorText}. Headers: ${JSON.stringify(headers)}`
+    );
   }
   
   const booksData = await booksResponse.json();
+  
+  // Check for API errors in response body
+  if (booksData.error) {
+    throw new Error(
+      `Google Books API error: ${booksData.error.message || JSON.stringify(booksData.error)}`
+    );
+  }
   
   if (!booksData.items || booksData.items.length === 0) {
     throw new Error(`No book found for "${cleanTitle}"`);

@@ -17,24 +17,96 @@ if (!AI_GATEWAY_API_KEY) {
 
 /**
  * Configuration for AI Gateway models
- * Using Groq models as they are fast and cost-effective
+ * Updated December 2025 - Includes latest trending models
+ * Prioritizes current popular models: GPT-4o, Claude 3.5 Sonnet, Gemini, etc.
  */
 export const AI_MODELS = {
-  // Groq models - very fast and cost-effective
-  'groq/llama-3.1-8b-instant': {
-    name: 'groq/llama-3.1-8b-instant',
-    displayName: 'Llama 3.1 8B (Groq)',
-    provider: 'groq',
+  // Latest & Trending (December 2025) - Most Popular Right Now
+  'openai/gpt-5': {
+    name: 'openai/gpt-5',
+    displayName: 'GPT-5 (OpenAI) 🔥 Latest - Most Advanced',
+    provider: 'openai',
+    category: 'major',
   },
+  'openai/gpt-5.2': {
+    name: 'openai/gpt-5.2',
+    displayName: 'GPT-5.2 (OpenAI) 🔥 Latest - Enhanced Reasoning',
+    provider: 'openai',
+    category: 'major',
+  },
+  'openai/gpt-4o': {
+    name: 'openai/gpt-4o',
+    displayName: 'GPT-4o (OpenAI) ⭐ Trending - Most Capable',
+    provider: 'openai',
+    category: 'major',
+  },
+  'openai/gpt-4o-mini': {
+    name: 'openai/gpt-4o-mini',
+    displayName: 'GPT-4o Mini (OpenAI) ⭐ Trending - Fast & Efficient',
+    provider: 'openai',
+    category: 'major',
+  },
+  'anthropic/claude-3-5-sonnet': {
+    name: 'anthropic/claude-3-5-sonnet',
+    displayName: 'Claude 3.5 Sonnet (Anthropic) ⭐ Trending - Top Quality',
+    provider: 'anthropic',
+    category: 'major',
+  },
+  'anthropic/claude-3-opus': {
+    name: 'anthropic/claude-3-opus',
+    displayName: 'Claude 3 Opus (Anthropic) - Most Powerful',
+    provider: 'anthropic',
+    category: 'major',
+  },
+  // Fast & Cheap - Great for Quick Recommendations
   'groq/llama-3.3-70b-versatile': {
     name: 'groq/llama-3.3-70b-versatile',
-    displayName: 'Llama 3.3 70B (Groq)',
+    displayName: 'Llama 3.3 70B (Groq) - Fast & Powerful',
     provider: 'groq',
+    category: 'fast-cheap',
+  },
+  'groq/llama-3.1-8b-instant': {
+    name: 'groq/llama-3.1-8b-instant',
+    displayName: 'Llama 3.1 8B (Groq) - Fast & Cheap',
+    provider: 'groq',
+    category: 'fast-cheap',
   },
   'groq/mixtral-8x7b-32768': {
     name: 'groq/mixtral-8x7b-32768',
-    displayName: 'Mixtral 8x7B (Groq)',
+    displayName: 'Mixtral 8x7B (Groq) - Fast & Versatile',
     provider: 'groq',
+    category: 'fast-cheap',
+  },
+  'anthropic/claude-3-haiku': {
+    name: 'anthropic/claude-3-haiku',
+    displayName: 'Claude 3 Haiku (Anthropic) - Fast & Cheap',
+    provider: 'anthropic',
+    category: 'fast-cheap',
+  },
+  'openai/gpt-3.5-turbo': {
+    name: 'openai/gpt-3.5-turbo',
+    displayName: 'GPT-3.5 Turbo (OpenAI) - Fast & Cheap',
+    provider: 'openai',
+    category: 'fast-cheap',
+  },
+  // Additional Major Models
+  'openai/gpt-4-turbo': {
+    name: 'openai/gpt-4-turbo',
+    displayName: 'GPT-4 Turbo (OpenAI)',
+    provider: 'openai',
+    category: 'major',
+  },
+  'meta-llama/llama-3.1-70b-instruct': {
+    name: 'meta-llama/llama-3.1-70b-instruct',
+    displayName: 'Llama 3.1 70B (Meta)',
+    provider: 'meta-llama',
+    category: 'major',
+  },
+  'meta-llama/llama-3.1-8b-instruct': {
+    name: 'meta-llama/llama-3.1-8b-instruct',
+    displayName: 'Llama 3.1 8B (Meta) - Fast',
+    provider: 'meta-llama',
+    category: 'fast-cheap',
   },
 } as const;
 

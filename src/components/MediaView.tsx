@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { FilterMenu } from '@/components/FilterMenu';
 import { PropertyVisibilityMenu } from '@/components/PropertyVisibilityMenu';
-import { FilterState } from '@/types/filters';
+import { FilterState, Filter } from '@/types/filters';
 import { Outfit } from 'next/font/google';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -948,6 +948,100 @@ export function MediaView() {
     }
   };
 
+  // Helper function to check if a media item matches a single filter
+  const matchesMediaFilter = (item: MediaItem, filter: Filter): boolean => {
+    const itemValue = item[filter.property as keyof MediaItem];
+    const filterValue = filter.value;
+    
+    // Handle null/undefined values
+    if (itemValue === null || itemValue === undefined) {
+      return filter.operator === 'is_empty';
+    }
+    
+    // Handle array fields (by, topic) for multi-select filters
+    if (Array.isArray(itemValue) && filter.propertyType === 'multi_select') {
+      const itemArray = itemValue as string[];
+      const filterArray = Array.isArray(filterValue) ? filterValue as string[] : [filterValue];
+      
+      switch (filter.operator) {
+        case 'contains':
+          return filterArray.some((val) => itemArray.includes(val));
+        case 'does_not_contain':
+          return !filterArray.some((val) => itemArray.includes(val));
+        case 'is_empty':
+          return itemArray.length === 0;
+        case 'is_not_empty':
+          return itemArray.length > 0;
+        default:
+          return true;
+      }
+    }
+    
+    // Handle string fields
+    if (typeof itemValue === 'string') {
+      const itemStr = itemValue.toLowerCase();
+      const filterStr = String(filterValue || '').toLowerCase();
+      
+      switch (filter.operator) {
+        case 'equals':
+          return itemStr === filterStr;
+        case 'not_equals':
+          return itemStr !== filterStr;
+        case 'contains':
+          return itemStr.includes(filterStr);
+        case 'does_not_contain':
+          return !itemStr.includes(filterStr);
+        case 'is_empty':
+          return itemStr.trim() === '';
+        case 'is_not_empty':
+          return itemStr.trim() !== '';
+        case 'starts_with':
+          return itemStr.startsWith(filterStr);
+        case 'ends_with':
+          return itemStr.endsWith(filterStr);
+        default:
+          return true;
+      }
+    }
+    
+    // Handle number fields
+    if (typeof itemValue === 'number' && typeof filterValue === 'number') {
+      switch (filter.operator) {
+        case 'equals':
+          return itemValue === filterValue;
+        case 'not_equals':
+          return itemValue !== filterValue;
+        case 'greater_than':
+          return itemValue > filterValue;
+        case 'less_than':
+          return itemValue < filterValue;
+        case 'greater_than_or_equal_to':
+          return itemValue >= filterValue;
+        case 'less_than_or_equal_to':
+          return itemValue <= filterValue;
+        default:
+          return true;
+      }
+    }
+    
+    // Default: convert to string and compare
+    const itemStr = String(itemValue || '').toLowerCase();
+    const filterStr = String(filterValue || '').toLowerCase();
+    
+    switch (filter.operator) {
+      case 'equals':
+        return itemStr === filterStr;
+      case 'not_equals':
+        return itemStr !== filterStr;
+      case 'contains':
+        return itemStr.includes(filterStr);
+      case 'does_not_contain':
+        return !itemStr.includes(filterStr);
+      default:
+        return true;
+    }
+  };
+
   // Filter and group media by category and status
   const groupedMedia = React.useMemo(() => {
     let filtered = media;
@@ -963,10 +1057,16 @@ export function MediaView() {
 
     // Apply custom filters
     if (filters && filters.groups.length > 0) {
-      // Simple filter implementation - can be enhanced
       filtered = filtered.filter((item) => {
-        // Add filter logic here if needed
-        return true;
+        // An item matches if it matches ANY filter group
+        return filters.groups.some((group) => {
+          if (group.filters.length === 0) return true;
+          
+          // Check if item matches all filters in group (AND) or any filter (OR)
+          return group.operator === 'and'
+            ? group.filters.every((filter) => matchesMediaFilter(item, filter))
+            : group.filters.some((filter) => matchesMediaFilter(item, filter));
+        });
       });
     }
 

@@ -9,6 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkles, Loader2, Plus, ExternalLink, Book, Film, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { MediaCreationPreview } from '@/components/MediaCreationPreview';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AI_MODELS, DEFAULT_MODEL } from '@/lib/ai-gateway';
 
 interface Recommendation {
   name: string;
@@ -193,6 +198,16 @@ interface GroupedRecommendations {
   Series: Recommendation[];
 }
 
+interface RecommendationSettings {
+  includeBooks: boolean;
+  includeMovies: boolean;
+  includeSeries: boolean;
+  bookCount: number;
+  movieCount: number;
+  seriesCount: number;
+  model: string;
+}
+
 export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps) {
   const [recommendations, setRecommendations] = React.useState<GroupedRecommendations>({
     Book: [],
@@ -205,6 +220,16 @@ export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps
   const [isPreviewVisible, setIsPreviewVisible] = React.useState(false);
   const [isCreating, setIsCreating] = React.useState(false);
   const [hiddenIds, setHiddenIds] = React.useState<Set<string>>(new Set());
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [settings, setSettings] = React.useState<RecommendationSettings>({
+    includeBooks: true,
+    includeMovies: true,
+    includeSeries: false,
+    bookCount: 10,
+    movieCount: 10,
+    seriesCount: 0,
+    model: DEFAULT_MODEL,
+  });
   const { toast } = useToast();
 
   const hideRecommendation = (rec: Recommendation) => {
@@ -232,9 +257,24 @@ export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps
   const generateRecommendations = async () => {
     setIsLoading(true);
     try {
+      // Build request payload based on settings
+      const payload: any = {
+        model: settings.model,
+      };
+      if (settings.includeBooks) {
+        payload.books = settings.bookCount;
+      }
+      if (settings.includeMovies) {
+        payload.movies = settings.movieCount;
+      }
+      if (settings.includeSeries) {
+        payload.series = settings.seriesCount;
+      }
+
       const response = await fetch('/api/media/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -343,7 +383,7 @@ export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps
   if (totalRecommendations === 0 && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4">
-        <div className="text-center space-y-4 max-w-md">
+        <div className="text-center space-y-4 max-w-md w-full">
           <div className="flex justify-center">
             <div className="p-4 rounded-full bg-primary/10">
               <Sparkles className="h-8 w-8 text-primary" />
@@ -353,10 +393,162 @@ export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps
           <p className="text-sm text-muted-foreground">
             Based on your media library, we'll suggest books and movies you might enjoy.
           </p>
-          <Button onClick={generateRecommendations} className="mt-4">
-            <Sparkles className="h-4 w-4 mr-2" />
-            Generate Recommendations
-          </Button>
+          
+          {/* Settings Panel */}
+          <Card className="p-4 mt-4 text-left">
+            <div className="space-y-4">
+              {/* AI Model Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">AI Model</Label>
+                <Select
+                  value={settings.model}
+                  onValueChange={(value) =>
+                    setSettings((prev) => ({ ...prev, model: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      🔥 Latest (Newest Models)
+                    </div>
+                    {Object.values(AI_MODELS)
+                      .filter((m) => m.displayName.includes('🔥'))
+                      .map((model) => (
+                        <SelectItem key={model.name} value={model.name}>
+                          {model.displayName}
+                        </SelectItem>
+                      ))}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                      ⭐ Trending (Most Popular)
+                    </div>
+                    {Object.values(AI_MODELS)
+                      .filter((m) => m.displayName.includes('⭐') && !m.displayName.includes('🔥'))
+                      .map((model) => (
+                        <SelectItem key={model.name} value={model.name}>
+                          {model.displayName}
+                        </SelectItem>
+                      ))}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                      Major Models
+                    </div>
+                    {Object.values(AI_MODELS)
+                      .filter((m) => m.category === 'major' && !m.displayName.includes('⭐'))
+                      .map((model) => (
+                        <SelectItem key={model.name} value={model.name}>
+                          {model.displayName}
+                        </SelectItem>
+                      ))}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                      Fast & Cheap
+                    </div>
+                    {Object.values(AI_MODELS)
+                      .filter((m) => m.category === 'fast-cheap')
+                      .map((model) => (
+                        <SelectItem key={model.name} value={model.name}>
+                          {model.displayName}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Categories</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="include-books"
+                      checked={settings.includeBooks}
+                      onCheckedChange={(checked) =>
+                        setSettings((prev) => ({ ...prev, includeBooks: checked === true }))
+                      }
+                    />
+                    <Label htmlFor="include-books" className="flex-1 cursor-pointer">
+                      Books
+                    </Label>
+                    {settings.includeBooks && (
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={settings.bookCount}
+                        onChange={(e) =>
+                          setSettings((prev) => ({
+                            ...prev,
+                            bookCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)),
+                          }))
+                        }
+                        className="w-20 h-8 text-xs"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="include-movies"
+                      checked={settings.includeMovies}
+                      onCheckedChange={(checked) =>
+                        setSettings((prev) => ({ ...prev, includeMovies: checked === true }))
+                      }
+                    />
+                    <Label htmlFor="include-movies" className="flex-1 cursor-pointer">
+                      Movies
+                    </Label>
+                    {settings.includeMovies && (
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={settings.movieCount}
+                        onChange={(e) =>
+                          setSettings((prev) => ({
+                            ...prev,
+                            movieCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)),
+                          }))
+                        }
+                        className="w-20 h-8 text-xs"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="include-series"
+                      checked={settings.includeSeries}
+                      onCheckedChange={(checked) =>
+                        setSettings((prev) => ({ ...prev, includeSeries: checked === true }))
+                      }
+                    />
+                    <Label htmlFor="include-series" className="flex-1 cursor-pointer">
+                      Series
+                    </Label>
+                    {settings.includeSeries && (
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={settings.seriesCount}
+                        onChange={(e) =>
+                          setSettings((prev) => ({
+                            ...prev,
+                            seriesCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)),
+                          }))
+                        }
+                        className="w-20 h-8 text-xs"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              <Button
+                onClick={generateRecommendations}
+                className="w-full"
+                disabled={!settings.includeBooks && !settings.includeMovies && !settings.includeSeries}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Recommendations
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
     );
@@ -375,23 +567,32 @@ export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps
             {totalRecommendations} personalized recommendations
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={generateRecommendations}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Spinner size="sm" className="mr-2" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Regenerate
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowSettings(!showSettings)}
+            disabled={isLoading}
+          >
+            Settings
+          </Button>
+          <Button
+            variant="outline"
+            onClick={generateRecommendations}
+            disabled={isLoading || (!settings.includeBooks && !settings.includeMovies && !settings.includeSeries)}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Regenerate
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Preview Modal */}
@@ -457,6 +658,139 @@ export function MediaRecommendations({ onMediaAdded }: MediaRecommendationsProps
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <Card className="p-4">
+          <div className="space-y-4">
+            {/* AI Model Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">AI Model</Label>
+              <Select
+                value={settings.model}
+                onValueChange={(value) =>
+                  setSettings((prev) => ({ ...prev, model: value }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                    Fast & Cheap
+                  </div>
+                  {Object.values(AI_MODELS)
+                    .filter((m) => m.category === 'fast-cheap')
+                    .map((model) => (
+                      <SelectItem key={model.name} value={model.name}>
+                        {model.displayName}
+                      </SelectItem>
+                    ))}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                    Major Models
+                  </div>
+                  {Object.values(AI_MODELS)
+                    .filter((m) => m.category === 'major')
+                    .map((model) => (
+                      <SelectItem key={model.name} value={model.name}>
+                        {model.displayName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Categories & Quantities</Label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="settings-books"
+                    checked={settings.includeBooks}
+                    onCheckedChange={(checked) =>
+                      setSettings((prev) => ({ ...prev, includeBooks: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="settings-books" className="flex-1 cursor-pointer flex items-center gap-2">
+                    <Book className="h-4 w-4" />
+                    Books
+                  </Label>
+                  {settings.includeBooks && (
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={settings.bookCount}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bookCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)),
+                        }))
+                      }
+                      className="w-20 h-8 text-xs"
+                    />
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="settings-movies"
+                    checked={settings.includeMovies}
+                    onCheckedChange={(checked) =>
+                      setSettings((prev) => ({ ...prev, includeMovies: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="settings-movies" className="flex-1 cursor-pointer flex items-center gap-2">
+                    <Film className="h-4 w-4" />
+                    Movies
+                  </Label>
+                  {settings.includeMovies && (
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={settings.movieCount}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          movieCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)),
+                        }))
+                      }
+                      className="w-20 h-8 text-xs"
+                    />
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="settings-series"
+                    checked={settings.includeSeries}
+                    onCheckedChange={(checked) =>
+                      setSettings((prev) => ({ ...prev, includeSeries: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="settings-series" className="flex-1 cursor-pointer flex items-center gap-2">
+                    <Film className="h-4 w-4" />
+                    Series
+                  </Label>
+                  {settings.includeSeries && (
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={settings.seriesCount}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          seriesCount: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)),
+                        }))
+                      }
+                      className="w-20 h-8 text-xs"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Loading State */}
