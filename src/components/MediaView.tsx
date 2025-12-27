@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Film, Book, BookOpen, ChevronDown, ChevronRight, ExternalLink, Plus, Loader2, MoreVertical, Trash2 } from 'lucide-react';
+import { RefreshCw, Film, Book, BookOpen, ChevronDown, ChevronRight, ExternalLink, Plus, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -139,17 +139,66 @@ function getDominantColor(imageUrl: string): Promise<string> {
   });
 }
 
+// Typed text animation component
+function TypedText({ text, delay = 0, className = '' }: { text: string; delay?: number; className?: string }) {
+  const [displayedText, setDisplayedText] = React.useState('');
+  const [isComplete, setIsComplete] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!text) return;
+    
+    setDisplayedText('');
+    setIsComplete(false);
+    
+    const timeout = setTimeout(() => {
+      let currentIndex = 0;
+      const typingInterval = setInterval(() => {
+        if (currentIndex < text.length) {
+          setDisplayedText(text.slice(0, currentIndex + 1));
+          currentIndex++;
+        } else {
+          setIsComplete(true);
+          clearInterval(typingInterval);
+        }
+      }, 30); // Typing speed
+
+      return () => clearInterval(typingInterval);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [text, delay]);
+
+  return (
+    <span className={className}>
+      {displayedText}
+      {!isComplete && <span className="animate-pulse">|</span>}
+    </span>
+  );
+}
+
 // Media Detail Modal Component
 function MediaDetailModal({ 
   item, 
   isOpen, 
-  onClose 
+  onClose,
+  mediaList,
+  currentIndex,
+  onNavigate,
+  onUpdate
 }: { 
   item: MediaItem | null; 
   isOpen: boolean; 
   onClose: () => void;
+  mediaList: MediaItem[];
+  currentIndex: number;
+  onNavigate: (index: number) => void;
+  onUpdate: (updatedItem: MediaItem) => void;
 }) {
   const [bgColor, setBgColor] = React.useState('#8b5cf6');
+  const [isFillingDescription, setIsFillingDescription] = React.useState(false);
+  const [shouldAnimateDescription, setShouldAnimateDescription] = React.useState(false);
+  const { toast } = useToast();
+  
   const thumbnailUrl = item?.thumbnail_url || (() => {
     if (!item?.thumbnail || !Array.isArray(item.thumbnail) || item.thumbnail.length === 0) {
       return null;
@@ -183,6 +232,63 @@ function MediaDetailModal({
     }
   }, [thumbnailUrl, item]);
 
+  // Reset animation state when item changes
+  React.useEffect(() => {
+    setShouldAnimateDescription(false);
+  }, [item?.id]);
+
+  const handleFillDescription = async () => {
+    if (!item || !item.id) return;
+    
+    setIsFillingDescription(true);
+    try {
+      const response = await fetch(`/api/media/${item.id}/fill-description`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fill description');
+      }
+
+      // Update local state
+      onUpdate(data.media);
+      
+      // Trigger typing animation
+      setShouldAnimateDescription(true);
+      
+      toast({
+        title: 'Description filled',
+        description: 'The description has been fetched and updated successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error filling description:', error);
+      toast({
+        title: 'Failed to fill description',
+        description: error.message || 'Failed to fetch description. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsFillingDescription(false);
+    }
+  };
+
+  const canNavigatePrev = currentIndex > 0;
+  const canNavigateNext = currentIndex < mediaList.length - 1;
+
+  const handlePrev = () => {
+    if (canNavigatePrev) {
+      onNavigate(currentIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (canNavigateNext) {
+      onNavigate(currentIndex + 1);
+    }
+  };
+
   if (!item) return null;
 
   return (
@@ -204,6 +310,31 @@ function MediaDetailModal({
               } as React.CSSProperties}
             >
               <DialogTitle className="sr-only">{item.name}</DialogTitle>
+              
+              {/* Navigation Arrows - Top Left */}
+              {mediaList.length > 1 && (
+                <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
+                    onClick={handlePrev}
+                    disabled={!canNavigatePrev}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
+                    onClick={handleNext}
+                    disabled={!canNavigateNext}
+                  >
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              
               <div className="flex h-full w-full">
                 {/* Left: Thumbnail */}
                 <motion.div
@@ -261,12 +392,43 @@ function MediaDetailModal({
             </div>
 
             {/* AI Synopsis */}
-            {item.ai_synopsis && (
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold mb-2 text-white/90">Synopsis</h3>
-                <p className="text-white/80 text-sm leading-relaxed">{item.ai_synopsis}</p>
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-white/90">Synopsis</h3>
+                {(!item.ai_synopsis || item.ai_synopsis.trim().length === 0) && item.url && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-white/20 hover:bg-white/30 text-white border-white/30"
+                    onClick={handleFillDescription}
+                    disabled={isFillingDescription}
+                  >
+                    {isFillingDescription ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Filling...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Fill Description
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
-            )}
+              {item.ai_synopsis ? (
+                <p className="text-white/80 text-sm leading-relaxed">
+                  {shouldAnimateDescription ? (
+                    <TypedText text={item.ai_synopsis} delay={200} />
+                  ) : (
+                    item.ai_synopsis
+                  )}
+                </p>
+              ) : (
+                <p className="text-white/50 text-sm italic">No description available</p>
+              )}
+            </div>
 
             {/* Topics */}
             {item.topic && item.topic.length > 0 && (
@@ -1008,6 +1170,27 @@ export function MediaView() {
         onClose={() => {
           setIsModalOpen(false);
           setSelectedMedia(null);
+        }}
+        mediaList={Object.values(groupedMedia).flat()}
+        currentIndex={(() => {
+          if (!selectedMedia) return 0;
+          const flatList = Object.values(groupedMedia).flat();
+          const index = flatList.findIndex(item => item.id === selectedMedia.id);
+          return index >= 0 ? index : 0;
+        })()}
+        onNavigate={(index) => {
+          const flatList = Object.values(groupedMedia).flat();
+          if (index >= 0 && index < flatList.length) {
+            setSelectedMedia(flatList[index]);
+          }
+        }}
+        onUpdate={(updatedItem) => {
+          setMedia((prev) =>
+            prev.map((item) =>
+              item.id === updatedItem.id ? updatedItem : item
+            )
+          );
+          setSelectedMedia(updatedItem);
         }}
       />
 

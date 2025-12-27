@@ -413,63 +413,61 @@ export function SpotifyPlayer() {
           onClick={() => setIsOpen(true)}
         >
           <div className="p-3">
-            {track ? (
-              <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
-                  <img
-                    src={track.album.images[2]?.url || track.album.images[0]?.url}
-                    alt={track.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <MarqueeText
-                    text={track.name}
-                    className="text-white font-semibold text-sm"
-                  />
-                  <p className="text-white/80 text-xs truncate">
-                    {track.artists.map((a) => a.name).join(', ')}
-                  </p>
-                </div>
-                {/* Waveform on same row */}
-                <div className="flex-shrink-0 w-20">
-                  <SpotifyWaveform isPlaying={isPlaying} compact={true} />
-                </div>
-                {/* Controls: Previous, Play/Pause, Next */}
-                <div className="flex-shrink-0 flex items-center gap-1">
-                  <button
-                    onClick={(e) => handleSkip('previous', e)}
-                    disabled={isToggling}
-                    className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
-                    aria-label="Previous track"
-                  >
-                    <SkipBack className="w-3.5 h-3.5 text-white" />
-                  </button>
-                  <button
-                    onClick={handlePlayPause}
-                    disabled={isToggling}
-                    className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
-                  >
-                    {isToggling ? (
-                      <Loader2 className="w-4 h-4 text-white animate-spin" />
-                    ) : isPlaying ? (
-                      <Pause className="w-4 h-4 text-white fill-white" />
-                    ) : (
-                      <Play className="w-4 h-4 text-white fill-white" />
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => handleSkip('next', e)}
-                    disabled={isToggling}
-                    className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
-                    aria-label="Next track"
-                  >
-                    <SkipForward className="w-3.5 h-3.5 text-white" />
-                  </button>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                <img
+                  src={track.album.images[2]?.url || track.album.images[0]?.url}
+                  alt={track.name}
+                  className="w-full h-full object-cover"
+                />
               </div>
-            )}
+              <div className="flex-1 min-w-0">
+                <MarqueeText
+                  text={track.name}
+                  className="text-white font-semibold text-sm"
+                />
+                <p className="text-white/80 text-xs truncate">
+                  {track.artists.map((a) => a.name).join(', ')}
+                </p>
+              </div>
+              {/* Waveform on same row */}
+              <div className="flex-shrink-0 w-20">
+                <SpotifyWaveform isPlaying={isPlaying} compact={true} />
+              </div>
+              {/* Controls: Previous, Play/Pause, Next */}
+              <div className="flex-shrink-0 flex items-center gap-1">
+                <button
+                  onClick={(e) => handleSkip('previous', e)}
+                  disabled={isToggling}
+                  className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                  aria-label="Previous track"
+                >
+                  <SkipBack className="w-3.5 h-3.5 text-white" />
+                </button>
+                <button
+                  onClick={handlePlayPause}
+                  disabled={isToggling}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isToggling ? (
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="w-4 h-4 text-white fill-white" />
+                  ) : (
+                    <Play className="w-4 h-4 text-white fill-white" />
+                  )}
+                </button>
+                <button
+                  onClick={(e) => handleSkip('next', e)}
+                  disabled={isToggling}
+                  className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                  aria-label="Next track"
+                >
+                  <SkipForward className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
