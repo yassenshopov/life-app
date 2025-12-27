@@ -12,7 +12,7 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { NewEntryDialog } from '@/components/dialogs/NewEntryDialog';
 import { EntryPeekModal } from '@/components/EntryPeekModal';
 import { useDeleteEntry } from '@/hooks/useDeleteEntry';
@@ -410,7 +410,10 @@ export function DatabaseTable({
     return (
       <Card>
         <CardContent className="p-6">
-          <LoadingSpinner size="lg" label="Loading database content..." />
+          <div className="flex flex-col items-center gap-2">
+            <Spinner size="lg" />
+            <span className="text-sm text-gray-700 dark:text-white/80">Loading database content...</span>
+          </div>
         </CardContent>
       </Card>
     );
@@ -564,7 +567,7 @@ export function DatabaseTable({
           >
             {isFetchingNextPage ? (
               <>
-                <LoadingSpinner size="sm" />
+                <Spinner size="sm" />
                 Loading more...
               </>
             ) : (

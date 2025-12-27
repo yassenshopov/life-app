@@ -1,6 +1,6 @@
 import { Outfit } from 'next/font/google';
 import { useEffect, useState, useRef } from 'react';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const outfit = Outfit({ subsets: ['latin'] });
@@ -59,7 +59,10 @@ export function FinancialOverview() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <LoadingSpinner size="lg" color="green" label='Loading assets...' />
+        <div className="flex flex-col items-center gap-2">
+          <Spinner size="lg" className="text-green-500" />
+          <span className="text-sm text-gray-700 dark:text-white/80">Loading assets...</span>
+        </div>
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { CircleDot, History, Ban, PencilIcon, LayoutGrid, List } from 'lucide-react';
-import { LoadingSpinner } from './LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { StatusFilter } from './StatusFilter';
 import { StatusBadge } from './StatusBadge';
 import { HabitLoadingOverlay } from './HabitLoadingOverlay';
@@ -479,7 +479,10 @@ export function HabitsOverview({ dateRange, activeTab, handleDateRangeFilter }: 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="lg" color="white" label='Loading habits...' />
+        <div className="flex flex-col items-center gap-2">
+          <Spinner size="lg" />
+          <span className="text-sm text-gray-700 dark:text-white/80">Loading habits...</span>
+        </div>
       </div>
     );
   }

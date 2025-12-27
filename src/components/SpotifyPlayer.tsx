@@ -9,7 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Music, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Music, ExternalLink, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 // Get default background color from CSS variables
 function getDefaultBgColor(): string {
@@ -479,7 +480,7 @@ export function SpotifyPlayer() {
                   aria-label={isPlaying ? 'Pause' : 'Play'}
                 >
                   {isToggling ? (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    <Spinner size="sm" className="text-white" />
                   ) : isPlaying ? (
                     <Pause className="w-4 h-4 text-white fill-white" />
                   ) : (
@@ -558,7 +559,7 @@ export function SpotifyPlayer() {
                     aria-label={isPlaying ? 'Pause' : 'Play'}
                   >
                     {isToggling ? (
-                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      <Spinner size="md" className="text-white" />
                     ) : isPlaying ? (
                       <Pause className="w-6 h-6 text-white fill-white" />
                     ) : (
@@ -588,7 +589,7 @@ export function SpotifyPlayer() {
               <div className="text-center space-y-4">
                 <div className="mx-auto w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
                   {loading ? (
-                    <Loader2 className="w-12 h-12 text-white animate-spin" />
+                    <Spinner size="lg" className="text-white" />
                   ) : (
                     <Music className="w-12 h-12 text-white/60" />
                   )}

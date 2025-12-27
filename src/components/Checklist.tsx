@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { CheckSquare, RefreshCw } from 'lucide-react';
 import { Outfit } from 'next/font/google';
 import { ChartLoadingOverlay } from './ChartLoadingOverlay';
-import { LoadingSpinner } from './LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -103,7 +103,10 @@ export function Checklist({
       <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-lg p-6 border border-slate-200 dark:border-slate-800 relative min-h-[200px]">
         {isLoadingCharts && (
           <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center">
-            <LoadingSpinner color="purple" label="Loading data..." />
+            <div className="flex flex-col items-center gap-2">
+              <Spinner size="lg" className="text-purple-500" />
+              <span className="text-sm text-gray-700 dark:text-white/80">Loading data...</span>
+            </div>
           </div>
         )}
         {isComplete && (

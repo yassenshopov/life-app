@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Film, Book, BookOpen, ChevronDown, ChevronRight, ExternalLink, Plus, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Sparkles } from 'lucide-react';
+import { RefreshCw, Film, Book, BookOpen, ChevronDown, ChevronRight, ExternalLink, Plus, MoreVertical, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Sparkles } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/use-toast';
 import { MediaCreationPreview } from '@/components/MediaCreationPreview';
+import { MediaRecommendations } from '@/components/MediaRecommendations';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -53,7 +55,7 @@ interface MediaItem {
   created: string | null;
 }
 
-type CategoryTab = 'movies-series' | 'books';
+type CategoryTab = 'movies-series' | 'books' | 'recommendations';
 
 // Extract dominant color from image (exactly like SpotifyPlayer)
 function getDominantColor(imageUrl: string): Promise<string> {
@@ -415,7 +417,7 @@ function MediaDetailModal({
                   >
                     {isFillingDescription ? (
                       <>
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        <Spinner size="sm" className="mr-1" />
                         Filling...
                       </>
                     ) : (
@@ -1082,16 +1084,29 @@ export function MediaView() {
                 <Book className="w-4 h-4 mr-2" />
                 Books
               </TabsTrigger>
+              <TabsTrigger value="recommendations">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Recommendations
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {/* Stats */}
-          <div className="text-sm text-muted-foreground">
-            Showing {Object.values(groupedMedia).flat().length} of {media.length} items
-          </div>
+          {/* Recommendations Tab Content */}
+          {selectedCategory === 'recommendations' ? (
+            <MediaRecommendations
+              onMediaAdded={() => {
+                fetchMedia();
+              }}
+            />
+          ) : (
+            <>
+              {/* Stats */}
+              <div className="text-sm text-muted-foreground">
+                Showing {Object.values(groupedMedia).flat().length} of {media.length} items
+              </div>
 
-          {/* Grouped Media by Status */}
-          {Object.keys(groupedMedia).length > 0 ? (
+              {/* Grouped Media by Status */}
+              {Object.keys(groupedMedia).length > 0 ? (
             <div className="space-y-6">
               {Object.entries(groupedMedia)
                 .sort(([statusA], [statusB]) => {
@@ -1188,6 +1203,8 @@ export function MediaView() {
                 </Button>
               )}
             </Card>
+          )}
+            </>
           )}
         </motion.div>
       </div>
@@ -1339,7 +1356,7 @@ export function MediaView() {
               >
                 {isCreating ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Creating...
                   </>
                 ) : (
@@ -1472,7 +1489,7 @@ export function MediaView() {
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Spinner size="sm" className="mr-2" />
                   Deleting...
                 </>
               ) : (

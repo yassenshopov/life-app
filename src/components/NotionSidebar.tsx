@@ -22,7 +22,7 @@ import {
   Moon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 const outfit = Outfit({ subsets: ['latin'] });
@@ -420,7 +420,7 @@ export default function NotionSidebar() {
           isCollapsed ? 'w-16' : 'w-64'
         )}
       >
-        <LoadingSpinner />
+        <Spinner />
       </div>
     );
   }

@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { LogOut, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { LogOut, Link as LinkIcon } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 export type TimeFormat = '12h' | '24h';
 
@@ -126,7 +127,7 @@ export function CalendarSettingsDialog({
                 >
                   {isDisconnecting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Spinner size="sm" />
                       Disconnecting...
                     </>
                   ) : (
@@ -146,7 +147,7 @@ export function CalendarSettingsDialog({
                 >
                   {isConnecting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Spinner size="sm" />
                       Connecting...
                     </>
                   ) : (

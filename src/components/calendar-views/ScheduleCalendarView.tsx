@@ -958,8 +958,7 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                                 <PersonAvatar
                                                   person={person}
                                                   size="sm"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
+                                                  onClick={() => {
                                                     onPersonClick?.(person);
                                                   }}
                                                 />

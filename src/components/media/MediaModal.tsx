@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, BookOpen, Loader2, Sparkles } from 'lucide-react';
+import { ExternalLink, BookOpen, Sparkles } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -291,7 +292,7 @@ export function MediaModal({ item, isOpen, onClose, onUpdate }: MediaModalProps)
                         >
                           {isFillingDescription ? (
                             <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              <Spinner size="sm" className="mr-1" />
                               Filling...
                             </>
                           ) : (
