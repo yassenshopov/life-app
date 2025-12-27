@@ -238,6 +238,17 @@ export function DatabaseGalleryView({
                 ([_, prop]) => prop.type === NOTION_PROPERTY_TYPES.MULTI_SELECT
               );
 
+              // Get thumbnail from files property (for media databases)
+              const thumbnailProperty = Object.entries(properties).find(
+                ([key, prop]) => prop.type === NOTION_PROPERTY_TYPES.FILES && (prop.name === 'Thumbnail' || key.toLowerCase() === 'thumbnail')
+              );
+              const thumbnailFiles = thumbnailProperty
+                ? page.properties[thumbnailProperty[0]]?.files || []
+                : [];
+              const thumbnailUrl = thumbnailFiles.length > 0
+                ? (thumbnailFiles[0].file?.url || thumbnailFiles[0].external?.url)
+                : null;
+
               return (
                 <Card
                   key={page.id}
@@ -246,7 +257,13 @@ export function DatabaseGalleryView({
                 >
                   {/* Cover Image */}
                   <div className="aspect-video w-full overflow-hidden bg-muted/20">
-                    {page.cover ? (
+                    {thumbnailUrl ? (
+                      <img
+                        src={thumbnailUrl}
+                        alt="Thumbnail"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    ) : page.cover ? (
                       page.cover.type === 'external' ? (
                         <img
                           src={page.cover.external.url}
@@ -292,15 +309,57 @@ export function DatabaseGalleryView({
                       </h3>
                     </div>
 
-                    {/* Assignees */}
-                    {assignees && assignees.length > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <User className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">
-                          {assignees.map((person: any) => person.name || person).join(', ')}
-                        </span>
-                      </div>
-                    )}
+                    {/* Assignees or By (for media) */}
+                    {(() => {
+                      // Check for "By" multi_select property (for media)
+                      const byProperty = Object.entries(properties).find(
+                        ([_, prop]) => prop.type === NOTION_PROPERTY_TYPES.MULTI_SELECT && (prop.name === 'By' || prop.name === 'by')
+                      );
+                      if (byProperty) {
+                        const byValues = getPropertyValue(page, byProperty[0], byProperty[1]);
+                        if (byValues && byValues.length > 0) {
+                          return (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <User className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {byValues.join(', ')}
+                              </span>
+                            </div>
+                          );
+                        }
+                      }
+                      // Fallback to people property
+                      if (assignees && assignees.length > 0) {
+                        return (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <User className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">
+                              {assignees.map((person: any) => person.name || person).join(', ')}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Category (for media) */}
+                    {(() => {
+                      const categoryProperty = Object.entries(properties).find(
+                        ([_, prop]) => prop.type === NOTION_PROPERTY_TYPES.SELECT && (prop.name === 'Category' || prop.name === 'category')
+                      );
+                      if (categoryProperty) {
+                        const category = getPropertyValue(page, categoryProperty[0], categoryProperty[1]);
+                        return category ? (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Tag className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                            <Badge variant="outline" className="text-xs px-2 py-0.5">
+                              {category}
+                            </Badge>
+                          </div>
+                        ) : null;
+                      }
+                      return null;
+                    })()}
 
                     {/* Date */}
                     {date && (

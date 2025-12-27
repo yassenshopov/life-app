@@ -11,19 +11,33 @@ import {
 } from '@/components/ui/dialog';
 import { Music, ExternalLink, Loader2, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
+// Get default background color from CSS variables
+function getDefaultBgColor(): string {
+  if (typeof window === 'undefined') {
+    return 'hsl(var(--card))';
+  }
+  const root = document.documentElement;
+  const cardColor = getComputedStyle(root).getPropertyValue('--card').trim();
+  if (cardColor) {
+    return `hsl(${cardColor})`;
+  }
+  return 'hsl(var(--card))';
+}
+
 // Extract dominant color from image
 function getDominantColor(imageUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     // Try to handle CORS - Spotify images should allow this
     img.crossOrigin = 'anonymous';
+    const defaultColor = getDefaultBgColor();
     
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve('#1DB954'); // Default Spotify green
+          resolve(defaultColor);
           return;
         }
         
@@ -60,21 +74,21 @@ function getDominantColor(imageUrl: string): Promise<string> {
           
           resolve(`rgb(${r}, ${g}, ${b})`);
         } else {
-          resolve('#1DB954');
+          resolve(defaultColor);
         }
       } catch {
-        resolve('#1DB954');
+        resolve(defaultColor);
       }
     };
     
     img.onerror = () => {
-      resolve('#1DB954');
+      resolve(defaultColor);
     };
     
     // Set timeout to avoid hanging
     setTimeout(() => {
       if (!img.complete) {
-        resolve('#1DB954');
+        resolve(defaultColor);
       }
     }, 3000);
     
@@ -99,57 +113,81 @@ interface CurrentlyPlaying {
 
 // Spotify waveform animation component
 function SpotifyWaveform({ isPlaying, compact = false }: { isPlaying: boolean; compact?: boolean }) {
-  const barCount = compact ? 12 : 20;
+  const barCount = compact ? 16 : 32;
   const bars = Array.from({ length: barCount }, (_, i) => i);
   const [heights, setHeights] = React.useState<number[]>(
-    Array.from({ length: barCount }, () => 20)
+    Array.from({ length: barCount }, () => 15)
   );
+  const animationRef = React.useRef<number>();
+  const lastUpdateRef = React.useRef<number>(0);
+  const timeRef = React.useRef<number>(0);
 
   React.useEffect(() => {
     if (!isPlaying) {
-      setHeights(Array.from({ length: barCount }, () => 20));
+      setHeights(Array.from({ length: barCount }, () => 15));
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       return;
     }
 
-    const interval = setInterval(() => {
-      setHeights(Array.from({ length: barCount }, () => Math.random() * 60 + 20));
-    }, 150);
+    timeRef.current = 0;
+    lastUpdateRef.current = performance.now();
 
-    return () => clearInterval(interval);
+    const animate = (currentTime: number) => {
+      // Throttle updates to ~30fps to prevent overload
+      const elapsed = currentTime - lastUpdateRef.current;
+      if (elapsed < 33) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      
+      lastUpdateRef.current = currentTime;
+      timeRef.current += elapsed / 1000; // Convert to seconds
+      
+      const baseSpeed = 0.5; // Slower, smoother animation
+      
+      // Simplified waveform - single smooth sine wave with position offset
+      // This creates synchronized adjacent bars that flow smoothly
+      const newHeights = bars.map((_, i) => {
+        const position = i / barCount; // Normalized position 0-1
+        
+        // Single smooth wave that flows across bars
+        // Adjacent bars are in sync, creating a realistic waveform
+        const wave = Math.sin(timeRef.current * baseSpeed + position * Math.PI * 1.5);
+        
+        // Normalize to 20-80% height range for smoother appearance
+        const normalized = (wave + 1) / 2; // Convert from -1,1 to 0,1
+        const height = 20 + normalized * 60; // Scale to 20-80%
+        
+        return Math.max(20, Math.min(80, height));
+      });
+
+      setHeights(newHeights);
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [isPlaying, barCount]);
 
   return (
-    <>
-      <style>{`
-        @keyframes waveform {
-          0%, 100% {
-            transform: scaleY(0.3);
-          }
-          50% {
-            transform: scaleY(1);
-          }
-        }
-      `}</style>
-      <div className={`flex items-end justify-center gap-0.5 ${compact ? 'h-6' : 'h-12'}`}>
-        {bars.map((_, i) => {
-          const duration = 0.5 + Math.random() * 0.5;
-          return (
-            <div
-              key={i}
-              className="w-0.5 bg-white/80 rounded-full transition-all duration-150"
-              style={{
-                height: `${heights[i] || 20}%`,
-                animationName: isPlaying ? 'waveform' : 'none',
-                animationDuration: isPlaying ? `${duration}s` : '0s',
-                animationTimingFunction: 'ease-in-out',
-                animationIterationCount: isPlaying ? 'infinite' : 1,
-                animationDelay: `${i * 0.05}s`,
-              }}
-            />
-          );
-        })}
-      </div>
-    </>
+    <div className={`flex items-end justify-center gap-0.5 ${compact ? 'h-6' : 'h-12'}`}>
+      {bars.map((_, i) => (
+        <div
+          key={i}
+          className="w-0.5 bg-white/80 rounded-full transition-all duration-200 ease-out"
+          style={{
+            height: `${heights[i] || 20}%`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -212,7 +250,7 @@ export function SpotifyPlayer() {
   const [lastTrack, setLastTrack] = React.useState<CurrentlyPlaying['item'] | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
-  const [bgColor, setBgColor] = React.useState('#1DB954');
+  const [bgColor, setBgColor] = React.useState<string>(() => getDefaultBgColor());
   const [isToggling, setIsToggling] = React.useState(false);
 
   // Check connection status
@@ -258,14 +296,14 @@ export function SpotifyPlayer() {
             setBgColor(color);
           })
           .catch(() => {
-            setBgColor('#1DB954');
+            setBgColor(getDefaultBgColor());
           });
       } else {
-        setBgColor('#1DB954');
+        setBgColor(getDefaultBgColor());
       }
     } else if (!currentlyPlaying?.isPlaying && !currentlyPlaying?.is_playing && !lastTrack) {
       // Reset to default when not playing and no last track
-      setBgColor('#1DB954');
+      setBgColor(getDefaultBgColor());
     }
   }, [currentlyPlaying?.item?.album?.images, currentlyPlaying?.isPlaying, currentlyPlaying?.is_playing, lastTrack]);
 
@@ -357,6 +395,11 @@ export function SpotifyPlayer() {
   // Use last track if paused, otherwise use current track
   const track = currentlyPlaying?.item || lastTrack;
 
+  // Don't show widget if there's no track playing
+  if (!track) {
+    return null;
+  }
+
   return (
     <>
       {/* Mini Widget - Fixed Width */}
@@ -364,8 +407,8 @@ export function SpotifyPlayer() {
         <div
           className="w-80 rounded-lg shadow-2xl border border-white/10 transition-all duration-500 cursor-pointer overflow-hidden"
           style={{
-            backgroundColor: bgColor || '#1DB954',
-            background: bgColor || '#1DB954',
+            backgroundColor: bgColor || getDefaultBgColor(),
+            background: bgColor || getDefaultBgColor(),
           } as React.CSSProperties}
           onClick={() => setIsOpen(true)}
         >
