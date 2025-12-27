@@ -4,7 +4,8 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, TrendingUp, Clock, Music, Users, Calendar, Zap, RefreshCw } from 'lucide-react';
+import { TrendingUp, Clock, Music, Users, Calendar, Zap, RefreshCw } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface AnalyticsData {
   totalMinutes: number;
@@ -28,6 +29,17 @@ interface AnalyticsData {
   listeningByHour: number[];
   listeningByDay: number[];
   timeRange: number | 'all';
+  hasTopData?: boolean;
+  topTracksByTimeRange?: Record<string, Array<{
+    id: string;
+    name: string;
+    rank: number;
+  }>>;
+  topArtistsByTimeRange?: Record<string, Array<{
+    id: string;
+    name: string;
+    rank: number;
+  }>>;
 }
 
 export function SpotifyAnalytics() {
@@ -99,7 +111,7 @@ export function SpotifyAnalytics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <Spinner size="lg" className="text-muted-foreground" />
       </div>
     );
   }
@@ -115,7 +127,7 @@ export function SpotifyAnalytics() {
           <Button onClick={syncHistory} disabled={syncing}>
             {syncing ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Syncing...
               </>
             ) : (
@@ -157,7 +169,7 @@ export function SpotifyAnalytics() {
           <Button onClick={syncHistory} disabled={syncing} variant="outline" title="Sync recently played tracks (last 50)">
             {syncing ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Syncing...
               </>
             ) : (
@@ -170,7 +182,7 @@ export function SpotifyAnalytics() {
           <Button onClick={syncTopData} disabled={syncingTop} variant="outline" title="Sync top tracks/artists (4 weeks, 6 months, several years)">
             {syncingTop ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Syncing...
               </>
             ) : (

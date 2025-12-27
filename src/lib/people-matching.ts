@@ -7,6 +7,7 @@ export interface Person {
   name: string;
   nicknames?: string[] | null;
   image?: any;
+  image_url?: string | null;
 }
 
 /**

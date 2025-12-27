@@ -147,7 +147,7 @@ export async function POST() {
       // Upsert artist metadata
       for (const artist of track.artists) {
         // Fetch artist details if we don't have them
-        let artistData = { id: artist.id, name: artist.name, genres: [], image_url: null, popularity: null };
+        let artistData = { id: artist.id, name: artist.name, genres: [], image_url: null, popularity: null, external_url: null };
         
         try {
           const artistResponse = await spotifyApiRequest(`/artists/${artist.id}`);

@@ -35,8 +35,8 @@ interface WeeklyCalendarViewProps {
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
   previewEvent?: CalendarEvent | null;
-  people?: Array<{ id: string; name: string; nicknames?: string[] | null; image?: any }>;
-  onPersonClick?: (person: { id: string; name: string; nicknames?: string[] | null; image?: any }) => void;
+  people?: Array<{ id: string; name: string; nicknames?: string[] | null; image?: any; image_url?: string | null }>;
+  onPersonClick?: (person: { id: string; name: string; nicknames?: string[] | null; image?: any; image_url?: string | null }) => void;
 }
 
 export function WeeklyCalendarView({

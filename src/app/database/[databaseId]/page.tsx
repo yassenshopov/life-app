@@ -17,7 +17,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { DatabaseTable } from '@/components/DatabaseTable';
 import { DatabaseBoardView } from '@/components/views/DatabaseBoardView';
 import { DatabaseCalendarView } from '@/components/views/DatabaseCalendarView';
@@ -132,7 +132,10 @@ export default function DatabasePage() {
     return (
       <DashboardLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size="lg" label="Loading database..." />
+          <div className="flex flex-col items-center gap-2">
+            <Spinner size="lg" />
+            <span className="text-sm text-gray-700 dark:text-white/80">Loading database...</span>
+          </div>
         </div>
       </DashboardLayout>
     );

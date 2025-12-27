@@ -17,7 +17,7 @@ import { useGymData } from '@/hooks/useGymData';
 import { DisplaySection } from '@/types/display-section';
 
 // Layout Components
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { NavigationTabs } from '@/components/NavigationTabs';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -266,7 +266,10 @@ export default function Dashboard() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950">
-        <LoadingSpinner size="lg" label="Authenticating..." />
+        <div className="flex flex-col items-center gap-2">
+          <Spinner size="lg" />
+          <span className="text-sm text-gray-700 dark:text-white/80">Authenticating...</span>
+        </div>
       </div>
     );
   }
@@ -274,7 +277,10 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950">
-        <LoadingSpinner size="lg" label="Loading your data..." />
+        <div className="flex flex-col items-center gap-2">
+          <Spinner size="lg" />
+          <span className="text-sm text-gray-700 dark:text-white/80">Loading your data...</span>
+        </div>
       </div>
     );
   }

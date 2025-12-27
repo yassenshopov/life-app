@@ -91,8 +91,15 @@ function calculateAge(birthDate: string | null): number | null {
   return age;
 }
 
-// Helper to extract image URL from Notion files JSONB
-function getImageUrl(imageData: any): string | null {
+// Helper to get image URL - prefer image_url from Supabase Storage, fallback to extracting from JSONB
+function getImageUrl(person: Person): string | null {
+  // Prefer Supabase Storage URL if available
+  if (person.image_url) {
+    return person.image_url;
+  }
+  
+  // Fallback to extracting from Notion JSONB (for backward compatibility)
+  const imageData = person.image;
   if (!imageData || !Array.isArray(imageData) || imageData.length === 0) {
     return null;
   }
@@ -120,6 +127,7 @@ interface Person {
   occupation: string | null;
   contact_freq: string | null;
   image: any;
+  image_url?: string | null;
   age: any;
   birthday: any;
 }
@@ -527,7 +535,7 @@ export function PeopleView() {
                         const zodiacSign = extractZodiacSign(person.star_sign);
                         const currentlyAt = extractFlag(person.currently_at);
                         const age = calculateAge(person.birth_date);
-                        const imageUrl = getImageUrl(person.image);
+                        const imageUrl = getImageUrl(person);
 
                         return (
                           <Card
@@ -671,7 +679,7 @@ export function PeopleView() {
                       const fromLocation = extractFlag(person.from_location);
                       const age = calculateAge(person.birth_date);
                       const tier = person.tier && person.tier.length > 0 ? person.tier[0] : '';
-                      const imageUrl = getImageUrl(person.image);
+                      const imageUrl = getImageUrl(person);
                       const events = personEvents[person.id] || [];
                       const isExpanded = expandedPersonId === person.id;
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { X, Pencil, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DayEntry } from '@/types/day-entry';
 import {
@@ -381,7 +381,7 @@ export function ManualEntryForm({
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
-                <LoadingSpinner size="sm" />
+                <Spinner size="sm" />
                 Saving...
               </span>
             ) : (

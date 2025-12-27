@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music } from 'lucide-react';
+import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Outfit } from 'next/font/google';
@@ -16,18 +16,24 @@ export default function HQSidebar() {
   const { user } = useUser();
   const { openUserProfile } = useClerk();
   const pathname = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedCollapsedState = localStorage.getItem('hq-sidebar-collapsed');
-      return savedCollapsedState !== null ? JSON.parse(savedCollapsedState) : false;
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Load sidebar state from localStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+    const savedCollapsedState = localStorage.getItem('hq-sidebar-collapsed');
+    if (savedCollapsedState !== null) {
+      setIsCollapsed(JSON.parse(savedCollapsedState));
     }
-    return false;
-  });
+  }, []);
 
   // Save sidebar state to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('hq-sidebar-collapsed', JSON.stringify(isCollapsed));
-  }, [isCollapsed]);
+    if (isMounted) {
+      localStorage.setItem('hq-sidebar-collapsed', JSON.stringify(isCollapsed));
+    }
+  }, [isCollapsed, isMounted]);
 
   // Listen for keyboard shortcuts
   useEffect(() => {
@@ -47,6 +53,7 @@ export default function HQSidebar() {
   const isActive = pathname === '/hq';
   const isPeopleActive = pathname === '/people';
   const isSpotifyActive = pathname === '/spotify';
+  const isMediaActive = pathname === '/media';
 
   return (
     <div
@@ -138,6 +145,18 @@ export default function HQSidebar() {
         >
           <Music className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Spotify</span>}
+        </Link>
+        <Link
+          href="/media"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            'hover:bg-accent hover:text-accent-foreground',
+            isMediaActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+        >
+          <Film className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">Media</span>}
         </Link>
       </div>
 

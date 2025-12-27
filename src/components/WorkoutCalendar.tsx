@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { X } from 'lucide-react';
 import { EXERCISE_LIBRARY, GymSessionType, Exercise } from '@/constants/exercises';
 import { MuscleGroup } from '@/constants/muscle-groups';
@@ -785,7 +785,7 @@ export const WorkoutCalendar = ({
                   >
                     {formState.isSubmittingGym ? (
                       <span className="flex items-center gap-2">
-                        <LoadingSpinner size="sm" />
+                        <Spinner size="sm" />
                         Saving...
                       </span>
                     ) : formState.editingWorkout ? (

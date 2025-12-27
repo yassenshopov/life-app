@@ -13,7 +13,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, Database, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Database, CheckCircle2, XCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   NOTION_DATABASE_TEMPLATES,
   type NotionDatabaseTemplate,
@@ -251,7 +252,7 @@ export default function NotionSetup() {
                 <Button type="submit" disabled={isLoading || isFetchingProperties}>
                   {isLoading || isFetchingProperties ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Spinner size="sm" className="mr-2" />
                       {isFetchingProperties ? 'Fetching Properties...' : 'Adding...'}
                     </>
                   ) : (

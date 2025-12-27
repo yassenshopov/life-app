@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useClerk } from '@clerk/nextjs';
 import NotionSetup from '@/components/NotionSetup';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Inter, Outfit } from 'next/font/google';
 import Link from 'next/link';
@@ -81,7 +81,10 @@ export default function Settings() {
       <div
         className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${inter.className}`}
       >
-        <LoadingSpinner size="lg" label="Authenticating..." />
+        <div className="flex flex-col items-center gap-2">
+          <Spinner size="lg" />
+          <span className="text-sm text-gray-700 dark:text-white/80">Authenticating...</span>
+        </div>
       </div>
     );
   }
