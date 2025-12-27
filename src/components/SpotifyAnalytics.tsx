@@ -28,6 +28,7 @@ interface AnalyticsData {
   listeningByHour: number[];
   listeningByDay: number[];
   timeRange: number | 'all';
+  hasTopData?: boolean;
 }
 
 export function SpotifyAnalytics() {
