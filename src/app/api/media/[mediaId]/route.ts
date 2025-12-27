@@ -211,14 +211,14 @@ export async function PATCH(
         
         // Update icon for books when status changes
         if (status !== undefined && mediaEntry.category === 'Book') {
-          // Use book icon if Done, empty bookmark otherwise - PNG format for better compatibility
+          // Use book icon if Done, empty bookmark otherwise
           const isDone = status === 'Done';
           pageUpdate.icon = { 
             type: 'external', 
             external: { 
               url: isDone 
-                ? 'https://api.iconify.design/lucide/book.png?width=280&height=280' 
-                : 'https://api.iconify.design/lucide/bookmark.png?width=280&height=280' 
+                ? 'https://api.iconify.design/lucide/book.svg' 
+                : 'https://api.iconify.design/lucide/bookmark.svg' 
             } 
           };
         }
@@ -238,8 +238,8 @@ export async function PATCH(
             type: 'external', 
             external: { 
               url: isDone 
-                ? 'https://api.iconify.design/lucide/book.png?width=280&height=280' 
-                : 'https://api.iconify.design/lucide/bookmark.png?width=280&height=280' 
+                ? 'https://api.iconify.design/lucide/book.svg' 
+                : 'https://api.iconify.design/lucide/bookmark.svg' 
             } 
           },
         });

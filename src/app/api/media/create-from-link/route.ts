@@ -347,16 +347,16 @@ export async function POST(request: NextRequest) {
     // Movies/Series get movie icon, Books get empty bookmark (since new entries are "Not started")
     let pageIcon: { type: 'external'; external: { url: string } } | null = null;
     if (mediaData.category === 'Movie' || mediaData.category === 'Series') {
-      // Use film/clapperboard icon from Iconify (Lucide icon set) - PNG format for better compatibility
+      // Use film/clapperboard icon from Iconify (Lucide icon set)
       pageIcon = { 
         type: 'external', 
-        external: { url: 'https://api.iconify.design/lucide/clapperboard.png?width=280&height=280' } 
+        external: { url: 'https://api.iconify.design/lucide/clapperboard.svg' } 
       };
     } else if (mediaData.category === 'Book') {
       // New entries are "Not started" by default, so use empty bookmark
       pageIcon = { 
         type: 'external', 
-        external: { url: 'https://api.iconify.design/lucide/bookmark.png?width=280&height=280' } 
+        external: { url: 'https://api.iconify.design/lucide/bookmark.svg' } 
       };
     }
 
