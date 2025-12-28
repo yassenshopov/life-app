@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 interface HealthMetricsTrendsProps {
   entries: TrackingEntry[];
   viewMode?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 type TimePeriod = 7 | 14 | 30 | 90 | 180 | 365 | 'all';
@@ -110,7 +111,8 @@ const YEARLY_TIME_PERIODS: { years: YearPeriod; label: string }[] = [
   { years: 'all', label: 'All' },
 ];
 
-// Helper to extract value from property
+// Helper to extract value from property (memoized for performance)
+const extractPropertyValueCache = new WeakMap();
 function extractPropertyValue(
   prop: { type: string; value: any } | undefined | Record<string, never>
 ): any {
@@ -124,22 +126,63 @@ function extractPropertyValue(
   )
     return null;
 
+  // Check cache first
+  if (extractPropertyValueCache.has(prop)) {
+    return extractPropertyValueCache.get(prop);
+  }
+
   const { value } = prop;
+  let result: any = null;
 
   // Handle formula results
   if (prop.type === 'formula' && value && typeof value === 'object') {
-    if (value.type === 'number' && value.number !== undefined) return value.number;
-    if (value.type === 'string' && value.string) return value.string;
-    if (value.type === 'boolean' && value.boolean !== undefined) return value.boolean;
+    if (value.type === 'number' && value.number !== undefined) result = value.number;
+    else if (value.type === 'string' && value.string) result = value.string;
+    else if (value.type === 'boolean' && value.boolean !== undefined) result = value.boolean;
   }
 
   // Handle nested structures
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    if (value.date) return value.date;
-    if (value.number !== undefined) return value.number;
+  if (result === null && value && typeof value === 'object' && !Array.isArray(value)) {
+    if (value.date) result = value.date;
+    else if (value.number !== undefined) result = value.number;
   }
 
-  return value;
+  if (result === null) {
+    result = value;
+  }
+
+  // Cache the result
+  extractPropertyValueCache.set(prop, result);
+  return result;
+}
+
+// Optimized date extraction with caching
+const dateExtractionCache = new WeakMap();
+function extractEntryDate(entry: TrackingEntry): string | null {
+  if (dateExtractionCache.has(entry)) {
+    return dateExtractionCache.get(entry);
+  }
+
+  const dateProp = entry.properties?.['Date'] || entry.properties?.['date'];
+  if (!dateProp) {
+    const titleMatch = entry.title?.match(/\d{4}-\d{2}-\d{2}/);
+    const result = titleMatch ? titleMatch[0] : null;
+    dateExtractionCache.set(entry, result);
+    return result;
+  }
+
+  const dateValue = extractPropertyValue(dateProp);
+  const dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
+
+  if (!dateStr) {
+    const titleMatch = entry.title?.match(/\d{4}-\d{2}-\d{2}/);
+    const result = titleMatch ? titleMatch[0] : null;
+    dateExtractionCache.set(entry, result);
+    return result;
+  }
+
+  dateExtractionCache.set(entry, dateStr);
+  return dateStr;
 }
 
 // Cookie helper functions
@@ -158,7 +201,11 @@ function setCookie(name: string, value: string, days: number = 365) {
   document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
 }
 
-export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetricsTrendsProps) {
+export function HealthMetricsTrends({
+  entries,
+  viewMode = 'daily',
+  colorPalette,
+}: HealthMetricsTrendsProps) {
   const [selectedDaysPeriod, setSelectedDaysPeriod] = useState<TimePeriod>(() => {
     if (typeof window !== 'undefined') {
       const saved = getCookie('tracking-days-period');
@@ -233,6 +280,20 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
   const chartData = useMemo(() => {
     if (entries.length === 0) return [];
 
+    // Early filter: pre-extract dates and filter invalid entries to reduce processing
+    const validEntries = entries.filter((entry) => {
+      const dateStr = extractEntryDate(entry);
+      if (!dateStr) return false;
+      try {
+        new Date(dateStr); // Validate date
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    if (validEntries.length === 0) return [];
+
     if (viewMode === 'yearly') {
       // Group by year
       const cutoffDate =
@@ -256,17 +317,8 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
         }
       >();
 
-      entries.forEach((entry) => {
-        const dateProp = entry.properties?.['Date'] || entry.properties?.['date'];
-        if (!dateProp) return;
-        const dateValue = extractPropertyValue(dateProp);
-        let dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
-
-        if (!dateStr) {
-          const titleMatch = entry.title?.match(/\d{4}-\d{2}-\d{2}/);
-          if (titleMatch) dateStr = titleMatch[0];
-        }
-
+      validEntries.forEach((entry) => {
+        const dateStr = extractEntryDate(entry);
         if (!dateStr) return;
 
         try {
@@ -467,17 +519,8 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
         }
       >();
 
-      entries.forEach((entry) => {
-        const dateProp = entry.properties?.['Date'] || entry.properties?.['date'];
-        if (!dateProp) return;
-        const dateValue = extractPropertyValue(dateProp);
-        let dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
-
-        if (!dateStr) {
-          const titleMatch = entry.title?.match(/\d{4}-\d{2}-\d{2}/);
-          if (titleMatch) dateStr = titleMatch[0];
-        }
-
+      validEntries.forEach((entry) => {
+        const dateStr = extractEntryDate(entry);
         if (!dateStr) return;
 
         try {
@@ -685,17 +728,8 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
         }
       >();
 
-      entries.forEach((entry) => {
-        const dateProp = entry.properties?.['Date'] || entry.properties?.['date'];
-        if (!dateProp) return;
-        const dateValue = extractPropertyValue(dateProp);
-        let dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
-
-        if (!dateStr) {
-          const titleMatch = entry.title?.match(/\d{4}-\d{2}-\d{2}/);
-          if (titleMatch) dateStr = titleMatch[0];
-        }
-
+      validEntries.forEach((entry) => {
+        const dateStr = extractEntryDate(entry);
         if (!dateStr) return;
 
         try {
@@ -898,17 +932,8 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
         }
       >();
 
-      entries.forEach((entry) => {
-        const dateProp = entry.properties?.['Date'] || entry.properties?.['date'];
-        if (!dateProp) return;
-        const dateValue = extractPropertyValue(dateProp);
-        let dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
-
-        if (!dateStr) {
-          const titleMatch = entry.title?.match(/\d{4}-\d{2}-\d{2}/);
-          if (titleMatch) dateStr = titleMatch[0];
-        }
-
+      validEntries.forEach((entry) => {
+        const dateStr = extractEntryDate(entry);
         if (!dateStr) return;
 
         try {
@@ -1094,31 +1119,15 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
           : subDays(new Date(), selectedDaysPeriod);
 
       // Sort entries by date
-      const sortedEntries = [...entries].sort((a, b) => {
-        const getDate = (e: TrackingEntry) => {
-          const dateProp = e.properties?.['Date'] || e.properties?.['date'];
-          if (!dateProp) return '';
-          const dateValue = extractPropertyValue(dateProp);
-          if (typeof dateValue === 'string') return dateValue;
-          if (dateValue?.start) return dateValue.start;
-          const titleMatch = e.title?.match(/\d{4}-\d{2}-\d{2}/);
-          return titleMatch ? titleMatch[0] : '';
-        };
-        return getDate(a).localeCompare(getDate(b));
+      const sortedEntries = [...validEntries].sort((a, b) => {
+        const dateA = extractEntryDate(a) || '';
+        const dateB = extractEntryDate(b) || '';
+        return dateA.localeCompare(dateB);
       });
 
       // Filter entries within the time period
       const filteredEntries = sortedEntries.filter((e) => {
-        const dateProp = e.properties?.['Date'] || e.properties?.['date'];
-        if (!dateProp) return false;
-        const dateValue = extractPropertyValue(dateProp);
-        let dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
-
-        if (!dateStr) {
-          const titleMatch = e.title?.match(/\d{4}-\d{2}-\d{2}/);
-          if (titleMatch) dateStr = titleMatch[0];
-        }
-
+        const dateStr = extractEntryDate(e);
         if (!dateStr) return false;
 
         try {
@@ -1132,14 +1141,7 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
       // Map to chart data format
       return filteredEntries
         .map((e) => {
-          const dateProp = e.properties?.['Date'] || e.properties?.['date'];
-          const dateValue = extractPropertyValue(dateProp);
-          let dateStr = typeof dateValue === 'string' ? dateValue : dateValue?.start || '';
-
-          if (!dateStr) {
-            const titleMatch = e.title?.match(/\d{4}-\d{2}-\d{2}/);
-            if (titleMatch) dateStr = titleMatch[0];
-          }
+          const dateStr = extractEntryDate(e);
 
           const rhrProp = e.properties?.['RHR [bpm]'] || e.properties?.['RHR'];
           const rhrValue = extractPropertyValue(rhrProp);
@@ -1251,8 +1253,16 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
   );
   const hasAnyData = hasRHR || hasWeight || hasSteps || hasSleep || hasSleepStages;
 
+  // Apply color palette to card if available
+  const cardStyle = colorPalette
+    ? {
+        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+        borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+      }
+    : undefined;
+
   return (
-    <Card className="p-6">
+    <Card className="p-6 transition-all duration-1000" style={cardStyle}>
       <div className="space-y-6">
         {/* Header with time period selector and chart type toggle */}
         <div className="flex items-center justify-between">
@@ -1403,9 +1413,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-red-500">{data.rhr} bpm</p>
                               </div>
                             );
@@ -1462,9 +1475,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-red-500">{data.rhr} bpm</p>
                               </div>
                             );
@@ -1511,9 +1527,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-yellow-500">
                                   {data.weight?.toFixed(2)} kg
                                 </p>
@@ -1560,9 +1579,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-yellow-500">
                                   {data.weight?.toFixed(2)} kg
                                 </p>
@@ -1611,9 +1633,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-green-500">
                                   {data.steps.toLocaleString()} steps
                                 </p>
@@ -1660,9 +1685,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-green-500">
                                   {data.steps.toLocaleString()} steps
                                 </p>
@@ -1711,9 +1739,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-purple-500">
                                   {data.sleep?.toFixed(2)} h
                                 </p>
@@ -1760,9 +1791,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
+                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                             return (
                               <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">{data.date}</p>
+                                <p className="text-xs font-medium">
+                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                </p>
                                 <p className="text-sm font-bold text-purple-500">
                                   {data.sleep?.toFixed(2)} h
                                 </p>
@@ -1819,9 +1853,12 @@ export function HealthMetricsTrends({ entries, viewMode = 'daily' }: HealthMetri
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
+                          const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
                           return (
                             <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                              <p className="text-xs font-medium mb-2">{data.date}</p>
+                              <p className="text-xs font-medium mb-2">
+                                {data.date} {year && !data.date.includes(year) && `(${year})`}
+                              </p>
                               {data.deepSleep !== null && (
                                 <p className="text-xs text-purple-600">
                                   Deep: {data.deepSleep.toFixed(1)}%

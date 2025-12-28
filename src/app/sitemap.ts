@@ -8,7 +8,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     '',           // home page
     '/login',
-    '/dashboard',
+    '/hq',
+    '/calendar',
     // Add other static routes as needed
   ]
 

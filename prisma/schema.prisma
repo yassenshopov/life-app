@@ -26,6 +26,7 @@ model User {
   userPreferences           user_preferences?
   googleCalendarEvents      google_calendar_events[]
   people                    people[]
+  media                     media[]
 
   @@map("users")
 }
@@ -139,4 +140,59 @@ model people {
   @@index([notion_database_id], map: "idx_people_notion_database_id")
   @@index([birth_date], map: "idx_people_birth_date")
   @@map("people")
+}
+
+model tracking_monthly {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  period            String   @default("monthly")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  title             String   @default("Untitled")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  media             media[]
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_tracking_monthly_user_id")
+  @@index([notion_page_id], map: "idx_tracking_monthly_notion_page_id")
+  @@index([notion_database_id], map: "idx_tracking_monthly_notion_database_id")
+  @@map("tracking_monthly")
+}
+
+model media {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  name              String
+  category          String?
+  status            String?
+  url               String?
+  by                String[]
+  topic             String[]
+  thumbnail         Json?
+  thumbnail_url     String?
+  ai_synopsis       String?
+  created           DateTime? @db.Timestamptz(6)
+  monthly_tracking_id String? @db.Uuid
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  monthly_tracking  tracking_monthly? @relation(fields: [monthly_tracking_id], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_media_user_id")
+  @@index([notion_page_id], map: "idx_media_notion_page_id")
+  @@index([notion_database_id], map: "idx_media_notion_database_id")
+  @@index([monthly_tracking_id], map: "idx_media_monthly_tracking_id")
+  @@map("media")
 }

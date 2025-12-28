@@ -290,24 +290,26 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   };
 
   // Load view mode from localStorage
-  const [viewMode, setViewMode] = React.useState<CalendarViewMode>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hq-calendar-view-mode');
-      // Migrate old "annual" to "year"
-      if (saved === 'annual') {
-        localStorage.setItem('hq-calendar-view-mode', 'year');
-        return 'year';
-      }
-      return saved === 'daily' ||
-        saved === 'weekly' ||
-        saved === 'monthly' ||
-        saved === 'year' ||
-        saved === 'schedule'
-        ? saved
-        : 'weekly';
+  // Initialize to 'weekly' on both server and client to prevent hydration mismatch
+  const [viewMode, setViewMode] = React.useState<CalendarViewMode>('weekly');
+
+  // Load view mode from localStorage after mount to prevent hydration mismatch
+  React.useEffect(() => {
+    const saved = localStorage.getItem('hq-calendar-view-mode');
+    // Migrate old "annual" to "year"
+    if (saved === 'annual') {
+      localStorage.setItem('hq-calendar-view-mode', 'year');
+      setViewMode('year');
+      return;
     }
-    return 'weekly';
-  });
+    if (saved === 'daily' ||
+      saved === 'weekly' ||
+      saved === 'monthly' ||
+      saved === 'year' ||
+      saved === 'schedule') {
+      setViewMode(saved);
+    }
+  }, []);
 
   const [currentDate, setCurrentDate] = React.useState(() => {
     const today = new Date();
@@ -734,8 +736,6 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     } else if (viewMode === 'year') {
       return currentDate.getFullYear().toString();
     } else if (viewMode === 'schedule') {
-      const endDate = new Date(currentDate);
-      endDate.setDate(currentDate.getDate() + 30);
       return `Next 30 days`;
     }
     return '';
@@ -815,7 +815,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <div className="text-sm font-medium text-muted-foreground min-w-[200px] text-right">
+            <div className="text-sm font-medium text-muted-foreground min-w-[200px] text-right" suppressHydrationWarning>
               {getDateRange()}
             </div>
             <Button

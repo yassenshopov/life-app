@@ -222,8 +222,13 @@ export function TrackingEntryDetailModal({
     return null;
   }, [entry]);
 
+  // Early return checks - moved after all hooks
+  if (!entry) return null;
+
   // Prepare sleep stages data
   const sleepStages = useMemo(() => {
+    if (!sleepData) return [];
+    
     const stages = [];
     
     if (sleepData.awakePercent !== null && sleepData.awakeTime > 0) {
@@ -538,7 +543,7 @@ export function TrackingEntryDetailModal({
     return sortedEntries.findIndex(e => e.id === entry.id);
   }, [entry, allEntries]);
 
-  if (!entry) return null;
+  // Early return for no sleep data - moved after all hooks
   if (!sleepData) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>

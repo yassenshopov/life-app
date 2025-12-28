@@ -218,9 +218,6 @@ export async function POST(
             value = value.boolean;
           } else if (value.type === 'date' && value.date) {
             value = value.date;
-          } else {
-            // Keep the full formula object for complex cases
-            value = value;
           }
         } else if (prop.type === 'rollup' && value && typeof value === 'object') {
           // Extract rollup result based on its type
@@ -230,16 +227,11 @@ export async function POST(
             value = value.date;
           } else if (value.type === 'array' && Array.isArray(value.array)) {
             value = value.array;
-          } else {
-            // Keep the full rollup object for complex cases
-            value = value;
           }
         } else if (prop.type === 'date' && value && typeof value === 'object' && value.start) {
           // Keep date object with start/end for date ranges
-          value = value;
         } else if (prop.type === 'relation' && Array.isArray(value)) {
           // Store relation IDs as array
-          value = value;
         }
         
         entryData.properties[key] = {

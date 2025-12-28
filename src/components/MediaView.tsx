@@ -53,6 +53,12 @@ interface MediaItem {
   thumbnail_url: string | null; // Supabase Storage URL
   ai_synopsis: string | null;
   created: string | null;
+  monthly_tracking_id: string | null;
+  monthly_tracking?: {
+    id: string;
+    title: string;
+    properties: any;
+  } | null;
 }
 
 type CategoryTab = 'movies-series' | 'books' | 'recommendations';
@@ -471,6 +477,15 @@ function MediaDetailModal({
               </div>
             )}
 
+            {/* Monthly Tracking */}
+            {item.monthly_tracking && (
+              <div className="mb-4">
+                <p className="text-white/70 text-sm">
+                  <span className="font-semibold">Month:</span> {item.monthly_tracking.title || 'Unknown'}
+                </p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="mt-auto pt-4">
               {item.url && (() => {
@@ -680,6 +695,14 @@ function MediaCard({
         {item.created && (
           <div className="text-xs text-muted-foreground">
             {format(new Date(item.created), 'MMM d, yyyy')}
+          </div>
+        )}
+
+        {/* Monthly Tracking */}
+        {item.monthly_tracking && (
+          <div className="text-xs text-muted-foreground">
+            <span className="font-medium">Month:</span>{' '}
+            {item.monthly_tracking.title || 'Unknown'}
           </div>
         )}
 

@@ -294,12 +294,6 @@ export default function NotionSidebar() {
             icon: <Target className="w-4 h-4" />,
             href: '/hq',
           },
-          {
-            id: 'dashboard',
-            title: 'Health Dashboard',
-            icon: <BarChart3 className="w-4 h-4" />,
-            href: '/dashboard',
-          },
         ],
       },
       {

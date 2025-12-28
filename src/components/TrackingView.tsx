@@ -283,16 +283,19 @@ export function TrackingView() {
       const data = await response.json();
       
       if (data.connections) {
-        const updatedConnections = { ...connections };
-        Object.keys(data.connections).forEach((period) => {
-          const conn = data.connections[period];
-          updatedConnections[period as TrackingPeriod] = {
-            period: period as TrackingPeriod,
-            connected: conn.connected,
-            database: conn.database,
-          };
+        // Use functional updater to avoid stale closure
+        setConnections((prev) => {
+          const updatedConnections = { ...prev };
+          Object.keys(data.connections).forEach((period) => {
+            const conn = data.connections[period];
+            updatedConnections[period as TrackingPeriod] = {
+              period: period as TrackingPeriod,
+              connected: conn.connected,
+              database: conn.database,
+            };
+          });
+          return updatedConnections;
         });
-        setConnections(updatedConnections);
       }
     } catch (error) {
       console.error('Error checking connections:', error);

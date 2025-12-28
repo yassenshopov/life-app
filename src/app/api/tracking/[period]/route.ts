@@ -41,13 +41,39 @@ export async function GET(
     }
 
     const tableName = PERIOD_TABLES[period as TrackingPeriod];
+    const { searchParams } = new URL(request.url);
+    
+    // Optional date range filtering for performance
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const limit = searchParams.get('limit');
 
-    // Fetch entries from the appropriate table
-    const { data: entries, error: fetchError } = await supabase
+    // Build query with optimized filtering
+    let query = supabase
       .from(tableName)
       .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .eq('user_id', userId);
+
+    // Apply date range filter if provided (uses created_at index)
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+    if (endDate) {
+      query = query.lte('created_at', endDate);
+    }
+
+    // Order by created_at (uses composite index)
+    query = query.order('created_at', { ascending: false });
+
+    // Apply limit if provided (reduces data transfer)
+    if (limit) {
+      const limitNum = parseInt(limit, 10);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        query = query.limit(limitNum);
+      }
+    }
+
+    const { data: entries, error: fetchError } = await query;
 
     if (fetchError) {
       console.error(`Error fetching ${period} entries:`, fetchError);
@@ -61,7 +87,7 @@ export async function GET(
       entries: entries || [],
     });
   } catch (error: any) {
-    console.error(`Error fetching ${period || 'unknown'} entries:`, error);
+    console.error(`Error fetching ${period ?? 'unknown period'} entries:`, error);
     return NextResponse.json(
       { error: 'Failed to fetch entries' },
       { status: 500 }

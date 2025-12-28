@@ -40,6 +40,9 @@ function getPropertyValue(property: any, propertyType: string): any {
       return property.url || null;
     case 'files':
       return property.files || [];
+    case 'relation':
+      // Return array of page IDs from the relation
+      return property.relation?.map((rel: any) => rel.id) || [];
     default:
       return null;
   }
@@ -221,9 +224,9 @@ export async function POST(request: NextRequest) {
         };
 
         // Map each property
-        Object.entries(currentProperties).forEach(([key, prop]: [string, any]) => {
+        for (const [key, prop] of Object.entries(currentProperties)) {
           const propertyValue = pageProperties[key];
-          if (!propertyValue) return;
+          if (!propertyValue) continue;
 
           const value = getPropertyValue(propertyValue, prop.type);
           
@@ -264,8 +267,26 @@ export async function POST(request: NextRequest) {
             case 'Created':
               mediaData.created = value ? new Date(value).toISOString() : null;
               break;
+            default:
+              // Handle relation properties (could be named "Month", "Monthly Tracking", etc.)
+              if (prop.type === 'relation' && Array.isArray(value) && value.length > 0) {
+                // Get the first related page ID (assuming single relation)
+                const relatedNotionPageId = value[0];
+                // Look up the tracking_monthly entry by notion_page_id
+                const { data: monthlyTracking } = await supabase
+                  .from('tracking_monthly')
+                  .select('id')
+                  .eq('user_id', userId)
+                  .eq('notion_page_id', relatedNotionPageId)
+                  .single();
+                
+                if (monthlyTracking?.id) {
+                  mediaData.monthly_tracking_id = monthlyTracking.id;
+                }
+              }
+              break;
           }
-        });
+        }
 
         return mediaData;
       })
