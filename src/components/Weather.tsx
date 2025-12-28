@@ -200,6 +200,32 @@ export function Weather({ colorPalette }: WeatherProps) {
     }
   };
 
+  // Calculate temperature gradient colors (yellow for warm, blue for cold)
+  // Temperature range: -20°C (blue) to 40°C (yellow)
+  const calculateTemperatureGradient = (minTemp: number, maxTemp: number) => {
+    const max = Number(maxTemp) || 0;
+    const min = Number(minTemp) || 0;
+    const avg = (max + min) / 2;
+    const tempRange = 60; // 40 - (-20)
+    const normalizedTemp = (avg - -20) / tempRange; // 0 to 1
+    const clampedTemp = Math.max(0, Math.min(1, normalizedTemp));
+
+    // Interpolate between yellow (255, 255, 0) and blue (0, 0, 255)
+    const r = Math.round(255 * (1 - clampedTemp));
+    const g = Math.round(255 * (1 - clampedTemp));
+    const b = Math.round(255 * clampedTemp);
+
+    return {
+      max,
+      min,
+      avg,
+      tempRange: max - min,
+      r,
+      g,
+      b,
+    };
+  };
+
   // Apply color palette to card if available
   const cardStyle = colorPalette
     ? {
@@ -376,30 +402,21 @@ export function Weather({ colorPalette }: WeatherProps) {
                                   day.temperature.min != null
                               )
                               .map((day) => {
-                                const max = Number(day.temperature.max) || 0;
-                                const min = Number(day.temperature.min) || 0;
-                                const avg = (max + min) / 2;
-                                // Calculate color gradient: yellow (warm) to blue (cold)
-                                // Assuming range from -20°C (blue) to 40°C (yellow)
-                                const tempRange = 60; // 40 - (-20)
-                                const normalizedTemp = (avg - -20) / tempRange; // 0 to 1
-                                const clampedTemp = Math.max(0, Math.min(1, normalizedTemp));
-
-                                // Interpolate between yellow (255, 255, 0) and blue (0, 0, 255)
-                                const r = Math.round(255 * (1 - clampedTemp));
-                                const g = Math.round(255 * (1 - clampedTemp));
-                                const b = Math.round(255 * clampedTemp);
+                                const gradient = calculateTemperatureGradient(
+                                  day.temperature.min,
+                                  day.temperature.max
+                                );
 
                                 return {
                                   date: formatDate(day.date),
                                   dateKey: day.date,
-                                  tempMax: max,
-                                  tempMin: min,
-                                  tempRange: max - min,
-                                  tempAvg: avg,
-                                  tempR: r,
-                                  tempG: g,
-                                  tempB: b,
+                                  tempMax: gradient.max,
+                                  tempMin: gradient.min,
+                                  tempRange: gradient.tempRange,
+                                  tempAvg: gradient.avg,
+                                  tempR: gradient.r,
+                                  tempG: gradient.g,
+                                  tempB: gradient.b,
                                   icon: day.icon,
                                   description: day.description,
                                 };
@@ -415,15 +432,10 @@ export function Weather({ colorPalette }: WeatherProps) {
                                     day.temperature.min != null
                                 )
                                 .map((day, index) => {
-                                  const max = Number(day.temperature.max) || 0;
-                                  const min = Number(day.temperature.min) || 0;
-                                  const avg = (max + min) / 2;
-                                  const tempRange = 60;
-                                  const normalizedTemp = (avg - -20) / tempRange;
-                                  const clampedTemp = Math.max(0, Math.min(1, normalizedTemp));
-                                  const r = Math.round(255 * (1 - clampedTemp));
-                                  const g = Math.round(255 * (1 - clampedTemp));
-                                  const b = Math.round(255 * clampedTemp);
+                                  const gradient = calculateTemperatureGradient(
+                                    day.temperature.min,
+                                    day.temperature.max
+                                  );
                                   return (
                                     <linearGradient
                                       key={`tempGradient-${index}`}
@@ -435,15 +447,15 @@ export function Weather({ colorPalette }: WeatherProps) {
                                     >
                                       <stop
                                         offset="0%"
-                                        stopColor={`rgb(${r}, ${g}, ${b})`}
+                                        stopColor={`rgb(${gradient.r}, ${gradient.g}, ${gradient.b})`}
                                         stopOpacity={1}
                                       />
                                       <stop
                                         offset="100%"
-                                        stopColor={`rgb(${Math.max(0, r - 40)}, ${Math.max(
+                                        stopColor={`rgb(${Math.max(0, gradient.r - 40)}, ${Math.max(
                                           0,
-                                          g - 40
-                                        )}, ${Math.min(255, b + 40)})`}
+                                          gradient.g - 40
+                                        )}, ${Math.min(255, gradient.b + 40)})`}
                                         stopOpacity={1}
                                       />
                                     </linearGradient>

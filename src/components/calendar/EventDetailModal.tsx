@@ -10,7 +10,7 @@ import {
 import { CalendarEvent } from '@/components/HQCalendar';
 import { formatEventTime, isAllDayEvent } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
-import { Calendar, Clock, MapPin, User, Link as LinkIcon, Bell, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X, Plus } from 'lucide-react';
+import { MapPin, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -242,6 +242,7 @@ export function EventDetailModal({
     }
   }, [showPersonSelector, people]);
 
+
   // Get available people (not already linked), filtered and sorted
   const availablePeople = React.useMemo(() => {
     const linkedIds = new Set(linkedPeople.map((p) => p.id));
@@ -431,7 +432,7 @@ export function EventDetailModal({
           style={{ backgroundColor: event.color || '#4285f4' }}
         />
         
-        <div className="p-8">
+        <div className="px-6 py-8 pb-16 relative">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
               {/* Person avatars - to the left of the title, overlapping */}
@@ -463,9 +464,6 @@ export function EventDetailModal({
           <div className="space-y-6">
             {/* Date & Time */}
             <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-              </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-sm font-medium text-muted-foreground">
@@ -513,7 +511,7 @@ export function EventDetailModal({
                           className="h-10 px-3 py-2 bg-background border rounded-md text-sm font-medium cursor-pointer hover:bg-accent transition-colors"
                           style={{ minWidth: '140px' }}
                         />
-                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
+                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
                           Start date
                         </div>
                       </div>
@@ -521,28 +519,16 @@ export function EventDetailModal({
                       {!isAllDayEdit && (
                         <>
                           {/* Start Time */}
-                          <div 
-                            className="relative"
-                            onClick={(e) => {
-                              console.log('[EventDetailModal] Start time wrapper clicked', {
-                                target: e.target,
-                                currentTarget: e.currentTarget,
-                              });
-                            }}
-                            onMouseDown={(e) => {
-                              console.log('[EventDetailModal] Start time wrapper mouseDown');
-                            }}
-                          >
+                          <div className="relative">
                             <TimePicker
                               value={startTime}
                               onChange={(newValue) => {
-                                console.log('[EventDetailModal] Start time changed:', newValue);
                                 setStartTime(newValue);
                               }}
                               timeFormat={timeFormat}
                               className="h-10"
                             />
-                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
+                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
                               Start time
                             </div>
                           </div>
@@ -551,28 +537,16 @@ export function EventDetailModal({
                           <span className="text-sm text-muted-foreground px-2">to</span>
 
                           {/* End Time */}
-                          <div 
-                            className="relative"
-                            onClick={(e) => {
-                              console.log('[EventDetailModal] End time wrapper clicked', {
-                                target: e.target,
-                                currentTarget: e.currentTarget,
-                              });
-                            }}
-                            onMouseDown={(e) => {
-                              console.log('[EventDetailModal] End time wrapper mouseDown');
-                            }}
-                          >
+                          <div className="relative">
                             <TimePicker
                               value={endTime}
                               onChange={(newValue) => {
-                                console.log('[EventDetailModal] End time changed:', newValue);
                                 setEndTime(newValue);
                               }}
                               timeFormat={timeFormat}
                               className="h-10"
                             />
-                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
+                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
                               End time
                             </div>
                           </div>
@@ -595,7 +569,7 @@ export function EventDetailModal({
                           className="h-10 px-3 py-2 bg-background border rounded-md text-sm font-medium cursor-pointer hover:bg-accent transition-colors"
                           style={{ minWidth: '140px' }}
                         />
-                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
+                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
                           End date
                         </div>
                       </div>
@@ -647,55 +621,10 @@ export function EventDetailModal({
             {/* Calendar */}
             {event.calendar && (
               <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Calendar
+                  <div className="inline-flex items-center px-2.5 py-1 rounded-full" style={{ backgroundColor: event.color || '#4285f4' }}>
+                    <span className="text-xs font-medium text-white">{event.calendar}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: event.color || '#4285f4' }}
-                    />
-                    <span className="text-base">{event.calendar}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Location */}
-            {event.location && String(event.location).trim() !== '' && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Location
-                  </div>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
-                  >
-                    <span>{event.location}</span>
-                    <svg
-                      className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
-                  </a>
                 </div>
               </div>
             )}
@@ -703,9 +632,6 @@ export function EventDetailModal({
             {/* Description */}
             {event.description && event.description.trim() && (
               <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <div className="w-5 h-5" />
-                </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-muted-foreground mb-2">
                     Description
@@ -731,122 +657,145 @@ export function EventDetailModal({
               </div>
             )}
 
-            {/* People */}
+            {/* People and Location */}
             <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Users className="h-5 w-5 text-muted-foreground" />
-              </div>
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    People
-                  </div>
-                  {availablePeople.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowPersonSelector(!showPersonSelector)}
-                      className="h-7 px-2"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                  )}
-                </div>
-                
-                {isLoadingLinkedPeople ? (
-                  <div className="text-sm text-muted-foreground">Loading...</div>
-                ) : linkedPeople.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {linkedPeople.map((person) => (
-                      <div
-                        key={person.id}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
-                      >
-                        <PersonAvatar
-                          person={person}
-                          size="sm"
-                          onClick={() => onPersonClick?.(person)}
-                        />
-                        <span className="text-sm">{person.name}</span>
-                        <button
-                          onClick={() => handleRemovePerson(person.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
-                          title="Remove person"
-                        >
-                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                        </button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* People Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-muted-foreground">
+                        People
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No people linked</div>
-                )}
-
-                {/* Person selector dropdown */}
-                {showPersonSelector && (
-                  <div className="mt-2 border rounded-md bg-background shadow-lg">
-                    {/* Search bar */}
-                    <div className="p-2 border-b">
-                      <Input
-                        placeholder="Search people..."
-                        value={personSearchQuery}
-                        onChange={(e) => setPersonSearchQuery(e.target.value)}
-                        className="h-8 text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    {/* People list */}
-                    <div className="max-h-48 overflow-y-auto">
-                      {availablePeople.length > 0 ? (
-                        availablePeople.map((person) => (
-                          <button
-                            key={person.id}
-                            onClick={() => handleAddPerson(person.id)}
-                            disabled={isAddingPerson}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
-                          >
-                            <PersonAvatar person={person} size="sm" onClick={undefined} />
-                            <span className="text-sm">{person.name}</span>
-                            {peopleWithRecentDates.has(person.id) && (
-                              <span className="text-xs text-muted-foreground ml-auto">
-                                {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
-                              </span>
-                            )}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="p-4 text-sm text-muted-foreground text-center">
-                          {personSearchQuery.trim() ? 'No people found' : 'No people available'}
-                        </div>
+                      {availablePeople.length > 0 && linkedPeople.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPersonSelector(!showPersonSelector)}
+                          className="h-7 px-2"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                    
+                    {isLoadingLinkedPeople ? (
+                      <div className="text-sm text-muted-foreground">Loading...</div>
+                    ) : linkedPeople.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {linkedPeople.map((person) => (
+                          <div
+                            key={person.id}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
+                          >
+                            <PersonAvatar
+                              person={person}
+                              size="sm"
+                              onClick={() => onPersonClick?.(person)}
+                            />
+                            <span className="text-sm">{person.name}</span>
+                            <button
+                              onClick={() => handleRemovePerson(person.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
+                              title="Remove person"
+                            >
+                              <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      availablePeople.length > 0 ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPersonSelector(!showPersonSelector)}
+                          className="h-7 px-2"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add people
+                        </Button>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">No people available</div>
+                      )
+                    )}
 
-            {/* Organizer */}
-            {event.organizer && (event.organizer.email || event.organizer.displayName) && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Organizer
-                  </div>
-                  <div className="text-base">
-                    {event.organizer.displayName || event.organizer.email}
-                    {event.organizer.email && event.organizer.displayName && (
-                      <span className="text-sm text-muted-foreground ml-2">
-                        ({event.organizer.email})
-                      </span>
+                    {/* Person selector dropdown */}
+                    {showPersonSelector && (
+                      <div className="mt-2 border rounded-md bg-background shadow-lg">
+                        {/* Search bar */}
+                        <div className="p-2 border-b">
+                          <Input
+                            placeholder="Search people..."
+                            value={personSearchQuery}
+                            onChange={(e) => setPersonSearchQuery(e.target.value)}
+                            className="h-8 text-sm"
+                            autoFocus
+                          />
+                        </div>
+                        {/* People list */}
+                        <div className="max-h-48 overflow-y-auto">
+                          {availablePeople.length > 0 ? (
+                            availablePeople.map((person) => (
+                              <button
+                                key={person.id}
+                                onClick={() => handleAddPerson(person.id)}
+                                disabled={isAddingPerson}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
+                              >
+                                <PersonAvatar person={person} size="sm" onClick={undefined} />
+                                <span className="text-sm">{person.name}</span>
+                                {peopleWithRecentDates.has(person.id) && (
+                                  <span className="text-xs text-muted-foreground ml-auto">
+                                    {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              {personSearchQuery.trim() ? 'No people found' : 'No people available'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
+
+                  {/* Location Section */}
+                  {event.location && String(event.location).trim() !== '' && (
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2">
+                        Location
+                      </div>
+                      <a
+                        href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(event.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        <span className="truncate">{event.location}</span>
+                        <svg
+                          className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                          />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Attendees */}
             {event.attendees && event.attendees.length > 0 && (
@@ -882,40 +831,6 @@ export function EventDetailModal({
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Reminders */}
-            {event.reminders && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <Bell className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Reminders
-                  </div>
-                  {event.reminders.useDefault ? (
-                    <div className="text-base">Using default reminders</div>
-                  ) : event.reminders.overrides && event.reminders.overrides.length > 0 ? (
-                    <div className="space-y-1">
-                      {event.reminders.overrides.map((reminder: any, idx: number) => (
-                        <div key={idx} className="text-base">
-                          {reminder.method === 'email' && '📧 '}
-                          {reminder.method === 'popup' && '🔔 '}
-                          {reminder.minutes !== undefined && (
-                            reminder.minutes === 0 ? 'At time of event' :
-                            reminder.minutes < 60 ? `${reminder.minutes} minutes before` :
-                            reminder.minutes < 1440 ? `${Math.floor(reminder.minutes / 60)} hours before` :
-                            `${Math.floor(reminder.minutes / 1440)} days before`
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-base text-muted-foreground">No reminders</div>
-                  )}
                 </div>
               </div>
             )}
@@ -1035,29 +950,27 @@ export function EventDetailModal({
               </div>
             )}
 
-            {/* Link to Google Calendar */}
-            {event.htmlLink && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <LinkIcon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    View in Google Calendar
-                  </div>
-                  <a
-                    href={event.htmlLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-base text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    Open event
-                  </a>
-                </div>
-              </div>
-            )}
           </div>
         </div>
+        
+        {/* Open event button in bottom left */}
+        {event.htmlLink && (
+          <div className="absolute bottom-4 left-4">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+            >
+              <a
+                href={event.htmlLink}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open event
+              </a>
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -27,6 +27,13 @@ export function TimePicker({
   disabled = false,
   className,
 }: TimePickerProps) {
+  console.log('[TimePicker] RENDER - Component rendering with props:', {
+    value,
+    timeFormat,
+    disabled,
+    className,
+  });
+
   const [isOpen, setIsOpen] = React.useState(false);
   const [hours, setHours] = React.useState(0);
   const [minutes, setMinutes] = React.useState(0);
@@ -40,6 +47,9 @@ export function TimePicker({
       disabled,
       timeFormat,
     });
+    return () => {
+      console.log('[TimePicker] Component unmounting');
+    };
   }, [value, isOpen, disabled, timeFormat]);
 
   React.useEffect(() => {
@@ -133,6 +143,9 @@ export function TimePicker({
       isOpen,
       disabled,
       buttonRect: e.currentTarget.getBoundingClientRect(),
+      eventType: e.type,
+      bubbles: e.bubbles,
+      cancelable: e.cancelable,
     });
     e.stopPropagation();
   };
@@ -157,26 +170,39 @@ export function TimePicker({
     }
   };
 
+  console.log('[TimePicker] About to render Popover, isOpen:', isOpen);
+
   return (
-    <Popover open={isOpen} onOpenChange={handlePopoverOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          type="button"
-          className={cn(
-            'px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors justify-start text-left font-normal',
-            !value && 'text-muted-foreground',
-            className
-          )}
-          disabled={disabled}
-          style={{ width: timeFormat === '12h' ? '85px' : '70px', fontSize: '11px', minHeight: '2.5rem' }}
-          onClick={handleButtonClick}
-          onMouseDown={handleButtonMouseDown}
-          onMouseUp={handleButtonMouseUp}
-        >
-          {displayValue || '00:00'}
-        </Button>
-      </PopoverTrigger>
+    <div 
+      onClick={(e) => {
+        console.log('[TimePicker] Outer div clicked', e.target);
+      }}
+      onMouseDown={(e) => {
+        console.log('[TimePicker] Outer div mouseDown', e.target);
+      }}
+    >
+      <Popover open={isOpen} onOpenChange={handlePopoverOpenChange}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            type="button"
+            className={cn(
+              'px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors justify-start text-left font-normal',
+              !value && 'text-muted-foreground',
+              className
+            )}
+            disabled={disabled}
+            style={{ width: timeFormat === '12h' ? '85px' : '70px', fontSize: '11px', minHeight: '2.5rem' }}
+            onClick={handleButtonClick}
+            onMouseDown={handleButtonMouseDown}
+            onMouseUp={handleButtonMouseUp}
+            onFocus={(e) => {
+              console.log('[TimePicker] Button focused', e.target);
+            }}
+          >
+            {displayValue || '00:00'}
+          </Button>
+        </PopoverTrigger>
       <PopoverContent 
         className="w-auto p-3 z-[10002]" 
         align="start"
@@ -255,6 +281,7 @@ export function TimePicker({
         </div>
       </PopoverContent>
     </Popover>
+    </div>
   );
 }
 
