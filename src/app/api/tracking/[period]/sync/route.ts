@@ -65,13 +65,15 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ period: string }> }
 ) {
+  let period: string | undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { period } = await params;
+    const resolvedParams = await params;
+    period = resolvedParams.period;
     
     if (!['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(period)) {
       return NextResponse.json(
@@ -300,11 +302,11 @@ export async function POST(
       last_sync: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error(`Error syncing ${period} tracking DB:`, error);
+    console.error(`Error syncing ${period || 'unknown'} tracking DB:`, error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || `Failed to sync ${period} entries`,
+        error: error.message || `Failed to sync ${period || 'unknown'} entries`,
       },
       { status: 500 }
     );

@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { TrackingCalendarView } from '@/components/TrackingCalendarView';
 import { TrackingWeeklyView } from '@/components/TrackingWeeklyView';
 import { TrackingMonthlyView } from '@/components/TrackingMonthlyView';
+import { TrackingQuarterlyView } from '@/components/TrackingQuarterlyView';
+import { TrackingYearlyView } from '@/components/TrackingYearlyView';
 import { TrackingEntryDetailModal } from '@/components/TrackingEntryDetailModal';
 import { HealthMetricsTrends } from '@/components/HealthMetricsTrends';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -241,11 +243,11 @@ export function TrackingView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentYear, setCurrentYear] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>(() => {
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'>(() => {
     if (typeof window !== 'undefined') {
       const saved = getCookie('tracking-view-mode');
-      if (saved && ['daily', 'weekly', 'monthly'].includes(saved)) {
-        return saved as 'daily' | 'weekly' | 'monthly';
+      if (saved && ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(saved)) {
+        return saved as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
       }
     }
     return 'daily';
@@ -423,7 +425,7 @@ export function TrackingView() {
 
         {/* View Tabs */}
         <Tabs value={viewMode} onValueChange={(value) => {
-          const newMode = value as 'daily' | 'weekly' | 'monthly';
+          const newMode = value as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
           setViewMode(newMode);
           setCookie('tracking-view-mode', newMode);
         }}>
@@ -431,6 +433,8 @@ export function TrackingView() {
             <TabsTrigger value="daily">Daily View</TabsTrigger>
             <TabsTrigger value="weekly">Weekly View</TabsTrigger>
             <TabsTrigger value="monthly">Monthly View</TabsTrigger>
+            <TabsTrigger value="quarterly">Quarterly View</TabsTrigger>
+            <TabsTrigger value="yearly">Yearly View</TabsTrigger>
           </TabsList>
           
           <TabsContent value="daily" className="mt-0">
@@ -452,6 +456,22 @@ export function TrackingView() {
           
           <TabsContent value="monthly" className="mt-0">
             <TrackingMonthlyView
+              entries={entries}
+              currentYear={currentYear}
+              onNavigate={handleNavigateYear}
+            />
+          </TabsContent>
+          
+          <TabsContent value="quarterly" className="mt-0">
+            <TrackingQuarterlyView
+              entries={entries}
+              currentYear={currentYear}
+              onNavigate={handleNavigateYear}
+            />
+          </TabsContent>
+          
+          <TabsContent value="yearly" className="mt-0">
+            <TrackingYearlyView
               entries={entries}
               currentYear={currentYear}
               onNavigate={handleNavigateYear}

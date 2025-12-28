@@ -23,13 +23,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ period: string }> }
 ) {
+  let period: string | undefined;
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { period } = await params;
+    const resolvedParams = await params;
+    period = resolvedParams.period;
     
     if (!['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(period)) {
       return NextResponse.json(
@@ -59,7 +61,7 @@ export async function GET(
       entries: entries || [],
     });
   } catch (error: any) {
-    console.error(`Error fetching ${period} entries:`, error);
+    console.error(`Error fetching ${period || 'unknown'} entries:`, error);
     return NextResponse.json(
       { error: 'Failed to fetch entries' },
       { status: 500 }

@@ -16,8 +16,8 @@ interface TrackingEntryDetailModalProps {
 }
 
 // Helper to extract value from property
-function extractPropertyValue(prop: { type: string; value: any }): any {
-  if (!prop || prop.value === null || prop.value === undefined) return null;
+function extractPropertyValue(prop: { type: string; value: any } | undefined | Record<string, never>): any {
+  if (!prop || typeof prop !== 'object' || !('type' in prop) || !('value' in prop) || prop.value === null || prop.value === undefined) return null;
   
   const { value } = prop;
   
@@ -129,10 +129,9 @@ export function TrackingEntryDetailModal({
   entry,
   allEntries = [],
 }: TrackingEntryDetailModalProps) {
-  if (!entry) return null;
-
   // Extract sleep-related data
   const sleepData = useMemo(() => {
+    if (!entry) return null;
     if (!entry.properties) return null;
 
     const props = entry.properties;
@@ -212,18 +211,16 @@ export function TrackingEntryDetailModal({
     };
   }, [entry]);
 
-  if (!sleepData) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-lg">
-          <div className="py-12 text-center">
-            <Bed className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground">No sleep data available for this entry</p>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  // Get entry date for sorting
+  const entryDate = useMemo(() => {
+    if (!entry || !entry.properties) return null;
+    const dateProp = entry.properties['Date'] || entry.properties['date'];
+    if (!dateProp) return null;
+    const dateValue = extractPropertyValue(dateProp);
+    if (typeof dateValue === 'string') return dateValue;
+    if (dateValue?.start) return dateValue.start;
+    return null;
+  }, [entry]);
 
   // Prepare sleep stages data
   const sleepStages = useMemo(() => {
@@ -264,20 +261,9 @@ export function TrackingEntryDetailModal({
     return stages;
   }, [sleepData]);
 
-  // Get entry date for sorting
-  const entryDate = useMemo(() => {
-    if (!entry.properties) return null;
-    const dateProp = entry.properties['Date'] || entry.properties['date'];
-    if (!dateProp) return null;
-    const dateValue = extractPropertyValue(dateProp);
-    if (typeof dateValue === 'string') return dateValue;
-    if (dateValue?.start) return dateValue.start;
-    return null;
-  }, [entry]);
-
   // Prepare RHR trend data (14 before, current, 14 after)
   const rhrTrendData = useMemo(() => {
-    if (!sleepData.rhr || allEntries.length === 0) return null;
+    if (!entry || !sleepData?.rhr || allEntries.length === 0) return null;
 
     // Sort all entries by date
     const sortedEntries = [...allEntries].sort((a, b) => {
@@ -368,6 +354,7 @@ export function TrackingEntryDetailModal({
 
   // Prepare Weight trend data (same logic as RHR)
   const weightTrendData = useMemo(() => {
+    if (!entry) return null;
     const weight = extractPropertyValue(entry.properties?.['Weight [kg]'] || entry.properties?.['Weight'] || {});
     if (weight === null || allEntries.length === 0) return null;
 
@@ -451,6 +438,7 @@ export function TrackingEntryDetailModal({
 
   // Prepare Steps trend data (same logic as RHR)
   const stepsTrendData = useMemo(() => {
+    if (!entry) return null;
     const steps = extractPropertyValue(entry.properties?.['Steps'] || {});
     if (steps === null || allEntries.length === 0) return null;
 
@@ -534,7 +522,7 @@ export function TrackingEntryDetailModal({
 
   // Get current entry index for determining future vs past
   const currentEntryIndex = useMemo(() => {
-    if (allEntries.length === 0) return -1;
+    if (!entry || allEntries.length === 0) return -1;
     const sortedEntries = [...allEntries].sort((a, b) => {
       const getDate = (e: TrackingEntry) => {
         const dateProp = e.properties?.['Date'] || e.properties?.['date'];
@@ -549,6 +537,20 @@ export function TrackingEntryDetailModal({
     });
     return sortedEntries.findIndex(e => e.id === entry.id);
   }, [entry, allEntries]);
+
+  if (!entry) return null;
+  if (!sleepData) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-lg">
+          <div className="py-12 text-center">
+            <Bed className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">No sleep data available for this entry</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

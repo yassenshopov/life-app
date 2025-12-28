@@ -16,8 +16,8 @@ interface TrackingMonthlyViewProps {
 }
 
 // Helper to extract property value
-function extractPropertyValue(prop: { type: string; value: any } | undefined): any {
-  if (!prop || prop.value === null || prop.value === undefined) return null;
+function extractPropertyValue(prop: { type: string; value: any } | undefined | Record<string, never>): any {
+  if (!prop || typeof prop !== 'object' || !('type' in prop) || !('value' in prop) || prop.value === null || prop.value === undefined) return null;
   
   const { value } = prop;
   

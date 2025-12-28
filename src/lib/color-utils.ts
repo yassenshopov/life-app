@@ -116,3 +116,22 @@ export function getTextColorClass(backgroundColor: string | undefined | null): s
   }
 }
 
+/**
+ * Get a high-contrast text color (hex value) for a given background color
+ * Ensures WCAG AA compliance (4.5:1 contrast ratio)
+ * @param backgroundColor - Hex color string (can be undefined/null)
+ * @returns Hex color string for text ('#000000' for dark text, '#ffffff' for light text)
+ */
+export function getContrastTextColorHex(backgroundColor: string | undefined | null): string {
+  const bgColor = normalizeHexColor(backgroundColor);
+  const contrastType = getContrastTextColor(bgColor);
+  
+  // Use pure black/white for maximum contrast
+  // These provide the best readability and ensure WCAG AA compliance
+  if (contrastType === 'dark') {
+    return '#000000'; // Black text for light backgrounds
+  } else {
+    return '#ffffff'; // White text for dark backgrounds
+  }
+}
+
