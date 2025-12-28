@@ -5,6 +5,7 @@ import { Calendar, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, isToday, isSameDay } from 'date-fns';
 import { CalendarEvent } from '@/components/HQCalendar';
+import { colorToRgba } from '@/lib/color-utils';
 
 interface HQTodayAgendaProps {
   colorPalette?: { primary: string; secondary: string; accent: string } | null;
@@ -74,8 +75,8 @@ export function HQTodayAgenda({ colorPalette }: HQTodayAgendaProps) {
   // Apply color palette to card if available
   const cardStyle = colorPalette
     ? {
-        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
-        borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+        backgroundColor: colorToRgba(colorPalette.primary, 0.1),
+        borderColor: colorToRgba(colorPalette.accent, 0.3),
       }
     : undefined;
 

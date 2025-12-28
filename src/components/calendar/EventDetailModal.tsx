@@ -513,7 +513,7 @@ export function EventDetailModal({
                           className="h-10 px-3 py-2 bg-background border rounded-md text-sm font-medium cursor-pointer hover:bg-accent transition-colors"
                           style={{ minWidth: '140px' }}
                         />
-                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
+                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
                           Start date
                         </div>
                       </div>
@@ -521,14 +521,28 @@ export function EventDetailModal({
                       {!isAllDayEdit && (
                         <>
                           {/* Start Time */}
-                          <div className="relative">
+                          <div 
+                            className="relative"
+                            onClick={(e) => {
+                              console.log('[EventDetailModal] Start time wrapper clicked', {
+                                target: e.target,
+                                currentTarget: e.currentTarget,
+                              });
+                            }}
+                            onMouseDown={(e) => {
+                              console.log('[EventDetailModal] Start time wrapper mouseDown');
+                            }}
+                          >
                             <TimePicker
                               value={startTime}
-                              onChange={setStartTime}
+                              onChange={(newValue) => {
+                                console.log('[EventDetailModal] Start time changed:', newValue);
+                                setStartTime(newValue);
+                              }}
                               timeFormat={timeFormat}
                               className="h-10"
                             />
-                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
+                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
                               Start time
                             </div>
                           </div>
@@ -537,14 +551,28 @@ export function EventDetailModal({
                           <span className="text-sm text-muted-foreground px-2">to</span>
 
                           {/* End Time */}
-                          <div className="relative">
+                          <div 
+                            className="relative"
+                            onClick={(e) => {
+                              console.log('[EventDetailModal] End time wrapper clicked', {
+                                target: e.target,
+                                currentTarget: e.currentTarget,
+                              });
+                            }}
+                            onMouseDown={(e) => {
+                              console.log('[EventDetailModal] End time wrapper mouseDown');
+                            }}
+                          >
                             <TimePicker
                               value={endTime}
-                              onChange={setEndTime}
+                              onChange={(newValue) => {
+                                console.log('[EventDetailModal] End time changed:', newValue);
+                                setEndTime(newValue);
+                              }}
                               timeFormat={timeFormat}
                               className="h-10"
                             />
-                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
+                            <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
                               End time
                             </div>
                           </div>
@@ -567,7 +595,7 @@ export function EventDetailModal({
                           className="h-10 px-3 py-2 bg-background border rounded-md text-sm font-medium cursor-pointer hover:bg-accent transition-colors"
                           style={{ minWidth: '140px' }}
                         />
-                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground">
+                        <div className="absolute -top-2 left-2 px-1 bg-background text-[10px] text-muted-foreground pointer-events-none">
                           End date
                         </div>
                       </div>

@@ -80,7 +80,9 @@ export default function HQPage() {
     if (imageUrl) {
       getColorPalette(imageUrl)
         .then((palette) => {
-          console.log('Color palette extracted:', palette);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Color palette extracted:', palette);
+          }
           setColorPalette(palette);
         })
         .catch((error) => {

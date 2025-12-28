@@ -284,12 +284,8 @@ export function HealthMetricsTrends({
     const validEntries = entries.filter((entry) => {
       const dateStr = extractEntryDate(entry);
       if (!dateStr) return false;
-      try {
-        new Date(dateStr); // Validate date
-        return true;
-      } catch {
-        return false;
-      }
+      const d = new Date(dateStr);
+      return !isNaN(d.getTime());
     });
 
     if (validEntries.length === 0) return [];

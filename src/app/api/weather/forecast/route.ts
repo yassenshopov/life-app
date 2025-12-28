@@ -18,7 +18,7 @@ interface ForecastDay {
   description: string;
   icon: string;
   precipitation: number;
-  windSpeed: number;
+  windSpeedKmh: number; // Wind speed in km/h
 }
 
 export async function GET(request: NextRequest) {
@@ -95,7 +95,8 @@ export async function GET(request: NextRequest) {
         const temps = items.map((item: any) => item.main.temp);
         const descriptions = items.map((item: any) => item.weather[0].description);
         const icons = items.map((item: any) => item.weather[0].icon);
-        const precipitations = items.map((item: any) => item.main.humidity); // Using humidity as precipitation percentage
+        // pop is probability of precipitation (0-1) from OpenWeather API
+        const precipitationProbabilities = items.map((item: any) => (item.pop ?? 0) * 100);
         const windSpeeds = items.map((item: any) => item.wind.speed);
 
         // Get most common description and icon (use midday item if available)
@@ -112,8 +113,8 @@ export async function GET(request: NextRequest) {
           },
           description: middayItem.weather[0].description,
           icon: middayItem.weather[0].icon,
-          precipitation: Math.round(precipitations.reduce((a: number, b: number) => a + b, 0) / precipitations.length),
-          windSpeed: Math.round(windSpeeds.reduce((a: number, b: number) => a + b, 0) / windSpeeds.length * 3.6),
+          precipitation: Math.round(precipitationProbabilities.reduce((a: number, b: number) => a + b, 0) / precipitationProbabilities.length),
+          windSpeedKmh: Math.round(windSpeeds.reduce((a: number, b: number) => a + b, 0) / windSpeeds.length * 3.6), // Convert m/s to km/h
         };
       });
 

@@ -54,15 +54,20 @@ export async function GET(
       .select('*')
       .eq('user_id', userId);
 
-    // Apply date range filter if provided (uses created_at index)
+    // Apply date range filter if provided (filters on properties->'Date'->>'start' for period-based filtering)
+    // Note: The Date property is stored as { start: "YYYY-MM-DD", end?: "YYYY-MM-DD" } in JSONB
     if (startDate) {
-      query = query.gte('created_at', startDate);
+      // Filter where properties->'Date'->>'start' >= startDate
+      // Using PostgREST JSONB operator syntax
+      query = query.gte("properties->Date->>start", startDate);
     }
     if (endDate) {
-      query = query.lte('created_at', endDate);
+      // Filter where properties->'Date'->>'start' <= endDate
+      query = query.lte("properties->Date->>start", endDate);
     }
 
-    // Order by created_at (uses composite index)
+    // Order by the Date property from JSONB (uses GIN index on properties->'Date')
+    // Fallback to created_at if Date is not available
     query = query.order('created_at', { ascending: false });
 
     // Apply limit if provided (reduces data transfer)

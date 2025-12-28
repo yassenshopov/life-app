@@ -32,6 +32,20 @@ export function TimePicker({
   const [minutes, setMinutes] = React.useState(0);
   const [period, setPeriod] = React.useState<'AM' | 'PM'>('AM');
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log('[TimePicker] Component mounted/updated', {
+      value,
+      isOpen,
+      disabled,
+      timeFormat,
+    });
+  }, [value, isOpen, disabled, timeFormat]);
+
+  React.useEffect(() => {
+    console.log('[TimePicker] Popover state changed:', isOpen);
+  }, [isOpen]);
+
   // Parse value on mount and when value changes
   React.useEffect(() => {
     if (value) {
@@ -107,23 +121,67 @@ export function TimePicker({
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
   }, [value, timeFormat]);
 
+  const handlePopoverOpenChange = (open: boolean) => {
+    console.log('[TimePicker] handlePopoverOpenChange called:', open);
+    setIsOpen(open);
+  };
+
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    console.log('[TimePicker] Button clicked!', {
+      currentTarget: e.currentTarget,
+      target: e.target,
+      isOpen,
+      disabled,
+      buttonRect: e.currentTarget.getBoundingClientRect(),
+    });
+    e.stopPropagation();
+  };
+
+  const handleButtonMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    console.log('[TimePicker] Button mouseDown');
+  };
+
+  const handleButtonMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
+    console.log('[TimePicker] Button mouseUp');
+  };
+
+  const handleInteractOutside = (e: Event) => {
+    const target = e.target as HTMLElement;
+    console.log('[TimePicker] onInteractOutside', {
+      target,
+      isDialog: !!target.closest('[role="dialog"]'),
+    });
+    // Prevent closing when clicking inside the dialog
+    if (target.closest('[role="dialog"]')) {
+      e.preventDefault();
+    }
+  };
+
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handlePopoverOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          type="button"
           className={cn(
-            'h-7 px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors justify-start text-left font-normal',
+            'px-1.5 py-0.5 bg-background border rounded text-[11px] font-medium cursor-pointer hover:bg-accent transition-colors justify-start text-left font-normal',
             !value && 'text-muted-foreground',
             className
           )}
           disabled={disabled}
-          style={{ width: timeFormat === '12h' ? '85px' : '70px', fontSize: '11px' }}
+          style={{ width: timeFormat === '12h' ? '85px' : '70px', fontSize: '11px', minHeight: '2.5rem' }}
+          onClick={handleButtonClick}
+          onMouseDown={handleButtonMouseDown}
+          onMouseUp={handleButtonMouseUp}
         >
           {displayValue || '00:00'}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-3" align="start">
+      <PopoverContent 
+        className="w-auto p-3 z-[10002]" 
+        align="start"
+        onInteractOutside={handleInteractOutside}
+      >
         <div className="flex items-center gap-2">
           {/* Hours */}
           <div className="flex flex-col items-center">

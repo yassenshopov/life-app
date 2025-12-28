@@ -27,7 +27,7 @@ interface ForecastDay {
   description: string;
   icon: string;
   precipitation?: number;
-  windSpeed?: number;
+  windSpeedKmh?: number; // Wind speed in km/h
 }
 
 export function HQWeekAgenda({ colorPalette }: HQWeekAgendaProps) {
@@ -249,7 +249,7 @@ export function HQWeekAgenda({ colorPalette }: HQWeekAgendaProps) {
                           {dayForecast.temperature.max}°/{dayForecast.temperature.min}°
                         </span>
                         <span className="opacity-70">💧 {dayForecast.precipitation}%</span>
-                        <span className="opacity-70">💨 {dayForecast.windSpeed}</span>
+                        <span className="opacity-70">💨 {dayForecast.windSpeedKmh} km/h</span>
                       </div>
                     )}
                   </div>

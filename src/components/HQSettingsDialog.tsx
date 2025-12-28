@@ -123,15 +123,18 @@ export function HQSettingsDialog({
     }
     setLocalPreferences(preferences);
     hasChangesRef.current = false;
-  }, [preferences, onPreferencesChange]);
+    // Close the dialog after reverting changes
+    if (onClose) {
+      onClose();
+    }
+  }, [preferences, onPreferencesChange, onClose]);
 
   const handleOpenChange = React.useCallback((open: boolean) => {
     if (!open) {
       // Dialog is closing - revert changes and close
       handleCancel();
-      onClose();
     }
-  }, [handleCancel, onClose]);
+  }, [handleCancel]);
 
   // Helper to check if a section is visible
   const isSectionVisible = (sectionId: string): boolean => {
@@ -230,12 +233,17 @@ export function HQSettingsDialog({
                     className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors cursor-pointer"
                     onClick={() => handleToggle(section.id)}
                   >
-                    <Checkbox
-                      id={section.id}
-                      checked={isVisible}
-                      onCheckedChange={() => handleToggle(section.id)}
-                      className="mt-0.5"
-                    />
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center"
+                    >
+                      <Checkbox
+                        id={section.id}
+                        checked={isVisible}
+                        onCheckedChange={() => handleToggle(section.id)}
+                        className="mt-0.5"
+                      />
+                    </div>
                     <div className="flex-1 space-y-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="text-muted-foreground">
@@ -244,6 +252,7 @@ export function HQSettingsDialog({
                         <Label
                           htmlFor={section.id}
                           className="text-sm font-medium leading-none cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {section.label}
                         </Label>

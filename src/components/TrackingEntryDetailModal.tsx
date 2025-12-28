@@ -352,7 +352,7 @@ export function TrackingEntryDetailModal({
       all: chartData,
       currentIndex: currentIdx,
     };
-  }, [entry, allEntries, sleepData.rhr]);
+  }, [entry, allEntries, sleepData?.rhr]);
 
   // Prepare Weight trend data (same logic as RHR)
   const weightTrendData = useMemo(() => {

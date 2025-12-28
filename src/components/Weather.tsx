@@ -54,7 +54,7 @@ interface ForecastDay {
   description: string;
   icon: string;
   precipitation: number;
-  windSpeed: number;
+  windSpeedKmh: number; // Wind speed in km/h
 }
 
 interface WeatherProps {
@@ -531,7 +531,7 @@ export function Weather({ colorPalette }: WeatherProps) {
                               date: formatDate(day.date),
                               dateKey: day.date,
                               precipitation: Number(day.precipitation) || 0,
-                              windSpeed: Number(day.windSpeed) || 0,
+                              windSpeedKmh: Number(day.windSpeedKmh) || 0,
                               icon: day.icon,
                               description: day.description,
                             }))}
@@ -589,7 +589,9 @@ export function Weather({ colorPalette }: WeatherProps) {
                                       {showWindSpeed && (
                                         <div className="text-xs">
                                           <span className="text-muted-foreground">Wind: </span>
-                                          <span className="font-medium">{data.windSpeed} km/h</span>
+                                          <span className="font-medium">
+                                            {data.windSpeedKmh} km/h
+                                          </span>
                                         </div>
                                       )}
                                     </div>
@@ -613,7 +615,7 @@ export function Weather({ colorPalette }: WeatherProps) {
                               <Line
                                 yAxisId="left"
                                 type="monotone"
-                                dataKey="windSpeed"
+                                dataKey="windSpeedKmh"
                                 stroke="#a855f7"
                                 strokeWidth={2}
                                 dot={{ r: 4 }}
@@ -663,7 +665,7 @@ export function Weather({ colorPalette }: WeatherProps) {
                             💧 {day.precipitation}%
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            💨 {day.windSpeed} km/h
+                            💨 {day.windSpeedKmh} km/h
                           </div>
                         </div>
                       </div>

@@ -144,3 +144,41 @@ export function getContrastTextColorHex(backgroundColor: string | undefined | nu
   return bestContrast;
 }
 
+/**
+ * Convert a color string (hex or rgb/rgba) to rgba format with specified opacity
+ * Handles both hex colors (e.g., '#4285f4', '4285f4') and rgb/rgba colors (e.g., 'rgb(66, 133, 244)')
+ * @param color - Color string in hex or rgb/rgba format
+ * @param opacity - Opacity value between 0 and 1
+ * @returns rgba color string (e.g., 'rgba(66, 133, 244, 0.1)')
+ */
+export function colorToRgba(color: string | undefined | null, opacity: number): string {
+  if (!color) {
+    return `rgba(66, 133, 244, ${opacity})`; // Default blue
+  }
+
+  const trimmedColor = color.trim();
+
+  // Handle hex colors (e.g., '#4285f4' or '4285f4')
+  if (trimmedColor.startsWith('#') || /^[0-9A-Fa-f]{3,6}$/.test(trimmedColor.replace('#', ''))) {
+    const hex = normalizeHexColor(trimmedColor).replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
+  // Handle rgb/rgba colors (e.g., 'rgb(66, 133, 244)' or 'rgba(66, 133, 244, 0.5)')
+  const rgbMatch = trimmedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+  if (rgbMatch) {
+    const r = rgbMatch[1];
+    const g = rgbMatch[2];
+    const b = rgbMatch[3];
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
+  // Fallback: try to extract RGB values from any format
+  // If we can't parse it, return a default
+  console.warn(`Unable to parse color format: ${color}. Using default.`);
+  return `rgba(66, 133, 244, ${opacity})`; // Default blue
+}
+
