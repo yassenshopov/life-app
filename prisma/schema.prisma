@@ -27,6 +27,7 @@ model User {
   googleCalendarEvents      google_calendar_events[]
   people                    people[]
   media                     media[]
+  trackingMonthly           tracking_monthly[]
 
   @@map("users")
 }

@@ -86,7 +86,7 @@ export function HQSettingsDialog({
     const newPreferences = {
       ...localPreferences,
       [sectionId]: {
-        visible: !localPreferences[sectionId]?.visible ?? true,
+        visible: !(localPreferences[sectionId]?.visible ?? true),
       },
     };
     setLocalPreferences(newPreferences);

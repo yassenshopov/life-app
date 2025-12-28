@@ -222,9 +222,6 @@ export function TrackingEntryDetailModal({
     return null;
   }, [entry]);
 
-  // Early return checks - moved after all hooks
-  if (!entry) return null;
-
   // Prepare sleep stages data
   const sleepStages = useMemo(() => {
     if (!sleepData) return [];
@@ -542,6 +539,9 @@ export function TrackingEntryDetailModal({
     });
     return sortedEntries.findIndex(e => e.id === entry.id);
   }, [entry, allEntries]);
+
+  // Early return checks - moved after all hooks
+  if (!entry) return null;
 
   // Early return for no sleep data - moved after all hooks
   if (!sleepData) {

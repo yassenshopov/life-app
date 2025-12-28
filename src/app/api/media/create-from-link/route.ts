@@ -52,7 +52,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 async function fetchIMDbData(imdbId: string) {
   const omdbApiKey = process.env.OMDB_API_KEY;
   if (!omdbApiKey) {
-    throw new Error('OMDB_API_KEY not configured');
+    throw new Error('OMDB_API_KEY not configured. Please set the OMDB_API_KEY environment variable.');
   }
 
   const response = await fetchWithTimeout(
@@ -60,10 +60,20 @@ async function fetchIMDbData(imdbId: string) {
     {},
     10000 // 10 second timeout
   );
+  
+  if (!response.ok) {
+    throw new Error(`OMDB API request failed: ${response.status} ${response.statusText}`);
+  }
+  
   const data = await response.json();
 
   if (data.Response === 'False') {
-    throw new Error(data.Error || 'Failed to fetch IMDb data');
+    // Provide more helpful error messages for common API errors
+    const errorMessage = data.Error || 'Failed to fetch IMDb data';
+    if (errorMessage.includes('Invalid API key') || errorMessage.includes('API key')) {
+      throw new Error('Invalid OMDB API key. Please check your OMDB_API_KEY environment variable. You can get a free API key at http://www.omdbapi.com/apikey.aspx');
+    }
+    throw new Error(errorMessage);
   }
 
   // Format title with year in brackets
