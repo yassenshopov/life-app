@@ -61,29 +61,56 @@ export async function PATCH(
 
     const { eventId } = await params;
     const body = await req.json();
-    const { calendarId, startTime, endTime, isAllDay } = body;
+    const { calendarId, startTime, endTime, isAllDay, newCalendarId, location } = body;
 
-    if (!calendarId || !startTime || !endTime) {
+    // If updating calendar, newCalendarId is required
+    if (newCalendarId && !calendarId) {
       return NextResponse.json(
-        { error: 'calendarId, startTime, and endTime are required' },
+        { error: 'calendarId is required when moving to a new calendar' },
         { status: 400 }
       );
     }
 
-    // Validate dates
-    const newStart = new Date(startTime);
-    const newEnd = new Date(endTime);
+    // Validate dates if provided
+    if (startTime && endTime) {
+      const newStart = new Date(startTime);
+      const newEnd = new Date(endTime);
 
-    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+      if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format' },
+          { status: 400 }
+        );
+      }
+
+      if (newStart >= newEnd) {
+        return NextResponse.json(
+          { error: 'Start time must be before end time' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // calendarId is required to fetch the existing event
+    if (!calendarId) {
       return NextResponse.json(
-        { error: 'Invalid date format' },
+        { error: 'calendarId is required' },
         { status: 400 }
       );
     }
 
-    if (newStart >= newEnd) {
+    // At least one field must be provided
+    if (!startTime && !endTime && !newCalendarId && location === undefined) {
       return NextResponse.json(
-        { error: 'Start time must be before end time' },
+        { error: 'At least one field (startTime, endTime, newCalendarId, or location) must be provided' },
+        { status: 400 }
+      );
+    }
+
+    // If updating time, both startTime and endTime are required
+    if ((startTime && !endTime) || (!startTime && endTime)) {
+      return NextResponse.json(
+        { error: 'Both startTime and endTime must be provided together' },
         { status: 400 }
       );
     }
@@ -171,52 +198,202 @@ export async function PATCH(
       });
       existingEvent = eventResponse.data;
     } catch (error: any) {
-      console.error('Error fetching event from Google Calendar:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch event from Google Calendar' },
-        { status: 404 }
-      );
+      // If event is not found (404) or deleted (410) and we're moving calendars, 
+      // try to fetch from Supabase cache as fallback
+      if ((error.code === 404 || error.code === 410) && newCalendarId) {
+        const { data: cachedEvent } = await supabase
+          .from('google_calendar_events')
+          .select('event_data')
+          .eq('user_id', userId)
+          .eq('calendar_id', calendarId)
+          .eq('event_id', eventId)
+          .single();
+        
+        if (cachedEvent?.event_data) {
+          existingEvent = cachedEvent.event_data;
+        } else {
+          console.error('Error fetching event from Google Calendar and no cache found:', error);
+          return NextResponse.json(
+            { error: 'Event not found and cannot be moved' },
+            { status: 404 }
+          );
+        }
+      } else {
+        console.error('Error fetching event from Google Calendar:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch event from Google Calendar' },
+          { status: 404 }
+        );
+      }
     }
 
-    // Update the event with new start/end times
-    // Use the isAllDay parameter if provided, otherwise detect from existing event
-    const shouldBeAllDay = isAllDay !== undefined ? isAllDay : (existingEvent.start?.date ? true : false);
+    // Handle calendar move (if newCalendarId is provided)
+    let targetCalendarId = calendarId;
+    let googleEvent = existingEvent;
+    
+    if (newCalendarId && newCalendarId !== calendarId) {
+      // Move event to new calendar: delete from old, insert into new
+      try {
+        // Try to delete from old calendar (ignore 404/410 errors - event might already be deleted)
+        try {
+          await calendar.events.delete({
+            calendarId,
+            eventId,
+          });
+        } catch (deleteError: any) {
+          // If event is already deleted (404) or gone (410), that's okay - proceed with insert
+          if (deleteError.code !== 404 && deleteError.code !== 410) {
+            throw deleteError;
+          }
+          console.log('Event already deleted from old calendar, proceeding with move');
+        }
+        
+        // Prepare event data for new calendar
+        // Remove id field completely to let Google generate a new one
+        const { id, ...eventDataWithoutId } = existingEvent;
+        const eventToMove: any = {
+          ...eventDataWithoutId,
+        };
+        
+        // Update location if provided
+        if (location !== undefined) {
+          eventToMove.location = location || undefined;
+        }
+        
+        // Update times if provided
+        if (startTime && endTime) {
+          const shouldBeAllDay = isAllDay !== undefined ? isAllDay : (existingEvent.start?.date ? true : false);
+          const newStart = new Date(startTime);
+          const newEnd = new Date(endTime);
+          
+          eventToMove.start = shouldBeAllDay
+            ? { date: newStart.toISOString().split('T')[0] }
+            : { dateTime: newStart.toISOString(), timeZone: existingEvent.start?.timeZone || 'UTC' };
+          eventToMove.end = shouldBeAllDay
+            ? { date: newEnd.toISOString().split('T')[0] }
+            : { dateTime: newEnd.toISOString(), timeZone: existingEvent.end?.timeZone || 'UTC' };
+        }
+        
+        // Try to insert into new calendar
+        // If it already exists (409), the event might already be in the new calendar
+        let insertResponse;
+        try {
+          insertResponse = await calendar.events.insert({
+            calendarId: newCalendarId,
+            requestBody: eventToMove,
+          });
+          googleEvent = insertResponse.data;
+          targetCalendarId = newCalendarId;
+        } catch (insertError: any) {
+          // If event already exists (409), check if it's already in the new calendar
+          if (insertError.code === 409) {
+            try {
+              // Check if event exists in new calendar with same ID
+              const existingInNew = await calendar.events.get({
+                calendarId: newCalendarId,
+                eventId: eventId,
+              });
+              
+              // Event already exists in new calendar, just update it
+              const updateResponse = await calendar.events.update({
+                calendarId: newCalendarId,
+                eventId: eventId,
+                requestBody: eventToMove,
+              });
+              googleEvent = updateResponse.data;
+              targetCalendarId = newCalendarId;
+            } catch (checkError: any) {
+              // Event doesn't exist in new calendar with that ID
+              // The 409 might be due to a different conflict - try without ID
+              try {
+                // Remove any potential conflicting fields and try again
+                const cleanEvent = { ...eventToMove };
+                delete cleanEvent.id;
+                delete cleanEvent.iCalUID;
+                
+                insertResponse = await calendar.events.insert({
+                  calendarId: newCalendarId,
+                  requestBody: cleanEvent,
+                });
+                googleEvent = insertResponse.data;
+                targetCalendarId = newCalendarId;
+              } catch (retryError: any) {
+                console.error('Failed to move event after retry:', retryError);
+                throw retryError;
+              }
+            }
+          } else {
+            throw insertError;
+          }
+        }
+        
+        // Delete old event from Supabase cache (if it exists)
+        await supabase
+          .from('google_calendar_events')
+          .delete()
+          .eq('user_id', userId)
+          .eq('calendar_id', calendarId)
+          .eq('event_id', eventId);
+      } catch (error: any) {
+        console.error('Error moving event to new calendar:', error);
+        return NextResponse.json(
+          { error: 'Failed to move event to new calendar', details: error.message },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Regular update (no calendar move)
+      // Update the event with new start/end times and location
+      const shouldBeAllDay = isAllDay !== undefined ? isAllDay : (existingEvent.start?.date ? true : false);
+      
+      const updatedEvent: any = {
+        ...existingEvent,
+      };
+      
+      // Update location if provided
+      if (location !== undefined) {
+        updatedEvent.location = location || undefined;
+      }
+      
+      // Update times if provided
+      if (startTime && endTime) {
+        const newStart = new Date(startTime);
+        const newEnd = new Date(endTime);
+        
+        updatedEvent.start = shouldBeAllDay
+          ? { date: newStart.toISOString().split('T')[0] }
+          : { dateTime: newStart.toISOString(), timeZone: existingEvent.start?.timeZone || 'UTC' };
+        updatedEvent.end = shouldBeAllDay
+          ? { date: newEnd.toISOString().split('T')[0] }
+          : { dateTime: newEnd.toISOString(), timeZone: existingEvent.end?.timeZone || 'UTC' };
+      }
 
-    const updatedEvent = {
-      ...existingEvent,
-      start: shouldBeAllDay
-        ? { date: newStart.toISOString().split('T')[0] }
-        : { dateTime: newStart.toISOString(), timeZone: existingEvent.start?.timeZone || 'UTC' },
-      end: shouldBeAllDay
-        ? { date: newEnd.toISOString().split('T')[0] }
-        : { dateTime: newEnd.toISOString(), timeZone: existingEvent.end?.timeZone || 'UTC' },
-    };
-
-    // Update event in Google Calendar
-    let googleEvent;
-    try {
-      const updateResponse = await calendar.events.update({
-        calendarId,
-        eventId,
-        requestBody: updatedEvent,
-      });
-      googleEvent = updateResponse.data;
-    } catch (error: any) {
-      console.error('Error updating event in Google Calendar:', error);
-      return NextResponse.json(
-        { error: 'Failed to update event in Google Calendar', details: error.message },
-        { status: 500 }
-      );
+      // Update event in Google Calendar
+      try {
+        const updateResponse = await calendar.events.update({
+          calendarId,
+          eventId,
+          requestBody: updatedEvent,
+        });
+        googleEvent = updateResponse.data;
+      } catch (error: any) {
+        console.error('Error updating event in Google Calendar:', error);
+        return NextResponse.json(
+          { error: 'Failed to update event in Google Calendar', details: error.message },
+          { status: 500 }
+        );
+      }
     }
 
-    // Get calendar color for fallback
+    // Get calendar color and summary for fallback (use target calendar)
     let calendarColor = '#4285f4';
+    let calendarSummary = targetCalendarId;
     try {
       const { data: cachedCalendar } = await supabase
         .from('google_calendars')
-        .select('background_color')
+        .select('background_color, summary')
         .eq('user_id', userId)
-        .eq('calendar_id', calendarId)
+        .eq('calendar_id', targetCalendarId)
         .single();
       
       if (cachedCalendar?.background_color) {
@@ -224,8 +401,12 @@ export async function PATCH(
           ? cachedCalendar.background_color 
           : `#${cachedCalendar.background_color}`;
       }
+      
+      if (cachedCalendar?.summary) {
+        calendarSummary = cachedCalendar.summary;
+      }
     } catch (error) {
-      console.warn('Could not fetch calendar color for event update response:', error);
+      console.warn('Could not fetch calendar info for event update response:', error);
     }
 
     // Update event in Supabase cache
@@ -239,22 +420,29 @@ export async function PATCH(
 
     const eventColor = getColorFromColorId(googleEvent.colorId, calendarColor);
 
+    // Upsert event in Supabase cache (use target calendar and event ID)
+    const finalEventId = googleEvent.id || eventId;
     const { error: updateError } = await supabase
       .from('google_calendar_events')
-      .update({
+      .upsert({
+        user_id: userId,
+        calendar_id: targetCalendarId,
+        event_id: finalEventId,
+        title: googleEvent.summary || 'No Title',
         start_time: eventStartTime.toISOString(),
         end_time: eventEndTime.toISOString(),
         is_all_day: isAllDayEvent,
         start_date: isAllDayEvent ? googleEvent.start.date : null,
         end_date: isAllDayEvent ? googleEvent.end.date : null,
-        color: eventColor, // Update with event-specific color if available
+        color: eventColor,
+        description: googleEvent.description || null,
+        location: googleEvent.location || null,
         updated_at: new Date().toISOString(),
         last_synced_at: new Date().toISOString(),
-        event_data: googleEvent, // Update full event data
-      })
-      .eq('user_id', userId)
-      .eq('calendar_id', calendarId)
-      .eq('event_id', eventId);
+        event_data: googleEvent,
+      }, {
+        onConflict: 'user_id,calendar_id,event_id',
+      });
 
     if (updateError) {
       console.error('Error updating event in Supabase:', updateError);
@@ -263,12 +451,13 @@ export async function PATCH(
 
     // Return updated event in the same format as GET /api/google-calendar/events
     const responseEvent = {
-      id: googleEvent.id,
+      id: finalEventId,
       title: googleEvent.summary || 'No Title',
       start: eventStartTime,
       end: eventEndTime,
       color: eventColor,
-      calendar: calendarId,
+      calendar: calendarSummary, // Use calendar name, not ID
+      calendarId: targetCalendarId,
       description: googleEvent.description || null,
       location: googleEvent.location || null,
       htmlLink: googleEvent.htmlLink || null,

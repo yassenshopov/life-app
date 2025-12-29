@@ -1857,17 +1857,17 @@ export function HealthMetricsTrends({
                               </p>
                               {data.deepSleep !== null && (
                                 <p className="text-xs text-purple-600">
-                                  Deep: {data.deepSleep.toFixed(1)}%
+                                  Deep: {Number(data.deepSleep).toFixed(1)}%
                                 </p>
                               )}
                               {data.lightSleep !== null && (
                                 <p className="text-xs text-blue-500">
-                                  Light: {data.lightSleep.toFixed(1)}%
+                                  Light: {Number(data.lightSleep).toFixed(1)}%
                                 </p>
                               )}
                               {data.remSleep !== null && (
                                 <p className="text-xs text-cyan-400">
-                                  REM: {data.remSleep.toFixed(1)}%
+                                  REM: {Number(data.remSleep).toFixed(1)}%
                                 </p>
                               )}
                             </div>
