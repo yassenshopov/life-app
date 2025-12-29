@@ -53,6 +53,12 @@ interface MediaItem {
   thumbnail_url: string | null; // Supabase Storage URL
   ai_synopsis: string | null;
   created: string | null;
+  monthly_tracking_id: string | null;
+  monthly_tracking?: {
+    id: string;
+    title: string;
+    properties: any;
+  } | null;
 }
 
 type CategoryTab = 'movies-series' | 'books' | 'recommendations';
@@ -471,6 +477,15 @@ function MediaDetailModal({
               </div>
             )}
 
+            {/* Monthly Tracking */}
+            {item.monthly_tracking && (
+              <div className="mb-4">
+                <p className="text-white/70 text-sm">
+                  <span className="font-semibold">Month:</span> {item.monthly_tracking.title || 'Unknown'}
+                </p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="mt-auto pt-4">
               {item.url && (() => {
@@ -680,6 +695,14 @@ function MediaCard({
         {item.created && (
           <div className="text-xs text-muted-foreground">
             {format(new Date(item.created), 'MMM d, yyyy')}
+          </div>
+        )}
+
+        {/* Monthly Tracking */}
+        {item.monthly_tracking && (
+          <div className="text-xs text-muted-foreground">
+            <span className="font-medium">Month:</span>{' '}
+            {item.monthly_tracking.title || 'Unknown'}
           </div>
         )}
 
@@ -961,7 +984,9 @@ export function MediaView() {
     // Handle array fields (by, topic) for multi-select filters
     if (Array.isArray(itemValue) && filter.propertyType === 'multi_select') {
       const itemArray = itemValue as string[];
-      const filterArray = Array.isArray(filterValue) ? filterValue as string[] : [filterValue];
+      const filterArray = Array.isArray(filterValue) 
+        ? (filterValue as (string | number | boolean)[]).map(v => String(v))
+        : [String(filterValue)];
       
       switch (filter.operator) {
         case 'contains':
@@ -1084,13 +1109,70 @@ export function MediaView() {
       grouped[status].push(item);
     });
 
-    // Sort items within each group by creation time (newest first)
-    // Items are already sorted by created date descending from the API,
-    // so we maintain that order within each group
+    // Helper function to parse month title and convert to date
+    const parseMonthTitle = (title: string | null | undefined): number | null => {
+      if (!title) return null;
+      
+      try {
+        // Try to parse common month formats like "January 2024", "Jan 2024", "2024-01", etc.
+        const date = new Date(title);
+        if (!isNaN(date.getTime())) {
+          return date.getTime();
+        }
+        
+        // Try parsing formats like "January 2024" or "Jan 2024"
+        const monthNames = [
+          'january', 'february', 'march', 'april', 'may', 'june',
+          'july', 'august', 'september', 'october', 'november', 'december'
+        ];
+        const shortMonthNames = [
+          'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+          'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+        ];
+        
+        const lowerTitle = title.toLowerCase().trim();
+        for (let i = 0; i < monthNames.length; i++) {
+          if (lowerTitle.startsWith(monthNames[i]) || lowerTitle.startsWith(shortMonthNames[i])) {
+            // Extract year (look for 4-digit number)
+            const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+            if (yearMatch) {
+              const year = parseInt(yearMatch[0]);
+              const date = new Date(year, i, 1);
+              return date.getTime();
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse month title:', title, error);
+      }
+      
+      return null;
+    };
+
+    // Sort items within each group
+    // Priority: 1) Items with monthly_tracking (chronologically by month), 2) Items without (by created date)
     Object.keys(grouped).forEach((status) => {
       grouped[status].sort((a, b) => {
+        const monthA = a.monthly_tracking?.title ? parseMonthTitle(a.monthly_tracking.title) : null;
+        const monthB = b.monthly_tracking?.title ? parseMonthTitle(b.monthly_tracking.title) : null;
+        
+        // If both have monthly tracking, sort by month (newest first for reverse chronological order)
+        if (monthA !== null && monthB !== null) {
+          return monthB - monthA;
+        }
+        
+        // If only one has monthly tracking, prioritize it (put it first)
+        if (monthA !== null && monthB === null) {
+          return -1;
+        }
+        if (monthA === null && monthB !== null) {
+          return 1;
+        }
+        
+        // Neither has monthly tracking, sort by created date (newest first)
         const dateA = a.created ? new Date(a.created).getTime() : 0;
         const dateB = b.created ? new Date(b.created).getTime() : 0;
+        
         // If both have no created date, maintain original order (newer items added first)
         if (dateA === 0 && dateB === 0) {
           // Find original indices to maintain insertion order
@@ -1098,6 +1180,7 @@ export function MediaView() {
           const indexB = filtered.findIndex(item => item.id === b.id);
           return indexA - indexB; // Maintain original order (newer items first)
         }
+        
         return dateB - dateA; // Newest first
       });
     });

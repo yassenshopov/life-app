@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film } from 'lucide-react';
+import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Outfit } from 'next/font/google';
@@ -54,6 +54,8 @@ export default function HQSidebar() {
   const isPeopleActive = pathname === '/people';
   const isSpotifyActive = pathname === '/spotify';
   const isMediaActive = pathname === '/media';
+  const isTrackingActive = pathname === '/tracking';
+  const isCalendarActive = pathname === '/calendar';
 
   return (
     <div
@@ -157,6 +159,30 @@ export default function HQSidebar() {
         >
           <Film className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Media</span>}
+        </Link>
+        <Link
+          href="/calendar"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            'hover:bg-accent hover:text-accent-foreground',
+            isCalendarActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+        >
+          <CalendarDays className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">Calendar</span>}
+        </Link>
+        <Link
+          href="/tracking"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            'hover:bg-accent hover:text-accent-foreground',
+            isTrackingActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+        >
+          <Calendar className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">Tracking</span>}
         </Link>
       </div>
 

@@ -8,11 +8,15 @@ import {
   MapPin, 
   Users, 
   MoreVertical,
-  Sparkles
+  Sparkles,
+  Heart,
+  Footprints,
+  Scale,
+  Activity
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { getContrastTextColor } from '@/lib/color-utils';
+import { getContrastTextColorHex } from '@/lib/color-utils';
 import DOMPurify from 'dompurify';
 import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
@@ -326,6 +330,27 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
   const [mediaItems, setMediaItems] = React.useState<Array<{ id: string; name: string; category: string | null }>>([]);
   const [selectedMediaItem, setSelectedMediaItem] = React.useState<any | null>(null);
   const [isMediaModalOpen, setIsMediaModalOpen] = React.useState(false);
+  const [trackingEntries, setTrackingEntries] = React.useState<Array<{
+    id: string;
+    title: string;
+    properties: Record<string, { type: string; value: any }>;
+  }>>([]);
+
+  // Fetch daily tracking entries
+  React.useEffect(() => {
+    const fetchTrackingEntries = async () => {
+      try {
+        const response = await fetch('/api/tracking/daily');
+        if (response.ok) {
+          const data = await response.json();
+          setTrackingEntries(data.entries || []);
+        }
+      } catch (error) {
+        console.error('Error fetching tracking entries:', error);
+      }
+    };
+    fetchTrackingEntries();
+  }, []);
 
   // Update current time every minute to refresh active event highlighting
   React.useEffect(() => {
@@ -335,6 +360,106 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
 
     return () => clearInterval(interval);
   }, []);
+
+  // Helper to extract property value from tracking entry
+  const extractPropertyValue = React.useCallback((prop: { type: string; value: any } | undefined | Record<string, never>): any => {
+    if (!prop || typeof prop !== 'object' || !('type' in prop) || !('value' in prop) || prop.value === null || prop.value === undefined) return null;
+    
+    const { value } = prop;
+    
+    // Handle formula results
+    if (prop.type === 'formula' && value && typeof value === 'object') {
+      if (value.type === 'number' && value.number !== undefined) return value.number;
+      if (value.type === 'string' && value.string) return value.string;
+      if (value.type === 'boolean' && value.boolean !== undefined) return value.boolean;
+    }
+    
+    // Handle nested structures
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (value.date) return value.date;
+      if (value.number !== undefined) return value.number;
+    }
+    
+    return value;
+  }, []);
+
+  // Helper to get date from tracking entry
+  const getTrackingEntryDate = React.useCallback((entry: { properties: Record<string, { type: string; value: any }> }): string | null => {
+    const dateProp = entry.properties['Date'] || entry.properties['date'];
+    if (!dateProp) return null;
+    const dateValue = extractPropertyValue(dateProp);
+    if (typeof dateValue === 'string') return dateValue;
+    if (dateValue?.start) return dateValue.start;
+    return null;
+  }, [extractPropertyValue]);
+
+  // Helper to match sleep event with tracking entry by date
+  const getTrackingEntryForSleepEvent = React.useCallback((sleepEvent: CalendarEvent) => {
+    // Get the date of the sleep event
+    const eventDate = new Date(sleepEvent.start);
+    let eventDateStr = eventDate.toISOString().split('T')[0];
+    
+    // For "Wake up" events, match with the previous day's tracking entry
+    // (since sleep typically spans from one day to the next)
+    if (sleepEvent.title === 'Wake up') {
+      const prevDay = new Date(eventDate);
+      prevDay.setDate(prevDay.getDate() - 1);
+      eventDateStr = prevDay.toISOString().split('T')[0];
+    }
+    
+    // Find matching tracking entry
+    return trackingEntries.find(entry => {
+      const entryDate = getTrackingEntryDate(entry);
+      if (!entryDate) return false;
+      const entryDateStr = entryDate.split('T')[0];
+      return entryDateStr === eventDateStr;
+    });
+  }, [trackingEntries, getTrackingEntryDate]);
+
+  // Helper to extract health metrics from tracking entry
+  const extractHealthMetrics = React.useCallback((entry: { properties: Record<string, { type: string; value: any }> } | undefined) => {
+    if (!entry) return null;
+    
+    const props = entry.properties;
+    if (!props) return null;
+    
+    // Extract sleep-related metrics
+    const sleepHours = extractPropertyValue(props['Sleep [h]'] || props['Sleep'] || {});
+    const deepSleepPercent = extractPropertyValue(props['Deep Sleep %'] || {});
+    const remSleepPercent = extractPropertyValue(props['REM Sleep %'] || {});
+    const awakeTime = extractPropertyValue(props['AwakeTime [min]'] || {});
+    const deepSleepHours = extractPropertyValue(props['Deep Sleep [h]'] || {});
+    const remSleepHours = extractPropertyValue(props['REM Sleep [h]'] || {});
+    
+    // Extract other health metrics
+    const rhr = extractPropertyValue(props['RHR [bpm]'] || props['RHR'] || {});
+    const steps = extractPropertyValue(props['Steps'] || {});
+    const weight = extractPropertyValue(props['Weight [kg]'] || props['Weight'] || {});
+    
+    // Only return if we have at least sleep data
+    if (sleepHours === null && deepSleepPercent === null && remSleepPercent === null) {
+      return null;
+    }
+    
+    // Calculate percentages (handle both decimal and percentage formats)
+    const deepPercent = deepSleepPercent !== null 
+      ? (deepSleepPercent < 1 ? deepSleepPercent * 100 : deepSleepPercent)
+      : (deepSleepHours !== null && sleepHours > 0 ? (deepSleepHours / sleepHours) * 100 : null);
+    
+    const remPercent = remSleepPercent !== null
+      ? (remSleepPercent < 1 ? remSleepPercent * 100 : remSleepPercent)
+      : (remSleepHours !== null && sleepHours > 0 ? (remSleepHours / sleepHours) * 100 : null);
+    
+    return {
+      sleepHours,
+      deepSleepPercent: deepPercent,
+      remSleepPercent: remPercent,
+      awakeTime,
+      rhr,
+      steps,
+      weight,
+    };
+  }, [extractPropertyValue]);
 
   // Expose scrollToToday method via ref
   React.useImperativeHandle(ref, () => ({
@@ -478,10 +603,10 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
     return event.start <= currentTime && currentTime <= event.end;
   };
 
-  // Check if any event is currently active for a given day
+  // Check if any event is currently active for a given day (only non-all-day events)
   const hasActiveEvent = (events: CalendarEvent[], date: Date): boolean => {
     if (!isToday(date)) return false;
-    return events.some(event => isEventActive(event, date));
+    return events.some(event => !event.isAllDay && isEventActive(event, date));
   };
 
   // Gather context for AI suggestions
@@ -756,7 +881,10 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
           {sortedDates.map((dateKey) => {
             const date = new Date(dateKey);
             const dayEvents = groupedEvents.get(dateKey) || [];
+            const regularEvents = dayEvents.filter(event => !event.isAllDay);
+            const allDayEvents = dayEvents.filter(event => event.isAllDay || false);
 
+            // Show day if it has any events (all-day or regular)
             if (dayEvents.length === 0) {
               return null;
             }
@@ -778,31 +906,84 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                   {formatDateHeader(date)}
                 </div>
                 
-                {/* Timeline container */}
-                <div className="relative">
-                  {(() => {
-                    const organizedEvents = organizeEvents(dayEvents);
-                    
-                    // Create unscheduled time block if needed (for today, when no event is active)
-                    let eventsToDisplay = [...organizedEvents];
-                    if (isTodayDate && !hasActiveEvent(organizedEvents, date)) {
-                      // Create a placeholder event for unscheduled time at current time
-                      const unscheduledEvent: CalendarEvent & { _isUnscheduled?: boolean } = {
-                        id: 'unscheduled-time',
-                        title: 'Unscheduled time',
-                        start: new Date(currentTime),
-                        end: new Date(currentTime),
-                        color: '#6b7280', // Gray color
-                        _isUnscheduled: true,
-                      };
+                {/* All-day events as badges */}
+                {allDayEvents.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {allDayEvents.map((event) => {
+                      const eventColor = event.color || '#4285f4';
+                      const matchedPeople = getEventPeople(event, people);
+                      // Get high-contrast text color that ensures WCAG AA compliance
+                      const textColor = getContrastTextColorHex(eventColor);
                       
-                      // Insert at correct chronological position
-                      eventsToDisplay.push(unscheduledEvent);
-                      eventsToDisplay.sort((a, b) => a.start.getTime() - b.start.getTime());
-                    }
-                    
-                    // Show timeline only if there are 2+ top-level events (events without parents)
-                    const showTimeline = eventsToDisplay.length > 1;
+                      return (
+                        <button
+                          key={event.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onEventClick) {
+                              onEventClick(event);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors hover:opacity-80"
+                          style={{
+                            backgroundColor: eventColor,
+                            color: textColor,
+                          }}
+                        >
+                          {matchedPeople.length > 0 && (
+                            <div className="flex items-center flex-shrink-0 -space-x-1">
+                              {matchedPeople.slice(0, 2).map((person: Person, idx: number) => (
+                                <div
+                                  key={person.id}
+                                  className="relative z-10"
+                                  style={{
+                                    zIndex: matchedPeople.length - idx,
+                                  }}
+                                >
+                                  <PersonAvatar
+                                    person={person}
+                                    size="xs"
+                                    onClick={() => {
+                                      onPersonClick?.(person);
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <span className="truncate max-w-[200px]">{event.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {/* Timeline container - only show if there are regular events */}
+                {regularEvents.length > 0 && (
+                  <div className="relative">
+                    {(() => {
+                      const organizedEvents = organizeEvents(regularEvents);
+                      
+                      // Create unscheduled time block if needed (for today, when no event is active)
+                      let eventsToDisplay = [...organizedEvents];
+                      if (isTodayDate && !hasActiveEvent(organizedEvents, date)) {
+                        // Create a placeholder event for unscheduled time at current time
+                        const unscheduledEvent: CalendarEvent & { _isUnscheduled?: boolean } = {
+                          id: 'unscheduled-time',
+                          title: 'Unscheduled time',
+                          start: new Date(currentTime),
+                          end: new Date(currentTime),
+                          color: '#6b7280', // Gray color
+                          _isUnscheduled: true,
+                        };
+                        
+                        // Insert at correct chronological position
+                        eventsToDisplay.push(unscheduledEvent);
+                        eventsToDisplay.sort((a, b) => a.start.getTime() - b.start.getTime());
+                      }
+                      
+                      // Show timeline only if there are 2+ top-level events (events without parents)
+                      const showTimeline = eventsToDisplay.length > 1;
                     
                     return (
                       <>
@@ -893,6 +1074,11 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                             const hasChildren = event.children && event.children.length > 0;
                             const isActive = isEventActive(event, date);
                             
+                            // Check if this is a sleep event and get matching tracking entry
+                            const isSleepEvent = event.title === 'Go to sleep' || event.title === 'Wake up';
+                            const matchingTrackingEntry = isSleepEvent ? getTrackingEntryForSleepEvent(event) : null;
+                            const healthMetrics = matchingTrackingEntry ? extractHealthMetrics(matchingTrackingEntry) : null;
+                            
                             // Calculate duration (use stored sleep duration if available)
                             const eventWithSleep = event as CalendarEvent & { _sleepDuration?: number };
                             const durationMs = eventWithSleep._sleepDuration ?? (event.end.getTime() - event.start.getTime());
@@ -975,6 +1161,70 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                       {!isAllDay && durationText && (
                                         <div className="text-xs text-muted-foreground">
                                           {durationText}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Health Metrics for Sleep Events */}
+                                      {isSleepEvent && healthMetrics && (
+                                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                                          <div className="grid grid-cols-2 gap-2 text-xs">
+                                            {/* Sleep Quality Metrics */}
+                                            {healthMetrics.sleepHours !== null && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <Activity className="h-3 w-3 text-blue-500" />
+                                                <span className="font-medium text-foreground">{healthMetrics.sleepHours.toFixed(1)}h</span>
+                                                <span className="text-muted-foreground">sleep</span>
+                                              </div>
+                                            )}
+                                            
+                                            {healthMetrics.deepSleepPercent !== null && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <div className="h-3 w-3 rounded-full bg-purple-600" />
+                                                <span className="font-medium text-foreground">{healthMetrics.deepSleepPercent.toFixed(0)}%</span>
+                                                <span className="text-muted-foreground">deep</span>
+                                              </div>
+                                            )}
+                                            
+                                            {healthMetrics.remSleepPercent !== null && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <div className="h-3 w-3 rounded-full bg-cyan-400" />
+                                                <span className="font-medium text-foreground">{healthMetrics.remSleepPercent.toFixed(0)}%</span>
+                                                <span className="text-muted-foreground">REM</span>
+                                              </div>
+                                            )}
+                                            
+                                            {healthMetrics.rhr !== null && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <Heart className="h-3 w-3 text-red-500" />
+                                                <span className="font-medium text-foreground">{healthMetrics.rhr}</span>
+                                                <span className="text-muted-foreground">bpm</span>
+                                              </div>
+                                            )}
+                                            
+                                            {healthMetrics.steps !== null && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <Footprints className="h-3 w-3 text-green-500" />
+                                                <span className="font-medium text-foreground">{healthMetrics.steps.toLocaleString()}</span>
+                                                <span className="text-muted-foreground">steps</span>
+                                              </div>
+                                            )}
+                                            
+                                            {healthMetrics.weight !== null && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <Scale className="h-3 w-3 text-orange-500" />
+                                                <span className="font-medium text-foreground">{healthMetrics.weight.toFixed(1)}</span>
+                                                <span className="text-muted-foreground">kg</span>
+                                              </div>
+                                            )}
+                                            
+                                            {healthMetrics.awakeTime !== null && healthMetrics.awakeTime > 0 && (
+                                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                <div className="h-3 w-3 rounded-full bg-orange-500" />
+                                                <span className="font-medium text-foreground">{healthMetrics.awakeTime}</span>
+                                                <span className="text-muted-foreground">min awake</span>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       )}
                                       
@@ -1077,7 +1327,8 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                       </>
                     );
                   })()}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}

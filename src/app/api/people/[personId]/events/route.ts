@@ -114,20 +114,23 @@ export async function GET(
       }
     }
 
-    // Get calendar preferences
+    // Create calendar API client (reused throughout)
+    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Get calendar preferences and fetch calendar list
     const preferences = user.calendar_preferences || {};
+    const calendarListResponse = await calendarApi.calendarList.list();
+    const calendarList = calendarListResponse.data.items || [];
+    
     let calendarsToFetch: string[] = [];
     if (preferences.selectedCalendars && Array.isArray(preferences.selectedCalendars)) {
       calendarsToFetch = preferences.selectedCalendars;
     } else {
       // Fetch all calendars
-      const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
-      const calendarList = await calendarApi.calendarList.list();
-      calendarsToFetch = (calendarList.data.items || []).map((cal: any) => cal.id);
+      calendarsToFetch = calendarList.map((cal: any) => cal.id);
     }
 
     // Fetch events from all calendars
-    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
     const timeMin = new Date();
     timeMin.setFullYear(timeMin.getFullYear() - 1);
     const timeMax = new Date();
@@ -161,7 +164,35 @@ export async function GET(
       eventIds.includes(event.id)
     );
 
-    return NextResponse.json({ events: linkedEvents });
+    // Enhance events with calendar colors (reuse calendarList already fetched)
+    const calendarMap = new Map(
+      calendarList.map((cal: any) => [cal.id, cal.backgroundColor || '#4285f4'])
+    );
+
+    // Map colorId to hex and add calendar color
+    const enhancedEvents = linkedEvents.map((event: any) => {
+      const calendarId = event.organizer?.email || event.calendarId;
+      const calendarColor = calendarId ? (calendarMap.get(calendarId) || '#4285f4') : '#4285f4';
+      
+      // Map colorId to hex color, using calendar color as fallback
+      let color = calendarColor;
+      if (event.colorId) {
+        const colorMap: Record<string, string> = {
+          '1': '#a4bdfc', '2': '#7ae7bf', '3': '#dbadff', '4': '#ff887c',
+          '5': '#fbd75b', '6': '#ffb878', '7': '#46d6db', '8': '#e1e1e1',
+          '9': '#5484ed', '10': '#51b749', '11': '#dc2127',
+        };
+        color = colorMap[event.colorId] || calendarColor;
+      }
+      
+      return {
+        ...event,
+        color: color.startsWith('#') ? color : `#${color}`,
+        calendarId: calendarId,
+      };
+    });
+
+    return NextResponse.json({ events: enhancedEvents });
   } catch (error) {
     console.error('Error in GET /api/people/[personId]/events:', error);
     return NextResponse.json(

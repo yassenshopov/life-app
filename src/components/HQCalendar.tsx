@@ -190,6 +190,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         updated: data.event.updated,
       };
 
+      // Update cache
+      allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
+      
+      // Update displayed events
       setEvents((prevEvents) =>
         [...prevEvents, newEvent].sort((a, b) => a.start.getTime() - b.start.getTime())
       );
@@ -267,6 +271,37 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
       const data = await response.json();
 
+      // Update the event in cache
+      const updatedEvent: CalendarEvent = {
+        id: eventId,
+        title: data.event.title || '',
+        start: new Date(data.event.start),
+        end: new Date(data.event.end),
+        color: data.event.color || '#4285f4',
+        calendar: data.event.calendar,
+        calendarId: data.event.calendarId || data.event.calendar,
+        description: data.event.description,
+        location: data.event.location,
+        htmlLink: data.event.htmlLink,
+        hangoutLink: data.event.hangoutLink,
+        isAllDay: data.event.isAllDay,
+        organizer: data.event.organizer,
+        attendees: data.event.attendees,
+        reminders: data.event.reminders,
+        recurrence: data.event.recurrence,
+        status: data.event.status,
+        transparency: data.event.transparency,
+        visibility: data.event.visibility,
+        conferenceData: data.event.conferenceData,
+        created: data.event.created ? new Date(data.event.created) : undefined,
+        updated: data.event.updated ? new Date(data.event.updated) : undefined,
+      };
+      
+      // Update cache
+      allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+        e.id === eventId ? updatedEvent : e
+      );
+
       // Update the event in the local state
       setEvents((prevEvents) =>
         prevEvents.map((e) =>
@@ -290,24 +325,26 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   };
 
   // Load view mode from localStorage
-  const [viewMode, setViewMode] = React.useState<CalendarViewMode>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hq-calendar-view-mode');
-      // Migrate old "annual" to "year"
-      if (saved === 'annual') {
-        localStorage.setItem('hq-calendar-view-mode', 'year');
-        return 'year';
-      }
-      return saved === 'daily' ||
-        saved === 'weekly' ||
-        saved === 'monthly' ||
-        saved === 'year' ||
-        saved === 'schedule'
-        ? saved
-        : 'weekly';
+  // Initialize to 'weekly' on both server and client to prevent hydration mismatch
+  const [viewMode, setViewMode] = React.useState<CalendarViewMode>('weekly');
+
+  // Load view mode from localStorage after mount to prevent hydration mismatch
+  React.useEffect(() => {
+    const saved = localStorage.getItem('hq-calendar-view-mode');
+    // Migrate old "annual" to "year"
+    if (saved === 'annual') {
+      localStorage.setItem('hq-calendar-view-mode', 'year');
+      setViewMode('year');
+      return;
     }
-    return 'weekly';
-  });
+    if (saved === 'daily' ||
+      saved === 'weekly' ||
+      saved === 'monthly' ||
+      saved === 'year' ||
+      saved === 'schedule') {
+      setViewMode(saved);
+    }
+  }, []);
 
   const [currentDate, setCurrentDate] = React.useState(() => {
     const today = new Date();
@@ -376,10 +413,18 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   const [shouldStopRetrying, setShouldStopRetrying] = React.useState(false);
   const [forceRefresh, setForceRefresh] = React.useState(false);
   const fetchingRef = React.useRef(false);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  
+  // Client-side cache: track what date ranges we've already fetched
+  const cachedRangeRef = React.useRef<{ min: Date; max: Date } | null>(null);
+  const allCachedEventsRef = React.useRef<CalendarEvent[]>([]);
 
   // Listen for calendar refresh events
   React.useEffect(() => {
     const handleRefresh = () => {
+      // Clear cache to force refetch
+      cachedRangeRef.current = null;
+      allCachedEventsRef.current = [];
       // Force refresh by clearing the stop retrying flag and triggering a refetch
       setShouldStopRetrying(false);
       fetchingRef.current = false;
@@ -394,6 +439,61 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     };
   }, []);
 
+  // Helper function to check if a date range is fully covered by cached events
+  const isRangeCached = (requestedMin: Date, requestedMax: Date): boolean => {
+    if (!cachedRangeRef.current) return false;
+    const cached = cachedRangeRef.current;
+    // Check if requested range is fully within cached range
+    return requestedMin >= cached.min && requestedMax <= cached.max;
+  };
+
+  // Helper function to determine what ranges need to be fetched
+  const getMissingRanges = (requestedMin: Date, requestedMax: Date): Array<{ min: Date; max: Date }> => {
+    if (!cachedRangeRef.current || forceRefresh) {
+      // No cache or force refresh - fetch everything
+      return [{ min: requestedMin, max: requestedMax }];
+    }
+
+    const cached = cachedRangeRef.current;
+    const ranges: Array<{ min: Date; max: Date }> = [];
+
+    // Check if we need to fetch before cached range
+    if (requestedMin < cached.min) {
+      ranges.push({
+        min: requestedMin,
+        max: new Date(Math.min(cached.min.getTime() - 1, requestedMax.getTime())),
+      });
+    }
+
+    // Check if we need to fetch after cached range
+    if (requestedMax > cached.max) {
+      ranges.push({
+        min: new Date(Math.max(cached.max.getTime() + 1, requestedMin.getTime())),
+        max: requestedMax,
+      });
+    }
+
+    return ranges;
+  };
+
+  // Helper function to merge events and remove duplicates
+  const mergeEvents = (existing: CalendarEvent[], newEvents: CalendarEvent[]): CalendarEvent[] => {
+    const eventMap = new Map<string, CalendarEvent>();
+    
+    // Add existing events
+    existing.forEach(event => {
+      eventMap.set(event.id, event);
+    });
+    
+    // Add/update with new events (new events take precedence)
+    newEvents.forEach(event => {
+      eventMap.set(event.id, event);
+    });
+    
+    // Convert back to array and sort by start time
+    return Array.from(eventMap.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
+  };
+
   // Fetch events from Google Calendar based on current view and date
   React.useEffect(() => {
     // Don't fetch if we're already fetching or should stop retrying
@@ -401,9 +501,67 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       return;
     }
 
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Calculate time range based on view mode (inside effect to avoid dependency issues)
+    let timeMin: Date;
+    let timeMax: Date;
+
+    if (viewMode === 'daily') {
+      timeMin = new Date(currentDate);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'weekly') {
+      timeMin = new Date(currentDate);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate);
+      timeMax.setDate(currentDate.getDate() + 7);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'monthly') {
+      timeMin = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'year') {
+      timeMin = new Date(currentDate.getFullYear(), 0, 1);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate.getFullYear(), 11, 31);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'schedule') {
+      timeMin = new Date(currentDate);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate);
+      timeMax.setDate(currentDate.getDate() + 30);
+      timeMax.setHours(23, 59, 59, 999);
+    } else {
+      return;
+    }
+
+    // Check if we already have all events for this range cached
+    if (!forceRefresh && isRangeCached(timeMin, timeMax)) {
+      // Filter cached events to show only what's in the current view range
+      const filteredEvents = allCachedEventsRef.current.filter(event => {
+        // Event overlaps with requested range if: start <= timeMax AND end >= timeMin
+        return event.start <= timeMax && event.end >= timeMin;
+      });
+      
+      setEvents(filteredEvents);
+      setLoadingEvents(false);
+      console.log('Using cached events:', filteredEvents.length, 'events in range');
+      return;
+    }
+
     const fetchEvents = async () => {
       // Prevent concurrent requests
-      if (fetchingRef.current) {
+      if (fetchingRef.current || abortController.signal.aborted) {
         return;
       }
 
@@ -411,64 +569,39 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         fetchingRef.current = true;
         setLoadingEvents(true);
 
-        // Calculate time range based on view mode
-        let timeMin: Date;
-        let timeMax: Date;
-
-        if (viewMode === 'daily') {
-          timeMin = new Date(currentDate);
-          timeMin.setHours(0, 0, 0, 0);
-          timeMax = new Date(currentDate);
-          timeMax.setHours(23, 59, 59, 999);
-        } else if (viewMode === 'weekly') {
-          timeMin = new Date(currentDate);
-          timeMin.setHours(0, 0, 0, 0);
-          timeMax = new Date(currentDate);
-          timeMax.setDate(currentDate.getDate() + 7);
-          timeMax.setHours(23, 59, 59, 999);
-        } else if (viewMode === 'monthly') {
-          timeMin = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-          timeMin.setHours(0, 0, 0, 0);
-          timeMax = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-          timeMax.setHours(23, 59, 59, 999);
-        } else if (viewMode === 'year') {
-          timeMin = new Date(currentDate.getFullYear(), 0, 1);
-          timeMin.setHours(0, 0, 0, 0);
-          timeMax = new Date(currentDate.getFullYear(), 11, 31);
-          timeMax.setHours(23, 59, 59, 999);
-        } else if (viewMode === 'schedule') {
-          timeMin = new Date(currentDate);
-          timeMin.setHours(0, 0, 0, 0);
-          timeMax = new Date(currentDate);
-          timeMax.setDate(currentDate.getDate() + 30);
-          timeMax.setHours(23, 59, 59, 999);
-        } else {
+        // Determine what ranges we need to fetch
+        const missingRanges = getMissingRanges(timeMin, timeMax);
+        
+        if (missingRanges.length === 0) {
+          // Shouldn't happen, but handle gracefully
+          setLoadingEvents(false);
+          fetchingRef.current = false;
           return;
         }
 
-        const forceRefreshParam = forceRefresh ? '&forceRefresh=true' : '';
-        const response = await fetch(
-          `/api/google-calendar/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}${forceRefreshParam}`
-        );
+        // Fetch all missing ranges in parallel
+        const fetchPromises = missingRanges.map(async (range) => {
+          const forceRefreshParam = forceRefresh ? '&forceRefresh=true' : '';
+          const response = await fetch(
+            `/api/google-calendar/events?timeMin=${range.min.toISOString()}&timeMax=${range.max.toISOString()}${forceRefreshParam}`,
+            { signal: abortController.signal }
+          );
 
-        const data = await response.json();
-        console.log('Events API response:', {
-          status: response.status,
-          ok: response.ok,
-          eventsCount: data.events?.length || 0,
-          fromCache: data.fromCache,
-          error: data.error,
-          timeRange: { min: timeMin.toISOString(), max: timeMax.toISOString() },
-        });
+          if (abortController.signal.aborted) {
+            return null;
+          }
 
-        if (response.ok) {
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error fetching range:', range, data.error);
+            return null;
+          }
+
           // Convert event data to CalendarEvent format
-          const fetchedEvents: CalendarEvent[] = (data.events || []).map((event: any) => {
-            // Handle both Date objects and ISO strings
+          return (data.events || []).map((event: any) => {
             const startDate = event.start instanceof Date ? event.start : new Date(event.start);
             const endDate = event.end instanceof Date ? event.end : new Date(event.end);
-
-            // Convert hex color to Tailwind class or use inline style
             const hexColor = event.color || '#4285f4';
 
             return {
@@ -476,9 +609,9 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               title: event.title,
               start: startDate,
               end: endDate,
-              color: hexColor, // Store hex color, will be used with inline styles
+              color: hexColor,
               calendar: event.calendar,
-              calendarId: event.calendarId || event.calendar, // Use calendarId if available, fallback to calendar
+              calendarId: event.calendarId || event.calendar,
               description: event.description,
               location: event.location,
               htmlLink: event.htmlLink,
@@ -504,46 +637,97 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
                 : undefined,
             };
           });
+        });
 
-          console.log('Formatted events:', fetchedEvents.length, fetchedEvents.slice(0, 3));
-          
-          // Fetch linked people for all events
-          const eventIds = fetchedEvents.map(e => e.id);
+        // Wait for all fetches to complete
+        const allFetchedEvents = await Promise.all(fetchPromises);
+        
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        // Flatten and combine all fetched events
+        const newEvents = allFetchedEvents.flat().filter(Boolean) as CalendarEvent[];
+
+        console.log('Fetched new events:', newEvents.length, 'from', missingRanges.length, 'ranges');
+
+        // Merge with existing cached events
+        const mergedEvents = mergeEvents(allCachedEventsRef.current, newEvents);
+        
+        // Update cache
+        allCachedEventsRef.current = mergedEvents;
+        
+        // Update cached range to include the new range
+        if (cachedRangeRef.current) {
+          cachedRangeRef.current = {
+            min: new Date(Math.min(cachedRangeRef.current.min.getTime(), timeMin.getTime())),
+            max: new Date(Math.max(cachedRangeRef.current.max.getTime(), timeMax.getTime())),
+          };
+        } else {
+          cachedRangeRef.current = { min: timeMin, max: timeMax };
+        }
+
+        // Fetch linked people for new events only (if not aborted)
+        if (!abortController.signal.aborted && newEvents.length > 0) {
+          const eventIds = newEvents.map(e => e.id);
           const eventPeopleMap = await fetchEventPeople(eventIds);
           
-          // Attach linked people to events
-          const eventsWithPeople = fetchedEvents.map(event => ({
-            ...event,
-            linkedPeople: eventPeopleMap[event.id] || [],
-          }));
-          
-          setEvents(eventsWithPeople);
-          // Reset stop retrying flag on success
-          setShouldStopRetrying(false);
-          // Reset force refresh flag after successful fetch
-          setForceRefresh(false);
-        } else {
-          // Handle auth errors - stop retrying
-          if (response.status === 401 || response.status === 404) {
-            setShouldStopRetrying(true);
-            console.warn('Authentication error or user not found, stopping retries');
+          if (abortController.signal.aborted) {
+            return;
           }
-          console.error('Events API error:', data.error || 'Unknown error');
-          // If not connected or error, use initial events or empty array
+          
+          // Update people data in merged events
+          mergedEvents.forEach(event => {
+            if (eventPeopleMap[event.id]) {
+              event.linkedPeople = eventPeopleMap[event.id];
+            }
+          });
+        }
+        
+        // Filter to show only events in the current view range
+        const filteredEvents = mergedEvents.filter(event => {
+          return event.start <= timeMax && event.end >= timeMin;
+        });
+        
+        setEvents(filteredEvents);
+        
+        // Reset stop retrying flag on success
+        setShouldStopRetrying(false);
+        // Reset force refresh flag after successful fetch
+        if (forceRefresh) {
+          setForceRefresh(false);
+        }
+      } catch (error: any) {
+        // Ignore abort errors
+        if (error.name === 'AbortError') {
+          return;
+        }
+        console.error('Error fetching events:', error);
+        // On error, try to use cached events if available
+        if (allCachedEventsRef.current.length > 0) {
+          const filteredEvents = allCachedEventsRef.current.filter(event => {
+            return event.start <= timeMax && event.end >= timeMin;
+          });
+          setEvents(filteredEvents);
+        } else {
           setEvents(initialEvents);
         }
-      } catch (error) {
-        console.error('Error fetching events:', error);
-        setEvents(initialEvents);
-        // Don't stop retrying on network errors, only on auth errors
       } finally {
         fetchingRef.current = false;
         setLoadingEvents(false);
       }
     };
 
-    fetchEvents();
-  }, [viewMode, currentDate, forceRefresh]); // Added forceRefresh to dependencies
+    // Debounce rapid changes (e.g., when user is quickly navigating dates)
+    const timeoutId = setTimeout(() => {
+      fetchEvents();
+    }, 150); // 150ms debounce
+
+    return () => {
+      clearTimeout(timeoutId);
+      abortController.abort();
+    };
+  }, [viewMode, currentDate, forceRefresh]); // Removed timeRange and initialEvents from dependencies
 
   const toggleFullscreen = React.useCallback(() => {
     setIsFullscreen((prev) => !prev);
@@ -703,7 +887,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     }
   };
 
-  const getDateRange = () => {
+  // Memoize date range string to avoid recalculating on every render
+  const dateRangeString = React.useMemo(() => {
     if (viewMode === 'daily') {
       return currentDate.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -734,12 +919,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     } else if (viewMode === 'year') {
       return currentDate.getFullYear().toString();
     } else if (viewMode === 'schedule') {
-      const endDate = new Date(currentDate);
-      endDate.setDate(currentDate.getDate() + 30);
       return `Next 30 days`;
     }
     return '';
-  };
+  }, [viewMode, currentDate]);
 
   const handleNavigate = (date: Date, switchToWeekly?: boolean) => {
     // If switchToWeekly is true (clicked day number in monthly view), switch to weekly view
@@ -815,8 +998,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <div className="text-sm font-medium text-muted-foreground min-w-[200px] text-right">
-              {getDateRange()}
+            <div className="text-sm font-medium text-muted-foreground min-w-[200px] text-right" suppressHydrationWarning>
+              {dateRangeString}
             </div>
             <Button
               variant="ghost"
@@ -951,6 +1134,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         people={people}
         onPersonClick={handlePersonClick}
         onPeopleChange={(eventId, updatedPeople) => {
+          // Update cache
+          allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+            e.id === eventId ? { ...e, linkedPeople: updatedPeople } : e
+          );
           // Optimistically update the event in the events array
           setEvents((prevEvents) =>
             prevEvents.map((e) =>

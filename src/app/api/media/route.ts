@@ -17,10 +17,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch only media belonging to this authenticated user
+    // Fetch only media belonging to this authenticated user, including monthly tracking relationship
     const { data: media, error } = await supabase
       .from('media')
-      .select('*')
+      .select(`
+        *,
+        monthly_tracking:tracking_monthly(
+          id,
+          title,
+          properties
+        )
+      `)
       .eq('user_id', userId) // Filter by authenticated user ID
       .order('created', { ascending: false, nullsFirst: false });
 

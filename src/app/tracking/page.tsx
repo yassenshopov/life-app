@@ -1,0 +1,20 @@
+'use client';
+
+import * as React from 'react';
+import HQSidebar from '@/components/HQSidebar';
+import { TrackingView } from '@/components/TrackingView';
+import { Outfit } from 'next/font/google';
+
+const outfit = Outfit({ subsets: ['latin'] });
+
+export default function TrackingPage() {
+  return (
+    <div className={`flex h-screen bg-background ${outfit.className}`}>
+      <HQSidebar />
+      <main className="flex-1 overflow-y-auto">
+        <TrackingView />
+      </main>
+    </div>
+  );
+}
+

@@ -10,7 +10,7 @@ import {
 import { CalendarEvent } from '@/components/HQCalendar';
 import { formatEventTime, isAllDayEvent } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
-import { Calendar, Clock, MapPin, User, Link as LinkIcon, Bell, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X, Plus } from 'lucide-react';
+import { MapPin, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,12 @@ import { formatTimeForInput } from '@/lib/time-format-utils';
 import { TimePicker } from '@/components/ui/time-picker';
 import { PersonAvatar } from './PersonAvatar';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { ChevronDown } from 'lucide-react';
 
 interface EventDetailModalProps {
   event: CalendarEvent | null;
@@ -47,6 +53,17 @@ export function EventDetailModal({
   onPeopleChange,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
+  // Local optimistic event state for UI updates without triggering parent rerenders
+  const [optimisticEvent, setOptimisticEvent] = React.useState<CalendarEvent | null>(event);
+  
+  // Update optimistic event when prop event changes
+  React.useEffect(() => {
+    setOptimisticEvent(event);
+  }, [event]);
+  
+  // Use optimistic event for rendering
+  const displayEvent = optimisticEvent || event;
+  
   const [isEditing, setIsEditing] = React.useState(false);
   const [editedStart, setEditedStart] = React.useState<Date>(() => 
     event ? new Date(event.start) : new Date()
@@ -63,12 +80,12 @@ export function EventDetailModal({
 
   // Initialize date/time inputs when event changes or editing starts
   React.useEffect(() => {
-    if (event) {
-      const start = new Date(event.start);
-      const end = new Date(event.end);
+    if (displayEvent) {
+      const start = new Date(displayEvent.start);
+      const end = new Date(displayEvent.end);
       setEditedStart(start);
       setEditedEnd(end);
-      setIsAllDayEdit(event.isAllDay || false);
+      setIsAllDayEdit(displayEvent.isAllDay || false);
       
       // Format for date input (YYYY-MM-DD)
       setStartDate(start.toISOString().split('T')[0]);
@@ -77,7 +94,7 @@ export function EventDetailModal({
       setStartTime(formatTimeForInput(start));
       setEndTime(formatTimeForInput(end));
     }
-  }, [event, isEditing]);
+  }, [displayEvent, isEditing]);
 
   // State for linked people (from database)
   const [linkedPeople, setLinkedPeople] = React.useState<Array<Person & { linkId?: string }>>([]);
@@ -86,34 +103,75 @@ export function EventDetailModal({
   const [showPersonSelector, setShowPersonSelector] = React.useState(false);
   const [personSearchQuery, setPersonSearchQuery] = React.useState('');
   const [peopleWithRecentDates, setPeopleWithRecentDates] = React.useState<Map<string, Date>>(new Map());
+  
+  // State for calendar and location editing
+  const [calendars, setCalendars] = React.useState<Array<{ id: string; summary: string; color?: string }>>([]);
+  const [isLoadingCalendars, setIsLoadingCalendars] = React.useState(false);
+  const [showCalendarSelector, setShowCalendarSelector] = React.useState(false);
+  const [isUpdatingCalendar, setIsUpdatingCalendar] = React.useState(false);
+  const [isEditingLocation, setIsEditingLocation] = React.useState(false);
+  const [locationValue, setLocationValue] = React.useState('');
+  const [isUpdatingLocation, setIsUpdatingLocation] = React.useState(false);
 
   // Use linked people from database (if available), otherwise fall back to title matching
   const matchedPeople = React.useMemo(() => {
-    if (!event) return [];
+    if (!displayEvent) return [];
     // Prefer linked people from database
-    if (event.linkedPeople && event.linkedPeople.length > 0) {
-      return event.linkedPeople;
+    if (displayEvent.linkedPeople && displayEvent.linkedPeople.length > 0) {
+      return displayEvent.linkedPeople;
     }
     // Fallback to title matching
     if (!people || people.length === 0) return [];
-    return getMatchedPeopleFromEvent(event.title, people);
-  }, [event?.linkedPeople, event?.title, people]);
+    return getMatchedPeopleFromEvent(displayEvent.title, people);
+  }, [displayEvent?.linkedPeople, displayEvent?.title, people]);
 
   // Fetch linked people when event changes
   React.useEffect(() => {
-    if (event?.id) {
+    if (displayEvent?.id) {
       fetchLinkedPeople();
     } else {
       setLinkedPeople([]);
     }
-  }, [event?.id]);
+  }, [displayEvent?.id]);
+
+  // Fetch calendars when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchCalendars();
+    }
+  }, [isOpen]);
+
+  // Initialize location value when event changes
+  React.useEffect(() => {
+    if (displayEvent?.location) {
+      setLocationValue(displayEvent.location);
+    } else {
+      setLocationValue('');
+    }
+    setIsEditingLocation(false);
+  }, [displayEvent?.location]);
+
+  const fetchCalendars = async () => {
+    setIsLoadingCalendars(true);
+    try {
+      const response = await fetch('/api/google-calendar/calendars');
+      if (response.ok) {
+        const data = await response.json();
+        setCalendars(data.calendars || []);
+      }
+    } catch (error) {
+      console.error('Error fetching calendars:', error);
+    } finally {
+      setIsLoadingCalendars(false);
+    }
+  };
 
   const fetchLinkedPeople = async () => {
-    if (!event?.id) return;
+    if (!displayEvent?.id) return;
     
     setIsLoadingLinkedPeople(true);
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(event.id)}/people`);
+      const response = await fetch(`/api/events/${encodeURIComponent(displayEvent.id)}/people`);
       const data = await response.json();
       if (response.ok) {
         setLinkedPeople(data.people || []);
@@ -126,7 +184,7 @@ export function EventDetailModal({
   };
 
   const handleAddPerson = async (personId: string) => {
-    if (!event?.id) return;
+    if (!displayEvent?.id) return;
     
     // Optimistically update
     const person = people.find(p => p.id === personId);
@@ -138,12 +196,12 @@ export function EventDetailModal({
       
       // Optimistically update parent component
       const updatedPeople = [...linkedPeople, optimisticPerson];
-      onPeopleChange?.(event.id, updatedPeople);
+      onPeopleChange?.(displayEvent.id, updatedPeople);
     }
     
     setIsAddingPerson(true);
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(event.id)}/people`, {
+      const response = await fetch(`/api/events/${encodeURIComponent(displayEvent.id)}/people`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personId }),
@@ -159,12 +217,12 @@ export function EventDetailModal({
         const updatedPeople = linkedPeople
           .filter(p => !p.linkId?.startsWith('temp-'))
           .concat(data.person);
-        onPeopleChange?.(event.id, updatedPeople);
+        onPeopleChange?.(displayEvent.id, updatedPeople);
       } else {
         // Revert optimistic update on error
         setLinkedPeople((prev) => prev.filter(p => p.id !== personId || !p.linkId?.startsWith('temp-')));
         const revertedPeople = linkedPeople.filter(p => p.id !== personId);
-        onPeopleChange?.(event.id, revertedPeople);
+        onPeopleChange?.(displayEvent.id, revertedPeople);
         alert(data.error || 'Failed to add person');
       }
     } catch (error) {
@@ -172,7 +230,7 @@ export function EventDetailModal({
       // Revert optimistic update on error
       setLinkedPeople((prev) => prev.filter(p => p.id !== personId || !p.linkId?.startsWith('temp-')));
       const revertedPeople = linkedPeople.filter(p => p.id !== personId);
-      onPeopleChange?.(event.id, revertedPeople);
+      onPeopleChange?.(displayEvent.id, revertedPeople);
       alert('Failed to add person');
     } finally {
       setIsAddingPerson(false);
@@ -180,7 +238,7 @@ export function EventDetailModal({
   };
 
   const handleRemovePerson = async (personId: string) => {
-    if (!event?.id) return;
+    if (!displayEvent?.id) return;
     
     // Optimistically update
     const personToRemove = linkedPeople.find(p => p.id === personId);
@@ -188,11 +246,11 @@ export function EventDetailModal({
     
     // Optimistically update parent component
     const updatedPeople = linkedPeople.filter(p => p.id !== personId);
-    onPeopleChange?.(event.id, updatedPeople);
+    onPeopleChange?.(displayEvent.id, updatedPeople);
     
     try {
       const response = await fetch(
-        `/api/events/${encodeURIComponent(event.id)}/people?personId=${personId}`,
+        `/api/events/${encodeURIComponent(displayEvent.id)}/people?personId=${personId}`,
         { method: 'DELETE' }
       );
       
@@ -200,7 +258,7 @@ export function EventDetailModal({
         // Revert optimistic update on error
         if (personToRemove) {
           setLinkedPeople((prev) => [...prev, personToRemove]);
-          onPeopleChange?.(event.id, linkedPeople);
+          onPeopleChange?.(displayEvent.id, linkedPeople);
         }
         const data = await response.json();
         alert(data.error || 'Failed to remove person');
@@ -210,7 +268,7 @@ export function EventDetailModal({
       // Revert optimistic update on error
       if (personToRemove) {
         setLinkedPeople((prev) => [...prev, personToRemove]);
-        onPeopleChange?.(event.id, linkedPeople);
+        onPeopleChange?.(displayEvent.id, linkedPeople);
       }
       alert('Failed to remove person');
     }
@@ -241,6 +299,7 @@ export function EventDetailModal({
       fetchRecentDates();
     }
   }, [showPersonSelector, people]);
+
 
   // Get available people (not already linked), filtered and sorted
   const availablePeople = React.useMemo(() => {
@@ -273,9 +332,6 @@ export function EventDetailModal({
     return filtered;
   }, [people, linkedPeople, personSearchQuery, peopleWithRecentDates]);
 
-  // Early return after all hooks
-  if (!event) return null;
-
   // Handle all-day toggle
   const handleAllDayToggle = (checked: boolean) => {
     setIsAllDayEdit(checked);
@@ -287,9 +343,9 @@ export function EventDetailModal({
   };
 
   const handleSave = async () => {
-    if (!onEventUpdate || !event) return;
+    if (!onEventUpdate || !displayEvent) return;
     
-    const calendarId = event.calendarId || event.calendar;
+    const calendarId = displayEvent.calendarId || displayEvent.calendar;
     if (!calendarId) {
       console.error('No calendar ID available');
       return;
@@ -323,10 +379,10 @@ export function EventDetailModal({
     setIsSaving(true);
     try {
       if (onEventUpdate) {
-        await onEventUpdate(event.id, calendarId, newStart, newEnd, isAllDayEdit);
+        await onEventUpdate(displayEvent.id, calendarId, newStart, newEnd, isAllDayEdit);
       } else {
         // Fallback to direct API call if onEventUpdate is not provided
-        const response = await fetch(`/api/google-calendar/events/${event.id}`, {
+        const response = await fetch(`/api/google-calendar/events/${displayEvent.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -362,12 +418,12 @@ export function EventDetailModal({
 
   const handleCancel = () => {
     // Reset to original values
-    if (event) {
-      setEditedStart(new Date(event.start));
-      setEditedEnd(new Date(event.end));
-      setIsAllDayEdit(event.isAllDay || false);
-      const start = new Date(event.start);
-      const end = new Date(event.end);
+    if (displayEvent) {
+      setEditedStart(new Date(displayEvent.start));
+      setEditedEnd(new Date(displayEvent.end));
+      setIsAllDayEdit(displayEvent.isAllDay || false);
+      const start = new Date(displayEvent.start);
+      const end = new Date(displayEvent.end);
       setStartDate(start.toISOString().split('T')[0]);
       setEndDate(end.toISOString().split('T')[0]);
       setStartTime(formatTimeForInput(start));
@@ -376,15 +432,147 @@ export function EventDetailModal({
     setIsEditing(false);
   };
 
+  const handleCalendarChange = async (newCalendarId: string) => {
+    if (!displayEvent || newCalendarId === displayEvent.calendarId || newCalendarId === displayEvent.calendar) {
+      setShowCalendarSelector(false);
+      return;
+    }
+
+    setIsUpdatingCalendar(true);
+    const oldCalendarId = displayEvent.calendarId || displayEvent.calendar;
+    const newCalendar = calendars.find(c => c.id === newCalendarId);
+    
+    // Optimistic update - update local state immediately
+    const updatedEvent = {
+      ...displayEvent,
+      calendarId: newCalendarId,
+      calendar: newCalendar?.summary || displayEvent.calendar,
+      color: newCalendar?.color || displayEvent.color,
+    };
+    setOptimisticEvent(updatedEvent);
+    setShowCalendarSelector(false);
+    
+    try {
+      const response = await fetch(`/api/google-calendar/events/${displayEvent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calendarId: oldCalendarId,
+          newCalendarId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update calendar');
+      }
+
+      const data = await response.json();
+      
+      // Update optimistic event with server response
+      // Ensure calendar name is used (not ID) - prefer API response, then newCalendar summary, then keep current
+      const calendarName = data.event.calendar && data.event.calendar !== data.event.calendarId
+        ? data.event.calendar
+        : (newCalendar?.summary || displayEvent.calendar);
+      
+      setOptimisticEvent({
+        ...updatedEvent,
+        calendarId: data.event.calendarId || newCalendarId,
+        calendar: calendarName,
+        color: data.event.color || newCalendar?.color || displayEvent.color,
+      });
+      
+      // Silently update parent without triggering full refresh
+      // Only update the specific event in parent's cache, not trigger a full calendar refresh
+      if (onEventUpdate) {
+        await onEventUpdate(
+          displayEvent.id,
+          newCalendarId,
+          new Date(data.event.start),
+          new Date(data.event.end),
+          data.event.isAllDay
+        );
+      }
+    } catch (error) {
+      console.error('Error updating calendar:', error);
+      // Revert optimistic update on error
+      setOptimisticEvent(displayEvent);
+      alert('Failed to update calendar. Please try again.');
+    } finally {
+      setIsUpdatingCalendar(false);
+    }
+  };
+
+  const handleLocationSave = async () => {
+    if (!displayEvent) return;
+
+    setIsUpdatingLocation(true);
+    const newLocation = locationValue.trim();
+    
+    // Optimistic update
+    const updatedEvent = {
+      ...displayEvent,
+      location: newLocation,
+    };
+    setOptimisticEvent(updatedEvent);
+    setIsEditingLocation(false);
+    
+    try {
+      const response = await fetch(`/api/google-calendar/events/${displayEvent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calendarId: displayEvent.calendarId || displayEvent.calendar,
+          location: newLocation,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update location');
+      }
+
+      const data = await response.json();
+      
+      // Update optimistic event with server response
+      setOptimisticEvent({
+        ...updatedEvent,
+        location: data.event.location || newLocation,
+      });
+      
+      // Silently update parent without triggering full refresh
+      if (onEventUpdate) {
+        await onEventUpdate(
+          displayEvent.id,
+          displayEvent.calendarId || displayEvent.calendar,
+          new Date(data.event.start),
+          new Date(data.event.end),
+          data.event.isAllDay
+        );
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+      // Revert optimistic update on error
+      setOptimisticEvent(displayEvent);
+      setIsEditingLocation(true);
+      alert('Failed to update location. Please try again.');
+    } finally {
+      setIsUpdatingLocation(false);
+    }
+  };
+
   // Format date for display (like "20 Dec 2025")
   const formatDateDisplay = (dateStr: string) => {
     const date = new Date(dateStr);
     return format(date, 'd MMM yyyy');
   };
 
-  const isAllDay = isAllDayEvent(event);
-  const eventStartDate = new Date(event.start);
-  const eventEndDate = new Date(event.end);
+  // Early return after all hooks
+  if (!displayEvent) return null;
+
+  const isAllDay = isAllDayEvent(displayEvent);
+  const eventStartDate = new Date(displayEvent.start);
+  const eventEndDate = new Date(displayEvent.end);
 
   // Format date range
   const formatDateRange = () => {
@@ -428,10 +616,10 @@ export function EventDetailModal({
         {/* Notion-style header with color accent */}
         <div
           className="h-1 w-full"
-          style={{ backgroundColor: event.color || '#4285f4' }}
+          style={{ backgroundColor: displayEvent.color || '#4285f4' }}
         />
         
-        <div className="p-8">
+        <div className="px-6 py-8 pb-16 relative">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
               {/* Person avatars - to the left of the title, overlapping */}
@@ -455,7 +643,7 @@ export function EventDetailModal({
                   ))}
                 </div>
               )}
-              <span className="flex-1">{event.title}</span>
+              <span className="flex-1">{displayEvent.title}</span>
             </DialogTitle>
           </DialogHeader>
 
@@ -463,9 +651,6 @@ export function EventDetailModal({
           <div className="space-y-6">
             {/* Date & Time */}
             <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-              </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-sm font-medium text-muted-foreground">
@@ -524,7 +709,9 @@ export function EventDetailModal({
                           <div className="relative">
                             <TimePicker
                               value={startTime}
-                              onChange={setStartTime}
+                              onChange={(newValue) => {
+                                setStartTime(newValue);
+                              }}
                               timeFormat={timeFormat}
                               className="h-10"
                             />
@@ -540,7 +727,9 @@ export function EventDetailModal({
                           <div className="relative">
                             <TimePicker
                               value={endTime}
-                              onChange={setEndTime}
+                              onChange={(newValue) => {
+                                setEndTime(newValue);
+                              }}
                               timeFormat={timeFormat}
                               className="h-10"
                             />
@@ -617,67 +806,82 @@ export function EventDetailModal({
             </div>
 
             {/* Calendar */}
-            {event.calendar && (
+            {displayEvent.calendar && (
               <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Calendar
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: event.color || '#4285f4' }}
-                    />
-                    <span className="text-base">{event.calendar}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Location */}
-            {event.location && String(event.location).trim() !== '' && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Location
-                  </div>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                  <Popover 
+                    open={showCalendarSelector} 
+                    onOpenChange={(open) => {
+                      if (!isUpdatingCalendar) {
+                        setShowCalendarSelector(open);
+                      }
+                    }}
                   >
-                    <span>{event.location}</span>
-                    <svg
-                      className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                    <PopoverTrigger asChild>
+                      <button
+                        className="inline-flex items-center px-2.5 py-1 rounded-full hover:opacity-90 transition-opacity cursor-pointer"
+                        style={{ backgroundColor: displayEvent.color || '#4285f4' }}
+                        disabled={isUpdatingCalendar || isLoadingCalendars}
+                      >
+                        <span className="text-xs font-medium text-white">{displayEvent.calendar}</span>
+                        {!isUpdatingCalendar && (
+                          <ChevronDown className="h-3 w-3 text-white ml-1.5" />
+                        )}
+                        {isUpdatingCalendar && (
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin ml-1.5" />
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      className="w-56 p-1" 
+                      align="start" 
+                      style={{ zIndex: 10002 }}
+                      onInteractOutside={(e) => {
+                        // Allow clicks inside the dialog but prevent closing when clicking outside
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[role="dialog"]')) {
+                          // Don't close when clicking inside dialog
+                          return;
+                        }
+                      }}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
-                  </a>
+                      <div className="max-h-64 overflow-y-auto" style={{ pointerEvents: 'auto' }}>
+                        {calendars.map((cal) => (
+                          <button
+                            key={cal.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleCalendarChange(cal.id);
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left cursor-pointer"
+                            disabled={isUpdatingCalendar}
+                            style={{ pointerEvents: 'auto' }}
+                          >
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: cal.color || '#4285f4' }}
+                            />
+                            <span className="text-sm flex-1 truncate">{cal.summary}</span>
+                            {(displayEvent.calendarId === cal.id || displayEvent.calendar === cal.id) && (
+                              <CheckCircle className="h-4 w-4 text-primary" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             )}
 
             {/* Description */}
-            {event.description && event.description.trim() && (
+            {displayEvent.description && displayEvent.description.trim() && (
               <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <div className="w-5 h-5" />
-                </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-muted-foreground mb-2">
                     Description
@@ -697,141 +901,222 @@ export function EventDetailModal({
                       [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2
                       [&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2
                       [&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border"
-                    dangerouslySetInnerHTML={{ __html: event.description }}
+                    dangerouslySetInnerHTML={{ __html: displayEvent.description }}
                   />
                 </div>
               </div>
             )}
 
-            {/* People */}
+            {/* People and Location */}
             <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Users className="h-5 w-5 text-muted-foreground" />
-              </div>
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    People
-                  </div>
-                  {availablePeople.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowPersonSelector(!showPersonSelector)}
-                      className="h-7 px-2"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                  )}
-                </div>
-                
-                {isLoadingLinkedPeople ? (
-                  <div className="text-sm text-muted-foreground">Loading...</div>
-                ) : linkedPeople.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {linkedPeople.map((person) => (
-                      <div
-                        key={person.id}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
-                      >
-                        <PersonAvatar
-                          person={person}
-                          size="sm"
-                          onClick={() => onPersonClick?.(person)}
-                        />
-                        <span className="text-sm">{person.name}</span>
-                        <button
-                          onClick={() => handleRemovePerson(person.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
-                          title="Remove person"
-                        >
-                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                        </button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* People Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-muted-foreground">
+                        People
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No people linked</div>
-                )}
-
-                {/* Person selector dropdown */}
-                {showPersonSelector && (
-                  <div className="mt-2 border rounded-md bg-background shadow-lg">
-                    {/* Search bar */}
-                    <div className="p-2 border-b">
-                      <Input
-                        placeholder="Search people..."
-                        value={personSearchQuery}
-                        onChange={(e) => setPersonSearchQuery(e.target.value)}
-                        className="h-8 text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    {/* People list */}
-                    <div className="max-h-48 overflow-y-auto">
-                      {availablePeople.length > 0 ? (
-                        availablePeople.map((person) => (
-                          <button
-                            key={person.id}
-                            onClick={() => handleAddPerson(person.id)}
-                            disabled={isAddingPerson}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
-                          >
-                            <PersonAvatar person={person} size="sm" onClick={undefined} />
-                            <span className="text-sm">{person.name}</span>
-                            {peopleWithRecentDates.has(person.id) && (
-                              <span className="text-xs text-muted-foreground ml-auto">
-                                {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
-                              </span>
-                            )}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="p-4 text-sm text-muted-foreground text-center">
-                          {personSearchQuery.trim() ? 'No people found' : 'No people available'}
-                        </div>
+                      {availablePeople.length > 0 && linkedPeople.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPersonSelector(!showPersonSelector)}
+                          className="h-7 px-2"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                    
+                    {isLoadingLinkedPeople ? (
+                      <div className="text-sm text-muted-foreground">Loading...</div>
+                    ) : linkedPeople.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {linkedPeople.map((person) => (
+                          <div
+                            key={person.id}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
+                          >
+                            <PersonAvatar
+                              person={person}
+                              size="sm"
+                              onClick={() => onPersonClick?.(person)}
+                            />
+                            <span className="text-sm">{person.name}</span>
+                            <button
+                              onClick={() => handleRemovePerson(person.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
+                              title="Remove person"
+                            >
+                              <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      availablePeople.length > 0 ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPersonSelector(!showPersonSelector)}
+                          className="h-7 px-2"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add people
+                        </Button>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">No people available</div>
+                      )
+                    )}
 
-            {/* Organizer */}
-            {event.organizer && (event.organizer.email || event.organizer.displayName) && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Organizer
+                    {/* Person selector dropdown */}
+                    {showPersonSelector && (
+                      <div className="mt-2 border rounded-md bg-background shadow-lg z-[100] relative">
+                        {/* Search bar */}
+                        <div className="p-2 border-b">
+                          <Input
+                            placeholder="Search people..."
+                            value={personSearchQuery}
+                            onChange={(e) => setPersonSearchQuery(e.target.value)}
+                            className="h-8 text-sm"
+                            autoFocus
+                          />
+                        </div>
+                        {/* People list */}
+                        <div className="max-h-48 overflow-y-auto">
+                          {availablePeople.length > 0 ? (
+                            availablePeople.map((person) => (
+                              <button
+                                key={person.id}
+                                onClick={() => handleAddPerson(person.id)}
+                                disabled={isAddingPerson}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
+                              >
+                                <PersonAvatar person={person} size="sm" onClick={undefined} />
+                                <span className="text-sm">{person.name}</span>
+                                {peopleWithRecentDates.has(person.id) && (
+                                  <span className="text-xs text-muted-foreground ml-auto">
+                                    {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              {personSearchQuery.trim() ? 'No people found' : 'No people available'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-base">
-                    {event.organizer.displayName || event.organizer.email}
-                    {event.organizer.email && event.organizer.displayName && (
-                      <span className="text-sm text-muted-foreground ml-2">
-                        ({event.organizer.email})
-                      </span>
+
+                  {/* Location Section */}
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-2">
+                      Location
+                    </div>
+                    {isEditingLocation ? (
+                      <div className="space-y-2">
+                        <Input
+                          value={locationValue}
+                          onChange={(e) => setLocationValue(e.target.value)}
+                          placeholder="Enter location..."
+                          className="text-base"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleLocationSave();
+                            } else if (e.key === 'Escape') {
+                              setIsEditingLocation(false);
+                              setLocationValue(event.location || '');
+                            }
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleLocationSave}
+                            disabled={isUpdatingLocation}
+                          >
+                            {isUpdatingLocation ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4 mr-2" />
+                                Save
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingLocation(false);
+                              setLocationValue(displayEvent.location || '');
+                            }}
+                            disabled={isUpdatingLocation}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : displayEvent.location && String(displayEvent.location).trim() !== '' ? (
+                      <a
+                        href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(displayEvent.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        <span className="truncate">{displayEvent.location}</span>
+                        <svg
+                          className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                          />
+                        </svg>
+                      </a>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsEditingLocation(true)}
+                        className="h-7 px-2"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add location
+                      </Button>
                     )}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Attendees */}
-            {event.attendees && event.attendees.length > 0 && (
+            {displayEvent.attendees && displayEvent.attendees.length > 0 && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
                   <Users className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-muted-foreground mb-2">
-                    Attendees ({event.attendees.length})
+                    Attendees ({displayEvent.attendees.length})
                   </div>
                   <div className="space-y-1">
-                    {event.attendees.map((attendee, idx) => (
+                    {displayEvent.attendees.map((attendee, idx) => (
                       <div key={idx} className="text-base flex items-center gap-2">
                         <span>{attendee.displayName || attendee.email}</span>
                         {attendee.organizer && (
@@ -858,42 +1143,8 @@ export function EventDetailModal({
               </div>
             )}
 
-            {/* Reminders */}
-            {event.reminders && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <Bell className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Reminders
-                  </div>
-                  {event.reminders.useDefault ? (
-                    <div className="text-base">Using default reminders</div>
-                  ) : event.reminders.overrides && event.reminders.overrides.length > 0 ? (
-                    <div className="space-y-1">
-                      {event.reminders.overrides.map((reminder: any, idx: number) => (
-                        <div key={idx} className="text-base">
-                          {reminder.method === 'email' && '📧 '}
-                          {reminder.method === 'popup' && '🔔 '}
-                          {reminder.minutes !== undefined && (
-                            reminder.minutes === 0 ? 'At time of event' :
-                            reminder.minutes < 60 ? `${reminder.minutes} minutes before` :
-                            reminder.minutes < 1440 ? `${Math.floor(reminder.minutes / 60)} hours before` :
-                            `${Math.floor(reminder.minutes / 1440)} days before`
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-base text-muted-foreground">No reminders</div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Recurrence */}
-            {event.recurrence && event.recurrence.length > 0 && (
+            {displayEvent.recurrence && displayEvent.recurrence.length > 0 && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
                   <Repeat className="h-5 w-5 text-muted-foreground" />
@@ -904,9 +1155,9 @@ export function EventDetailModal({
                   </div>
                   <div className="text-base">
                     Recurring event
-                    {event.recurrence[0] && (
+                    {displayEvent.recurrence[0] && (
                       <div className="text-sm text-muted-foreground mt-1 font-mono">
-                        {event.recurrence[0]}
+                        {displayEvent.recurrence[0]}
                       </div>
                     )}
                   </div>
@@ -915,7 +1166,7 @@ export function EventDetailModal({
             )}
 
             {/* Video Conference */}
-            {(event.hangoutLink || (event.conferenceData?.entryPoints && event.conferenceData.entryPoints.length > 0)) && (
+            {(displayEvent.hangoutLink || (displayEvent.conferenceData?.entryPoints && displayEvent.conferenceData.entryPoints.length > 0)) && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
                   <Video className="h-5 w-5 text-muted-foreground" />
@@ -924,9 +1175,9 @@ export function EventDetailModal({
                   <div className="text-sm font-medium text-muted-foreground mb-1">
                     Video Conference
                   </div>
-                  {event.hangoutLink && (
+                  {displayEvent.hangoutLink && (
                     <a
-                      href={event.hangoutLink}
+                      href={displayEvent.hangoutLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-base text-blue-600 dark:text-blue-400 hover:underline block"
@@ -934,7 +1185,7 @@ export function EventDetailModal({
                       Join Google Meet
                     </a>
                   )}
-                  {event.conferenceData?.entryPoints?.map((entry: any, idx: number) => (
+                  {displayEvent.conferenceData?.entryPoints?.map((entry: any, idx: number) => (
                     <div key={idx} className="mt-1">
                       <a
                         href={entry.uri}
@@ -951,12 +1202,12 @@ export function EventDetailModal({
             )}
 
             {/* Status */}
-            {event.status && event.status !== 'confirmed' && (
+            {displayEvent.status && displayEvent.status !== 'confirmed' && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
-                  {event.status === 'cancelled' ? (
+                  {displayEvent.status === 'cancelled' ? (
                     <XCircle className="h-5 w-5 text-red-500" />
-                  ) : event.status === 'tentative' ? (
+                  ) : displayEvent.status === 'tentative' ? (
                     <AlertCircle className="h-5 w-5 text-yellow-500" />
                   ) : (
                     <CheckCircle className="h-5 w-5 text-muted-foreground" />
@@ -966,16 +1217,16 @@ export function EventDetailModal({
                   <div className="text-sm font-medium text-muted-foreground mb-1">
                     Status
                   </div>
-                  <div className="text-base capitalize">{event.status}</div>
+                  <div className="text-base capitalize">{displayEvent.status}</div>
                 </div>
               </div>
             )}
 
             {/* Visibility */}
-            {event.visibility && event.visibility !== 'default' && (
+            {displayEvent.visibility && displayEvent.visibility !== 'default' && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
-                  {event.visibility === 'private' ? (
+                  {displayEvent.visibility === 'private' ? (
                     <EyeOff className="h-5 w-5 text-muted-foreground" />
                   ) : (
                     <Eye className="h-5 w-5 text-muted-foreground" />
@@ -985,13 +1236,13 @@ export function EventDetailModal({
                   <div className="text-sm font-medium text-muted-foreground mb-1">
                     Visibility
                   </div>
-                  <div className="text-base capitalize">{event.visibility}</div>
+                  <div className="text-base capitalize">{displayEvent.visibility}</div>
                 </div>
               </div>
             )}
 
             {/* Transparency */}
-            {event.transparency && event.transparency !== 'opaque' && (
+            {displayEvent.transparency && displayEvent.transparency !== 'opaque' && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
                   <div className="w-5 h-5" />
@@ -1001,35 +1252,33 @@ export function EventDetailModal({
                     Transparency
                   </div>
                   <div className="text-base capitalize">
-                    {event.transparency === 'transparent' ? 'Shows as available' : event.transparency}
+                    {displayEvent.transparency === 'transparent' ? 'Shows as available' : displayEvent.transparency}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Link to Google Calendar */}
-            {event.htmlLink && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <LinkIcon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    View in Google Calendar
-                  </div>
-                  <a
-                    href={event.htmlLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-base text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    Open event
-                  </a>
-                </div>
-              </div>
-            )}
           </div>
         </div>
+        
+        {/* Open event button in bottom left */}
+        {displayEvent.htmlLink && (
+          <div className="absolute bottom-4 left-4">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+            >
+              <a
+                href={displayEvent.htmlLink}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open event
+              </a>
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -108,11 +108,11 @@ export default function Settings() {
       <div className="max-w-3xl mx-auto">
         <div className="mb-6 sm:mb-8">
           <Link
-            href="/dashboard"
+            href="/hq"
             className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            Back to HQ
           </Link>
         </div>
 

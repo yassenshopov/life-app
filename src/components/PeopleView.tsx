@@ -23,6 +23,7 @@ import { ConnectPeopleDbDialog } from '@/components/dialogs/ConnectPeopleDbDialo
 import { useTableFilters } from '@/hooks/useTableFilters';
 import { FilterState } from '@/types/filters';
 import { cn } from '@/lib/utils';
+import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 
 // Zodiac sign symbols mapping
 const zodiacSymbols: Record<string, string> = {
@@ -167,8 +168,10 @@ export function PeopleView() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [connectionInfo, setConnectionInfo] = useState<any>(null);
   const [personEvents, setPersonEvents] = useState<Record<string, any[]>>({});
-  const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
   const [isLinkingEvents, setIsLinkingEvents] = useState(false);
+  const [loadingPersonEvents, setLoadingPersonEvents] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+  const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
 
   // Check connection status
   useEffect(() => {
@@ -234,6 +237,7 @@ export function PeopleView() {
   };
 
   const fetchPersonEvents = async (personId: string) => {
+    setLoadingPersonEvents(personId);
     try {
       const response = await fetch(`/api/people/${personId}/events`);
       const data = await response.json();
@@ -245,6 +249,8 @@ export function PeopleView() {
       }
     } catch (error) {
       console.error('Error fetching person events:', error);
+    } finally {
+      setLoadingPersonEvents(null);
     }
   };
 
@@ -541,6 +547,14 @@ export function PeopleView() {
                           <Card
                             key={person.id}
                             className="group overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                            onClick={async () => {
+                              setSelectedPerson(person);
+                              setIsPersonModalOpen(true);
+                              // Fetch events when opening modal
+                              if (!personEvents[person.id]) {
+                                fetchPersonEvents(person.id);
+                              }
+                            }}
                           >
                             {/* Profile Image - Smaller */}
                             <div className="h-20 w-full overflow-hidden bg-muted/20 relative">
@@ -681,19 +695,16 @@ export function PeopleView() {
                       const tier = person.tier && person.tier.length > 0 ? person.tier[0] : '';
                       const imageUrl = getImageUrl(person);
                       const events = personEvents[person.id] || [];
-                      const isExpanded = expandedPersonId === person.id;
 
                       return (
                         <React.Fragment key={person.id}>
                           <TableRow
                             className="hover:bg-muted/30 transition-colors cursor-pointer"
                             onClick={async () => {
-                              // Toggle expansion first
-                              const newExpandedState = !isExpanded;
-                              setExpandedPersonId(newExpandedState ? person.id : null);
-                              
-                              // Fetch events only when expanding (lazy load)
-                              if (newExpandedState && !personEvents[person.id]) {
+                              setSelectedPerson(person);
+                              setIsPersonModalOpen(true);
+                              // Fetch events when opening modal
+                              if (!personEvents[person.id]) {
                                 fetchPersonEvents(person.id);
                               }
                             }}
@@ -778,72 +789,6 @@ export function PeopleView() {
                           </TableCell>
                           <TableCell className="text-sm">{person.occupation || ''}</TableCell>
                         </TableRow>
-                        {/* Expanded Events Row */}
-                        {isExpanded && events.length > 0 && (
-                          <TableRow>
-                            <TableCell colSpan={columns.length} className="bg-muted/20 p-4">
-                              <div className="space-y-2">
-                                <div className="text-sm font-medium mb-2">Connected Calendar Events</div>
-                                <div className="space-y-1">
-                                  {events.map((event: any) => {
-                                    // Parse event start date - handle Google Calendar API format
-                                    let eventStart: Date | null = null;
-                                    if (event.start?.dateTime) {
-                                      eventStart = new Date(event.start.dateTime);
-                                    } else if (event.start?.date) {
-                                      eventStart = new Date(event.start.date + 'T00:00:00');
-                                    } else if (event.start) {
-                                      // Try to parse as ISO string or timestamp
-                                      eventStart = new Date(event.start);
-                                    }
-                                    
-                                    // Skip invalid events
-                                    if (!eventStart || isNaN(eventStart.getTime())) {
-                                      console.warn('Invalid event date:', event);
-                                      return null;
-                                    }
-                                    
-                                    const dateStr = eventStart.toISOString().split('T')[0];
-                                    const isAllDay = event.start?.date || !event.start?.dateTime;
-                                    
-                                    return (
-                                      <Link
-                                        key={event.id}
-                                        href={`/hq?date=${dateStr}`}
-                                        className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors group"
-                                      >
-                                        <div
-                                          className="w-2 h-2 rounded-full flex-shrink-0"
-                                          style={{ backgroundColor: event.color || '#4285f4' }}
-                                        />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-sm font-medium truncate">{event.summary || event.title || 'Untitled Event'}</div>
-                                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                                            <div className="flex items-center gap-1">
-                                              <Clock className="w-3 h-3" />
-                                              <span>
-                                                {isAllDay 
-                                                  ? format(eventStart, 'MMM d, yyyy')
-                                                  : `${format(eventStart, 'MMM d, yyyy')} at ${format(eventStart, 'h:mm a')}`
-                                                }
-                                              </span>
-                                            </div>
-                                            {event.location && (
-                                              <div className="flex items-center gap-1">
-                                                <MapPin className="w-3 h-3" />
-                                                <span className="truncate">{event.location}</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </Link>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
                       </React.Fragment>
                       );
                     })
@@ -872,6 +817,19 @@ export function PeopleView() {
           </Card>
         )}
       </div>
+
+      {/* Person Details Modal */}
+      <PersonDetailsModal
+        person={selectedPerson}
+        isOpen={isPersonModalOpen}
+        onClose={() => {
+          setIsPersonModalOpen(false);
+          setSelectedPerson(null);
+        }}
+        onFetchEvents={fetchPersonEvents}
+        events={selectedPerson ? (personEvents[selectedPerson.id] || []) : []}
+        isLoadingEvents={selectedPerson ? (loadingPersonEvents === selectedPerson.id) : false}
+      />
     </div>
   );
 }
