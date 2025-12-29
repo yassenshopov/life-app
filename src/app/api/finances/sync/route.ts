@@ -62,7 +62,8 @@ function getIconUrl(icon: any): string | null {
 async function uploadIconToStorage(
   imageUrl: string,
   userId: string,
-  assetId: string
+  assetId: string,
+  updatedAt?: string
 ): Promise<string | null> {
   try {
     // Download the image
@@ -133,7 +134,8 @@ async function uploadIconToStorage(
 async function uploadPlaceIconToStorage(
   imageUrl: string,
   userId: string,
-  placeId: string
+  placeId: string,
+  updatedAt?: string
 ): Promise<string | null> {
   try {
     // Download the image
