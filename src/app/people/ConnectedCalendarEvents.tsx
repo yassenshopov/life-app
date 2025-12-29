@@ -216,8 +216,8 @@ export function ConnectedCalendarEvents({ events, isLoading = false }: Connected
 
           const dateStr = eventStart.toISOString().split('T')[0];
           const isAllDay = 
-            (typeof event.start === 'object' && event.start?.date) || 
-            !(typeof event.start === 'object' && event.start?.dateTime);
+            (typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.date) || 
+            !(typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.dateTime);
           
           const eventColor = getEventColor(event);
           const timeAgo = formatDistanceToNow(eventStart, { addSuffix: true });

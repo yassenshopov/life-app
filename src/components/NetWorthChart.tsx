@@ -448,8 +448,8 @@ export function NetWorthChart({ investments, selectedCurrency, exchangeRates }: 
     return { data: filteredData, assets: Array.from(uniqueAssets.values()) };
   }, [investments, selectedPeriod, historicalPrices]);
 
-  const chartDataArray = chartData.data || [];
-  const chartAssets = chartData.assets || [];
+  const chartDataArray = Array.isArray(chartData) ? [] : (chartData.data || []);
+  const chartAssets = Array.isArray(chartData) ? [] : (chartData.assets || []);
 
   // Calculate Jan 1st dates for reference lines (using closest date in chart data)
   const jan1stDates = useMemo(() => {

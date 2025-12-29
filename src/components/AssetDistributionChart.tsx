@@ -39,6 +39,15 @@ interface IndividualInvestment {
   id: string;
   asset_id: string | null;
   current_worth?: number | null;
+  current_value: number | null;
+  current_price: number | null;
+  quantity: number | null;
+  place?: {
+    id: string;
+    name: string;
+    icon: any | null;
+    icon_url: string | null;
+  } | null;
 }
 
 interface AssetDistributionChartProps {

@@ -67,6 +67,7 @@ interface Place {
   icon: any | null;
   icon_url: string | null;
   properties: any;
+  institution?: string | null;
 }
 
 
