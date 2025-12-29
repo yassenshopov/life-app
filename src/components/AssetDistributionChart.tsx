@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card } from '@/components/ui/card';
 import { PageIcon } from '@/components/PageIcon';
-import { Building2 } from 'lucide-react';
+import { Building2, Wallet } from 'lucide-react';
 import { getDominantColor, getIconUrl } from '@/lib/notion-color';
 import { motion } from 'framer-motion';
 
@@ -46,6 +46,8 @@ interface AssetDistributionChartProps {
   places: Place[];
   investments: IndividualInvestment[]; // Add investments to calculate total_worth
   balanceVisible: boolean;
+  selectedCurrency: string;
+  exchangeRates: Record<string, number> | null;
 }
 
 interface PieDataItem {
@@ -71,7 +73,7 @@ const COLORS = [
   '#6366f1', // indigo
 ];
 
-export function AssetDistributionChart({ assets, places, investments, balanceVisible }: AssetDistributionChartProps) {
+export function AssetDistributionChart({ assets, places, investments, balanceVisible, selectedCurrency, exchangeRates }: AssetDistributionChartProps) {
   const pieData = useMemo(() => {
     const data: PieDataItem[] = [];
 
@@ -153,7 +155,7 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
       data.push({
         name: 'Cash',
         value: pureAccountValue,
-        color: '#8b5cf6', // purple for accounts
+        color: '#87CEEB', // light sky blue for accounts
         type: 'account',
         accounts: accountsWithCash, // Store account references for icon display
       });
@@ -184,7 +186,7 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
       <div className="flex flex-col md:flex-row gap-6 items-center">
         {/* Donut Chart */}
         <motion.div 
-          className="h-[400px] w-full md:w-1/2 flex-shrink-0 flex items-center justify-center"
+          className="h-[500px] w-full md:w-1/2 flex-shrink-0 flex items-center justify-center"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -197,8 +199,8 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                outerRadius={140}
-                innerRadius={70}
+                outerRadius={180}
+                innerRadius={90}
                 animationBegin={0}
                 animationDuration={800}
                 animationEasing="ease-out"
@@ -214,13 +216,31 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
               <Tooltip 
                 formatter={(value: number, name: string, props: any) => {
                   const percent = ((value / totalValue) * 100).toFixed(2);
+                  
+                  // Convert currency
+                  const convertCurrency = (amount: number, fromCurrency: string = 'USD'): number => {
+                    if (amount === 0 || !exchangeRates || selectedCurrency === fromCurrency) return amount;
+                    if (fromCurrency === 'USD') {
+                      const rate = exchangeRates[selectedCurrency];
+                      return rate ? amount * rate : amount;
+                    }
+                    const fromRate = exchangeRates[fromCurrency];
+                    const toRate = exchangeRates[selectedCurrency];
+                    if (fromRate && toRate) {
+                      const usdAmount = amount / fromRate;
+                      return usdAmount * toRate;
+                    }
+                    return amount;
+                  };
+                  
                   const formatCurrency = (amount: number) => {
+                    const convertedAmount = convertCurrency(amount);
                     return new Intl.NumberFormat('en-US', {
                       style: 'currency',
-                      currency: 'USD',
+                      currency: selectedCurrency,
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    }).format(amount);
+                    }).format(convertedAmount);
                   };
                   return [
                     balanceVisible 
@@ -247,13 +267,31 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
             .sort((a, b) => b.value - a.value) // Sort by value descending
             .map((item, index) => {
               const percent = ((item.value / totalValue) * 100).toFixed(2);
+              
+              // Convert currency
+              const convertCurrency = (amount: number, fromCurrency: string = 'USD'): number => {
+                if (amount === 0 || !exchangeRates || selectedCurrency === fromCurrency) return amount;
+                if (fromCurrency === 'USD') {
+                  const rate = exchangeRates[selectedCurrency];
+                  return rate ? amount * rate : amount;
+                }
+                const fromRate = exchangeRates[fromCurrency];
+                const toRate = exchangeRates[selectedCurrency];
+                if (fromRate && toRate) {
+                  const usdAmount = amount / fromRate;
+                  return usdAmount * toRate;
+                }
+                return amount;
+              };
+              
               const formatCurrency = (amount: number) => {
+                const convertedAmount = convertCurrency(amount);
                 return new Intl.NumberFormat('en-US', {
                   style: 'currency',
-                  currency: 'USD',
+                  currency: selectedCurrency,
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                }).format(amount);
+                }).format(convertedAmount);
               };
               
               if (item.type === 'asset' && item.asset) {
@@ -265,7 +303,7 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
                       uniquePlaces.set(inv.place.id, {
                         id: inv.place.id,
                         name: inv.place.name,
-                        icon: inv.place.icon,
+                        icon: null, // Places don't have icon column, only icon_url
                         icon_url: inv.place.icon_url,
                       });
                     }
@@ -329,7 +367,7 @@ export function AssetDistributionChart({ assets, places, investments, balanceVis
                           fallbackIcon={<Building2 className="w-5 h-5 text-muted-foreground" />}
                         />
                       ) : (
-                        <Building2 className="w-5 h-5 text-muted-foreground" />
+                        <Wallet className="w-5 h-5 text-muted-foreground" />
                       )}
                     </div>
                      <div className="flex-1 min-w-0">

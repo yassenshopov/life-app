@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         asset:finances_assets(*),
-        place:finances_places(id, name, icon, icon_url)
+        place:finances_places(id, name, icon_url)
       `)
       .eq('user_id', userId)
       .order('purchase_date', { ascending: false, nullsFirst: false });

@@ -662,7 +662,11 @@ export function FinancesView() {
           </div>
 
           {/* Net Worth Chart */}
-          <NetWorthChart investments={investments} />
+          <NetWorthChart 
+            investments={investments} 
+            selectedCurrency={selectedCurrency}
+            exchangeRates={exchangeRates}
+          />
 
           {/* Asset Distribution Pie Chart */}
           <AssetDistributionChart 
@@ -670,6 +674,8 @@ export function FinancesView() {
             places={places}
             investments={investments}
             balanceVisible={balanceVisible}
+            selectedCurrency={selectedCurrency}
+            exchangeRates={exchangeRates}
           />
 
           {/* All Investments Grouped by Month */}
@@ -1237,6 +1243,8 @@ export function FinancesView() {
                         iconUrl={asset.icon_url}
                         investments={asset.investments}
                         colorSettings={asset.color_settings}
+                        selectedCurrency={selectedCurrency}
+                        exchangeRates={exchangeRates}
                       />
                     )}
                   </div>
@@ -1469,6 +1477,8 @@ export function FinancesView() {
                               iconUrl={asset.icon_url}
                               investments={asset.investments}
                               colorSettings={asset.color_settings}
+                              selectedCurrency={selectedCurrency}
+                              exchangeRates={exchangeRates}
                             />
                           )}
                         </div>

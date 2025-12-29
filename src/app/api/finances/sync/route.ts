@@ -120,7 +120,9 @@ async function uploadIconToStorage(
       .from('finances-icons')
       .getPublicUrl(fileName);
 
-    return urlData.publicUrl;
+    // Add cache-busting query parameter using updated_at timestamp or current time
+    const cacheBuster = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+    return `${urlData.publicUrl}?t=${cacheBuster}`;
   } catch (error) {
     console.error(`Error uploading icon:`, error);
     return null;
@@ -189,7 +191,9 @@ async function uploadPlaceIconToStorage(
       .from('finances-place-icons')
       .getPublicUrl(fileName);
 
-    return urlData.publicUrl;
+    // Add cache-busting query parameter using updated_at timestamp or current time
+    const cacheBuster = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+    return `${urlData.publicUrl}?t=${cacheBuster}`;
   } catch (error) {
     console.error(`Error uploading place icon:`, error);
     return null;
@@ -584,7 +588,7 @@ async function syncDatabase(
           // Get the asset ID from the database
           const { data: existingAsset } = await supabase
             .from('finances_assets')
-            .select('id')
+            .select('id, updated_at')
             .eq('user_id', userId)
             .eq('notion_page_id', assetItem.notion_page_id)
             .single();
@@ -593,7 +597,8 @@ async function syncDatabase(
             const storageUrl = await uploadIconToStorage(
               assetItem._iconUrl,
               userId,
-              existingAsset.id
+              existingAsset.id,
+              existingAsset.updated_at
             );
 
             if (storageUrl) {
@@ -636,7 +641,7 @@ async function syncDatabase(
           // Get the place ID from the database
           const { data: existingPlace, error: lookupError } = await supabase
             .from('finances_places')
-            .select('id, notion_page_id')
+            .select('id, notion_page_id, updated_at')
             .eq('user_id', userId)
             .eq('notion_page_id', placeItem.notion_page_id)
             .single();
@@ -650,7 +655,8 @@ async function syncDatabase(
             const storageUrl = await uploadPlaceIconToStorage(
               placeItem._iconUrl,
               userId,
-              existingPlace.id
+              existingPlace.id,
+              existingPlace.updated_at
             );
 
             if (storageUrl) {

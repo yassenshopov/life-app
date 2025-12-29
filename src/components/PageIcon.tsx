@@ -11,6 +11,8 @@ interface PageIconProps {
 export function PageIcon({ icon, iconUrl, className = 'w-4 h-4', fallbackIcon }: PageIconProps) {
   // Prefer iconUrl (Supabase Storage) if available
   if (iconUrl) {
+    // Note: Cache-busting is handled when URLs are generated during sync
+    // URLs already include a timestamp query parameter (?t=timestamp)
     return <img src={iconUrl} alt="Page icon" className={`rounded ${className}`} />;
   }
 

@@ -24,6 +24,8 @@ interface AssetMiniChartProps {
   height?: number;
   investments?: Investment[];
   colorSettings?: { primary?: string; badge?: string } | null;
+  selectedCurrency: string;
+  exchangeRates: Record<string, number> | null;
 }
 
 interface HistoricalPrice {
@@ -43,6 +45,8 @@ export function AssetMiniChart({
   height = 60,
   investments = [],
   colorSettings,
+  selectedCurrency,
+  exchangeRates,
 }: AssetMiniChartProps) {
   const [historicalPricesMap, setHistoricalPricesMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -281,13 +285,30 @@ export function AssetMiniChart({
     return null;
   }
 
+  // Convert currency
+  const convertCurrency = (amount: number, fromCurrency: string = 'USD'): number => {
+    if (amount === 0 || !exchangeRates || selectedCurrency === fromCurrency) return amount;
+    if (fromCurrency === 'USD') {
+      const rate = exchangeRates[selectedCurrency];
+      return rate ? amount * rate : amount;
+    }
+    const fromRate = exchangeRates[fromCurrency];
+    const toRate = exchangeRates[selectedCurrency];
+    if (fromRate && toRate) {
+      const usdAmount = amount / fromRate;
+      return usdAmount * toRate;
+    }
+    return amount;
+  };
+
   const formatCurrency = (value: number) => {
+    const convertedValue = convertCurrency(value);
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: selectedCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(convertedValue);
   };
 
   return (

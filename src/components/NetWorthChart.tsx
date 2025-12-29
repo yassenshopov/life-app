@@ -43,6 +43,8 @@ interface IndividualInvestment {
 
 interface NetWorthChartProps {
   investments: IndividualInvestment[];
+  selectedCurrency: string;
+  exchangeRates: Record<string, number> | null;
 }
 
 interface HistoricalPrice {
@@ -63,7 +65,7 @@ const TIME_PERIODS: { period: TimePeriod; label: string }[] = [
 
 type ChartMode = 'area' | 'bar';
 
-export function NetWorthChart({ investments }: NetWorthChartProps) {
+export function NetWorthChart({ investments, selectedCurrency, exchangeRates }: NetWorthChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('all');
   const [chartMode, setChartMode] = useState<ChartMode>('area');
   const [historicalPrices, setHistoricalPrices] = useState<Map<string, Map<string, number>>>(new Map());
@@ -505,14 +507,31 @@ export function NetWorthChart({ investments }: NetWorthChartProps) {
     );
   }
 
+  // Convert currency
+  const convertCurrency = (amount: number, fromCurrency: string = 'USD'): number => {
+    if (amount === 0 || !exchangeRates || selectedCurrency === fromCurrency) return amount;
+    if (fromCurrency === 'USD') {
+      const rate = exchangeRates[selectedCurrency];
+      return rate ? amount * rate : amount;
+    }
+    const fromRate = exchangeRates[fromCurrency];
+    const toRate = exchangeRates[selectedCurrency];
+    if (fromRate && toRate) {
+      const usdAmount = amount / fromRate;
+      return usdAmount * toRate;
+    }
+    return amount;
+  };
+
   // Format currency for tooltip
   const formatCurrency = (value: number) => {
+    const convertedValue = convertCurrency(value);
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: selectedCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(convertedValue);
   };
 
   return (

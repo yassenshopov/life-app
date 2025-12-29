@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         asset_id,
         place_id,
         asset:finances_assets(current_price),
-        place:finances_places(id, name, icon, icon_url)
+        place:finances_places(id, name, icon_url)
       `)
       .eq('user_id', userId);
 
