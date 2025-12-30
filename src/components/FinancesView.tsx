@@ -741,6 +741,7 @@ export function FinancesView() {
                                       <PageIcon 
                                         icon={investment.asset.icon} 
                                         iconUrl={investment.asset.icon_url}
+                                        assetId={investment.asset.id}
                                         className="w-6 h-6" 
                                         fallbackIcon={<Building2 className="w-6 h-6 text-muted-foreground" />}
                                       />
@@ -792,6 +793,7 @@ export function FinancesView() {
                                           <PageIcon 
                                             icon={investment.place.icon} 
                                             iconUrl={investment.place.icon_url}
+                                            placeId={investment.place.id}
                                             className="w-3 h-3" 
                                             fallbackIcon={<Building2 className="w-3 h-3" />}
                                           />
@@ -1118,6 +1120,8 @@ export function FinancesView() {
                   <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                     <PageIcon 
                       icon={asset.icon} 
+                      iconUrl={asset.icon_url}
+                      assetId={asset.id}
                       className="w-6 h-6" 
                       fallbackIcon={<Building2 className="w-6 h-6 text-muted-foreground" />}
                     />
@@ -1158,6 +1162,7 @@ export function FinancesView() {
                                 <PageIcon 
                                   icon={place.icon} 
                                   iconUrl={place.icon_url}
+                                  placeId={place.id}
                                   className="w-5 h-5" 
                                   fallbackIcon={<Building2 className="w-5 h-5 text-muted-foreground" />}
                                 />
@@ -1517,6 +1522,8 @@ export function FinancesView() {
                         <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                           <PageIcon 
                             icon={investment.asset.icon} 
+                            iconUrl={investment.asset.icon_url}
+                            assetId={investment.asset.id}
                             className="w-6 h-6" 
                             fallbackIcon={<Building2 className="w-6 h-6 text-muted-foreground" />}
                           />

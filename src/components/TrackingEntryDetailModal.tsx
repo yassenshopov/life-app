@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Bed, Heart, Scale, Footprints } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { TrackingEntry } from '@/components/TrackingView';
 import { cn } from '@/lib/utils';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
@@ -548,6 +548,7 @@ export function TrackingEntryDetailModal({
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-lg">
+          <DialogTitle className="sr-only">No sleep data available</DialogTitle>
           <div className="py-12 text-center">
             <Bed className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground">No sleep data available for this entry</p>
@@ -560,6 +561,7 @@ export function TrackingEntryDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0 overflow-hidden">
+        <DialogTitle className="sr-only">Sleep Report</DialogTitle>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div className="flex items-center gap-3">
@@ -665,11 +667,12 @@ export function TrackingEntryDetailModal({
                             strokeWidth={2.5}
                             connectNulls={false}
                             dot={(props: any) => {
-                              const { cx, cy, payload } = props;
+                              const { cx, cy, payload, index } = props;
                               if (!payload || payload.rhrPast === null || payload.rhrPast === undefined) return null;
                               if (payload.isCurrent) {
                                 return (
                                   <circle
+                                    key={`rhr-past-${index}-${payload.date}`}
                                     cx={cx}
                                     cy={cy}
                                     r={4}
@@ -681,6 +684,7 @@ export function TrackingEntryDetailModal({
                               }
                               return (
                                 <circle
+                                  key={`rhr-past-${index}-${payload.date}`}
                                   cx={cx}
                                   cy={cy}
                                   r={2}
@@ -701,12 +705,13 @@ export function TrackingEntryDetailModal({
                               strokeDasharray="5 5"
                               connectNulls={false}
                               dot={(props: any) => {
-                                const { cx, cy, payload } = props;
+                                const { cx, cy, payload, index } = props;
                                 if (!payload || payload.rhrFuture === null || payload.rhrFuture === undefined) return null;
                                 // Don't show dot for current point as it's already shown in past line
                                 if (payload.isCurrent) return null;
                                 return (
                                   <circle
+                                    key={`rhr-future-${index}-${payload.date}`}
                                     cx={cx}
                                     cy={cy}
                                     r={2}
@@ -785,11 +790,12 @@ export function TrackingEntryDetailModal({
                             strokeWidth={2.5}
                             connectNulls={false}
                             dot={(props: any) => {
-                              const { cx, cy, payload } = props;
+                              const { cx, cy, payload, index } = props;
                               if (!payload || payload.weightPast === null || payload.weightPast === undefined) return null;
                               if (payload.isCurrent) {
                                 return (
                                   <circle
+                                    key={`weight-past-${index}-${payload.date}`}
                                     cx={cx}
                                     cy={cy}
                                     r={4}
@@ -801,6 +807,7 @@ export function TrackingEntryDetailModal({
                               }
                               return (
                                 <circle
+                                  key={`weight-past-${index}-${payload.date}`}
                                   cx={cx}
                                   cy={cy}
                                   r={2}
@@ -821,11 +828,12 @@ export function TrackingEntryDetailModal({
                               strokeDasharray="5 5"
                               connectNulls={false}
                               dot={(props: any) => {
-                                const { cx, cy, payload } = props;
+                                const { cx, cy, payload, index } = props;
                                 if (!payload || payload.weightFuture === null || payload.weightFuture === undefined) return null;
                                 if (payload.isCurrent) return null;
                                 return (
                                   <circle
+                                    key={`weight-future-${index}-${payload.date}`}
                                     cx={cx}
                                     cy={cy}
                                     r={2}
@@ -904,11 +912,12 @@ export function TrackingEntryDetailModal({
                             strokeWidth={2.5}
                             connectNulls={false}
                             dot={(props: any) => {
-                              const { cx, cy, payload } = props;
+                              const { cx, cy, payload, index } = props;
                               if (!payload || payload.stepsPast === null || payload.stepsPast === undefined) return null;
                               if (payload.isCurrent) {
                                 return (
                                   <circle
+                                    key={`steps-past-${index}-${payload.date}`}
                                     cx={cx}
                                     cy={cy}
                                     r={4}
@@ -920,6 +929,7 @@ export function TrackingEntryDetailModal({
                               }
                               return (
                                 <circle
+                                  key={`steps-past-${index}-${payload.date}`}
                                   cx={cx}
                                   cy={cy}
                                   r={2}
@@ -940,11 +950,12 @@ export function TrackingEntryDetailModal({
                               strokeDasharray="5 5"
                               connectNulls={false}
                               dot={(props: any) => {
-                                const { cx, cy, payload } = props;
+                                const { cx, cy, payload, index } = props;
                                 if (!payload || payload.stepsFuture === null || payload.stepsFuture === undefined) return null;
                                 if (payload.isCurrent) return null;
                                 return (
                                   <circle
+                                    key={`steps-future-${index}-${payload.date}`}
                                     cx={cx}
                                     cy={cy}
                                     r={2}
