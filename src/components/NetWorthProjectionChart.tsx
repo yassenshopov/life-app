@@ -675,7 +675,7 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
     });
 
     // For each date, calculate cumulative net worth
-    const finalData: Array<{ date: string; dateTimestamp: number; netWorth: number; isProjection?: boolean; [assetId: string]: number | string | boolean | undefined }> = [];
+    const finalData: Array<{ date: string; netWorth: number; isProjection?: boolean; [assetId: string]: number | string | boolean | undefined }> = [];
     const projectionDateStr = projectionDate ? format(startOfDay(projectionDate), 'yyyy-MM-dd') : null;
     
     // Pre-calculate contributions for each investment (independent of historical prices)
@@ -1120,10 +1120,8 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
         totalContributions = contributionsUpToDate;
       }
 
-      const dateObj = parseISO(dateKey);
-      const dataPoint: { date: string; dateTimestamp: number; netWorth?: number; projectedNetWorth?: number; contributions?: number; projectedContributions?: number; isProjection?: boolean; [assetId: string]: number | string | boolean | undefined } = {
+      const dataPoint: { date: string; netWorth?: number; projectedNetWorth?: number; contributions?: number; projectedContributions?: number; isProjection?: boolean; [assetId: string]: number | string | boolean | undefined } = {
         date: dateKey,
-        dateTimestamp: dateObj.getTime(),
         netWorth: isProjectionDate ? undefined : totalNetWorth,
         projectedNetWorth: isProjectionDate ? totalNetWorth : (isToday && projectionDate ? totalNetWorth : undefined),
         contributions: isProjectionDate ? undefined : totalContributions,
@@ -1757,16 +1755,11 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
-              type="number"
-              dataKey="dateTimestamp"
-              scale="time"
-              domain={['dataMin', 'dataMax']}
-              tickFormatter={(value) => {
-                const date = new Date(value);
-                return format(date, 'MMM d');
-              }}
+              dataKey="date"
+              tickFormatter={(value) => format(parseISO(value), 'MMM d')}
               className="text-xs"
               stroke="currentColor"
+              ticks={chartDataArray.map(d => d.date)}
             />
             <YAxis
               tickFormatter={(value) => formatCurrency(value)}
@@ -1850,7 +1843,7 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
                   connectNulls={true}
                 />
                 <ReferenceLine
-                  x={startOfDay(new Date()).getTime()}
+                  x={format(startOfDay(new Date()), 'yyyy-MM-dd')}
                   stroke="hsl(var(--muted-foreground))"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
@@ -1875,16 +1868,11 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
-              type="number"
-              dataKey="dateTimestamp"
-              scale="time"
-              domain={['dataMin', 'dataMax']}
-              tickFormatter={(value) => {
-                const date = new Date(value);
-                return format(date, 'MMM d');
-              }}
+              dataKey="date"
+              tickFormatter={(value) => format(parseISO(value), 'MMM d')}
               className="text-xs"
               stroke="currentColor"
+              ticks={chartDataArray.map(d => d.date)}
             />
             <YAxis
               tickFormatter={(value) => formatCurrency(value)}
