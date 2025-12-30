@@ -23,6 +23,7 @@ import { EventDetailModal } from '@/components/calendar/EventDetailModal';
 import { NewEventModal } from '@/components/calendar/NewEventModal';
 import { KeyboardShortcutsDialog } from '@/components/calendar/KeyboardShortcutsDialog';
 import { PersonDetailModal } from '@/components/calendar/PersonDetailModal';
+import { EventColorMenu } from '@/components/calendar/EventColorMenu';
 import { motion } from 'framer-motion';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { fetchEventPeople } from '@/lib/fetch-event-people';
@@ -99,6 +100,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   const [people, setPeople] = React.useState<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = React.useState<Person | null>(null);
   const [isPersonModalOpen, setIsPersonModalOpen] = React.useState(false);
+  const [contextMenuEvent, setContextMenuEvent] = React.useState<{ event: CalendarEvent; x: number; y: number; calendarColor?: string } | null>(null);
   const scheduleViewRef = React.useRef<ScheduleCalendarViewRef>(null);
 
   const handlePersonClick = (person: Person) => {
@@ -118,6 +120,107 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     });
     setSelectedEvent(event);
     setIsEventModalOpen(true);
+  };
+
+  const handleEventRightClick = async (event: CalendarEvent, e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Fetch calendar color
+    let calendarColor: string | undefined;
+    try {
+      const response = await fetch(`/api/google-calendar/calendars`);
+      if (response.ok) {
+        const data = await response.json();
+        const calendar = data.calendars?.find((cal: any) => 
+          cal.id === event.calendarId || cal.id === event.calendar
+        );
+        if (calendar?.color) {
+          calendarColor = calendar.color.startsWith('#') ? calendar.color : `#${calendar.color}`;
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch calendar color:', error);
+    }
+    
+    setContextMenuEvent({
+      event,
+      x: e.clientX,
+      y: e.clientY,
+      calendarColor: calendarColor || '#4285f4',
+    });
+  };
+
+  const handleColorChange = async (color: string | null) => {
+    if (!contextMenuEvent) return;
+
+    const event = contextMenuEvent.event;
+    const calendarColor = contextMenuEvent.calendarColor || '#4285f4';
+    
+    // If color is null, use calendar default
+    const colorToUse = color || calendarColor;
+    
+    // Optimistically update the UI
+    const updatedEvent: CalendarEvent = { ...event, color: colorToUse };
+    setEvents((prevEvents) =>
+      prevEvents.map((e) => (e.id === event.id ? updatedEvent : e))
+    );
+    
+    // Update cache
+    allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+      e.id === event.id ? updatedEvent : e
+    );
+
+    // Close context menu
+    setContextMenuEvent(null);
+
+    try {
+      const response = await fetch(`/api/google-calendar/events/${event.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          calendarId: event.calendarId || event.calendar,
+          color: colorToUse,
+          useCalendarDefault: color === null, // Flag to indicate we want to use calendar default
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update event color');
+      }
+
+      const data = await response.json();
+      
+      // Update with server response
+      const serverUpdatedEvent: CalendarEvent = {
+        ...event,
+        color: data.event.color,
+      };
+      
+      setEvents((prevEvents) =>
+        prevEvents.map((e) => (e.id === event.id ? serverUpdatedEvent : e))
+      );
+      
+      // Update cache
+      allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+        e.id === event.id ? serverUpdatedEvent : e
+      );
+
+      // No need to trigger refresh - we've already updated the UI optimistically and with server response
+    } catch (error) {
+      console.error('Error updating event color:', error);
+      
+      // Revert optimistic update on error
+      setEvents((prevEvents) =>
+        prevEvents.map((e) => (e.id === event.id ? event : e))
+      );
+      
+      allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+        e.id === event.id ? event : e
+      );
+    }
   };
 
   const handleCloseEventModal = () => {
@@ -964,9 +1067,9 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   return (
     <Card
       className={cn(
-        'w-full transition-all duration-300',
+        'w-full h-screen transition-all duration-300 flex flex-col',
         isFullscreen &&
-          'fixed inset-0 z-[9999] m-0 rounded-none h-screen w-screen max-w-none flex flex-col'
+          'fixed inset-0 z-[9999] m-0 rounded-none w-screen max-w-none'
       )}
     >
       <CardHeader className="pb-4">
@@ -1034,7 +1137,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           </div>
         </div>
       </CardHeader>
-      <CardContent className={cn('p-0 overflow-hidden relative flex-1', isFullscreen && 'min-h-0')}>
+      <CardContent className={cn('p-0 overflow-hidden relative flex-1 min-h-0')}>
         {/* Loading overlay */}
         {loadingEvents && (
           <motion.div
@@ -1051,7 +1154,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           </motion.div>
         )}
 
-        <AnimatedCalendarView viewKey={viewMode} className="h-full">
+        <AnimatedCalendarView viewKey={viewMode} className="h-full min-h-0">
           {viewMode === 'daily' && (
             <DailyCalendarView
               currentDate={currentDate}
@@ -1059,6 +1162,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onEventRightClick={handleEventRightClick}
               onPersonClick={handlePersonClick}
               onEventUpdate={handleEventUpdate}
               onEmptySpaceClick={handleEmptySpaceClick}
@@ -1073,6 +1177,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onEventRightClick={handleEventRightClick}
               onPersonClick={handlePersonClick}
               onEventUpdate={handleEventUpdate}
               onEmptySpaceClick={handleEmptySpaceClick}
@@ -1086,6 +1191,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               events={events}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onEventRightClick={handleEventRightClick}
               people={people}
               onPersonClick={handlePersonClick}
             />
@@ -1095,6 +1201,8 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               currentYear={currentDate}
               events={events}
               onNavigate={handleNavigate}
+              onEventClick={handleEventClick}
+              onEventRightClick={handleEventRightClick}
             />
           )}
           {viewMode === 'schedule' && (
@@ -1105,6 +1213,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               timeFormat={timeFormat}
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
+              onEventRightClick={handleEventRightClick}
               onPersonClick={handlePersonClick}
               people={people}
             />
@@ -1201,6 +1310,35 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         }}
         person={selectedPerson}
       />
+
+      {/* Event Color Context Menu */}
+      {contextMenuEvent && (
+        <>
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => setContextMenuEvent(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenuEvent(null);
+            }}
+          />
+          <div
+            className="fixed z-[9999]"
+            style={{
+              left: contextMenuEvent.x,
+              top: contextMenuEvent.y,
+            }}
+          >
+            <EventColorMenu
+              event={contextMenuEvent.event}
+              calendarColor={contextMenuEvent.calendarColor}
+              onColorChange={handleColorChange}
+            >
+              <div style={{ width: 0, height: 0 }} />
+            </EventColorMenu>
+          </div>
+        </>
+      )}
     </Card>
   );
 }

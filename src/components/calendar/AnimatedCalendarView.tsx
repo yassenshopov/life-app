@@ -29,6 +29,7 @@ export function AnimatedCalendarView({
           ease: 'easeInOut',
         }}
         className={className}
+        style={{ height: '100%', minHeight: 0 }}
       >
         {children}
       </motion.div>

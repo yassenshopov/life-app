@@ -13,6 +13,7 @@ interface MonthlyCalendarViewProps {
   events: CalendarEvent[];
   onNavigate: (date: Date, switchToWeekly?: boolean) => void;
   onEventClick?: (event: CalendarEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
   people?: Person[];
   onPersonClick?: (person: Person) => void;
 }
@@ -22,6 +23,7 @@ export function MonthlyCalendarView({
   events,
   onNavigate,
   onEventClick,
+  onEventRightClick,
   people = [],
   onPersonClick,
 }: MonthlyCalendarViewProps) {
@@ -80,7 +82,7 @@ export function MonthlyCalendarView({
   };
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-full">
       <div className="overflow-x-auto">
         <div className="min-w-[800px]">
           {/* Weekday headers - Fixed */}
@@ -157,6 +159,11 @@ export function MonthlyCalendarView({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onEventClick?.(event);
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onEventRightClick?.(event, e);
                               }}
                             >
                               {matchedPeople.length > 0 && (

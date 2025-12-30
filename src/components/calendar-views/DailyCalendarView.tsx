@@ -29,6 +29,7 @@ interface DailyCalendarViewProps {
   timeFormat: TimeFormat;
   onNavigate: (date: Date) => void;
   onEventClick?: (event: CalendarEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
   previewEvent?: CalendarEvent | null;
@@ -42,6 +43,7 @@ export function DailyCalendarView({
   timeFormat,
   onNavigate,
   onEventClick,
+  onEventRightClick,
   onEventUpdate,
   onEmptySpaceClick,
   previewEvent,
@@ -184,7 +186,7 @@ export function DailyCalendarView({
   });
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-full">
       <div className="overflow-x-auto">
         <div className="min-w-[400px]">
           {/* Day header - Fixed */}
@@ -305,6 +307,7 @@ export function DailyCalendarView({
                       
                       return (
                         <AnimatedCalendarEvent
+                          onRightClick={onEventRightClick}
                           key={event.id}
                           event={event}
                           style={style}

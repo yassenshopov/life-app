@@ -276,22 +276,22 @@ export function TrackingCalendarView({
                                 title={entry.title}
                               >
                                 <div className="truncate font-medium mb-1">{entry.title}</div>
-                                <div className="space-y-0.5 mt-1">
-                                  <div className="flex items-center gap-1 text-[10px] text-red-500">
-                                    <Heart className="w-2.5 h-2.5 flex-shrink-0" />
-                                    <span className="truncate">{rhr !== null ? `${rhr} bpm` : '-'}</span>
+                                <div className="grid grid-cols-2 gap-1 mt-1">
+                                  <div className="bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                    <Heart className="w-2 h-2 text-red-600 dark:text-red-400 flex-shrink-0" />
+                                    <span className="text-[9px] font-semibold text-red-900 dark:text-red-100 truncate">{rhr !== null && rhr !== 0 ? rhr : '-'}</span>
                                   </div>
-                                  <div className="flex items-center gap-1 text-[10px] text-yellow-500">
-                                    <Scale className="w-2.5 h-2.5 flex-shrink-0" />
-                                    <span className="truncate">{weight !== null ? `${weight.toFixed(1)} kg` : '-'}</span>
+                                  <div className="bg-yellow-100 dark:bg-yellow-900/40 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                    <Scale className="w-2 h-2 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                                    <span className="text-[9px] font-semibold text-yellow-900 dark:text-yellow-100 truncate">{weight !== null && weight !== 0 ? weight.toFixed(1) : '-'}</span>
                                   </div>
-                                  <div className="flex items-center gap-1 text-[10px] text-green-500">
-                                    <Footprints className="w-2.5 h-2.5 flex-shrink-0" />
-                                    <span className="truncate">{steps !== null ? `${steps.toLocaleString()} steps` : '-'}</span>
+                                  <div className="bg-green-100 dark:bg-green-900/40 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                    <Footprints className="w-2 h-2 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                    <span className="text-[9px] font-semibold text-green-900 dark:text-green-100 truncate">{steps !== null && steps !== 0 ? `${(steps / 1000).toFixed(0)}k` : '-'}</span>
                                   </div>
-                                  <div className="flex items-center gap-1 text-[10px] text-blue-500">
-                                    <span className="text-xs">💤</span>
-                                    <span className="truncate">{sleep !== null ? `${sleep.toFixed(1)} h` : '-'}</span>
+                                  <div className="bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                    <span className="text-[9px]">💤</span>
+                                    <span className="text-[9px] font-semibold text-blue-900 dark:text-blue-100 truncate">{sleep !== null && sleep !== 0 ? `${sleep.toFixed(1)}h` : '-'}</span>
                                   </div>
                                 </div>
                               </div>

@@ -8,12 +8,16 @@ interface AnnualCalendarViewProps {
   currentYear: Date;
   events: CalendarEvent[];
   onNavigate: (date: Date) => void;
+  onEventClick?: (event: CalendarEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
 }
 
 export function AnnualCalendarView({
   currentYear,
   events,
   onNavigate,
+  onEventClick,
+  onEventRightClick,
 }: AnnualCalendarViewProps) {
   const months = [
     'January',
@@ -74,7 +78,7 @@ export function AnnualCalendarView({
   const year = currentYear.getFullYear();
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="grid grid-cols-3 gap-4 p-4">
           {months.map((monthName, monthIndex) => {

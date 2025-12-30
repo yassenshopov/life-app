@@ -1,17 +1,14 @@
 import { Client } from '@notionhq/client';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY,
 });
 
 // Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseServiceRoleClient();
 
 interface HabitResponse {
   id: string;

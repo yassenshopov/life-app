@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
 interface NotionDatabase {
   database_id: string;
@@ -11,10 +11,7 @@ interface NotionDatabase {
   properties: Record<string, any>;
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseServiceRoleClient();
 
 export async function GET() {
   try {

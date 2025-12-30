@@ -32,6 +32,7 @@ interface WeeklyCalendarViewProps {
   timeFormat: TimeFormat;
   onNavigate: (date: Date) => void;
   onEventClick?: (event: CalendarEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
   onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
   previewEvent?: CalendarEvent | null;
@@ -45,6 +46,7 @@ export function WeeklyCalendarView({
   timeFormat,
   onNavigate,
   onEventClick,
+  onEventRightClick,
   onEventUpdate,
   onEmptySpaceClick,
   previewEvent,
@@ -166,7 +168,7 @@ export function WeeklyCalendarView({
   const timeSlots = React.useMemo(() => generateTimeSlots(), []);
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-full">
       <div className="overflow-x-auto">
         <div className="min-w-[800px]">
           {/* Day headers - Fixed */}
@@ -325,6 +327,7 @@ export function WeeklyCalendarView({
                               style={style}
                               timeFormat={timeFormat}
                               onClick={onEventClick}
+                              onRightClick={onEventRightClick}
                               currentDate={day}
                               touchingEvents={{ top: touchingTop, bottom: touchingBottom }}
                               people={people}
