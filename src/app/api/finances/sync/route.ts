@@ -416,29 +416,33 @@ async function syncDatabase(
                   // Normalize Notion page ID (remove dashes for comparison)
                   const normalizedPageId = relatedNotionPageId.replace(/-/g, '');
                   
-                  // Try to find the asset by normalized page ID
-                  const { data: asset, error: assetError } = await supabase
-                    .from('finances_assets')
-                    .select('id, name, notion_page_id')
-                    .eq('user_id', userId)
-                    .eq('notion_page_id', normalizedPageId)
-                    .single();
-
-                  if (asset?.id) {
-                    entryData.asset_id = asset.id;
-                    console.log(`✓ Linked investment "${name}" to asset "${asset.name}" (ID: ${asset.id}, Notion page: ${relatedNotionPageId})`);
-                  } else {
-                    // Try without normalization in case the asset was stored with dashes
-                    const { data: assetWithDashes } = await supabase
+                  // Try to find the asset by normalized page ID with retry logic
+                  const assetResult = await retryLookup(async () => {
+                    return await supabase
                       .from('finances_assets')
                       .select('id, name, notion_page_id')
                       .eq('user_id', userId)
-                      .eq('notion_page_id', relatedNotionPageId)
+                      .eq('notion_page_id', normalizedPageId)
                       .single();
+                  });
+
+                  if (assetResult.data?.id) {
+                    entryData.asset_id = assetResult.data.id;
+                    console.log(`✓ Linked investment "${name}" to asset "${assetResult.data.name}" (ID: ${assetResult.data.id}, Notion page: ${relatedNotionPageId})`);
+                  } else {
+                    // Try without normalization in case the asset was stored with dashes (with retry)
+                    const assetWithDashesResult = await retryLookup(async () => {
+                      return await supabase
+                        .from('finances_assets')
+                        .select('id, name, notion_page_id')
+                        .eq('user_id', userId)
+                        .eq('notion_page_id', relatedNotionPageId)
+                        .single();
+                    });
                     
-                    if (assetWithDashes?.id) {
-                      entryData.asset_id = assetWithDashes.id;
-                      console.log(`✓ Linked investment "${name}" to asset "${assetWithDashes.name}" (ID: ${assetWithDashes.id}, Notion page with dashes: ${relatedNotionPageId})`);
+                    if (assetWithDashesResult.data?.id) {
+                      entryData.asset_id = assetWithDashesResult.data.id;
+                      console.log(`✓ Linked investment "${name}" to asset "${assetWithDashesResult.data.name}" (ID: ${assetWithDashesResult.data.id}, Notion page with dashes: ${relatedNotionPageId})`);
                     } else {
                       console.warn(`⚠ Asset not found for investment "${name}". Notion page ID: ${relatedNotionPageId} (normalized: ${normalizedPageId})`);
                       // Log available assets for debugging
@@ -481,29 +485,33 @@ async function syncDatabase(
                   // Normalize Notion page ID (remove dashes for comparison)
                   const normalizedPageId = relatedNotionPageId.replace(/-/g, '');
                   
-                  // Try to find the place by normalized page ID
-                  const { data: place, error: placeError } = await supabase
-                    .from('finances_places')
-                    .select('id, name, notion_page_id')
-                    .eq('user_id', userId)
-                    .eq('notion_page_id', normalizedPageId)
-                    .single();
-
-                  if (place?.id) {
-                    entryData.place_id = place.id;
-                    console.log(`✓ Linked investment "${name}" to place "${place.name}" (ID: ${place.id}, Notion page: ${relatedNotionPageId})`);
-                  } else {
-                    // Try without normalization in case the place was stored with dashes
-                    const { data: placeWithDashes } = await supabase
+                  // Try to find the place by normalized page ID with retry logic
+                  const placeResult = await retryLookup(async () => {
+                    return await supabase
                       .from('finances_places')
                       .select('id, name, notion_page_id')
                       .eq('user_id', userId)
-                      .eq('notion_page_id', relatedNotionPageId)
+                      .eq('notion_page_id', normalizedPageId)
                       .single();
+                  });
+
+                  if (placeResult.data?.id) {
+                    entryData.place_id = placeResult.data.id;
+                    console.log(`✓ Linked investment "${name}" to place "${placeResult.data.name}" (ID: ${placeResult.data.id}, Notion page: ${relatedNotionPageId})`);
+                  } else {
+                    // Try without normalization in case the place was stored with dashes (with retry)
+                    const placeWithDashesResult = await retryLookup(async () => {
+                      return await supabase
+                        .from('finances_places')
+                        .select('id, name, notion_page_id')
+                        .eq('user_id', userId)
+                        .eq('notion_page_id', relatedNotionPageId)
+                        .single();
+                    });
                     
-                    if (placeWithDashes?.id) {
-                      entryData.place_id = placeWithDashes.id;
-                      console.log(`✓ Linked investment "${name}" to place "${placeWithDashes.name}" (ID: ${placeWithDashes.id}, Notion page with dashes: ${relatedNotionPageId})`);
+                    if (placeWithDashesResult.data?.id) {
+                      entryData.place_id = placeWithDashesResult.data.id;
+                      console.log(`✓ Linked investment "${name}" to place "${placeWithDashesResult.data.name}" (ID: ${placeWithDashesResult.data.id}, Notion page with dashes: ${relatedNotionPageId})`);
                     } else {
                       console.warn(`⚠ Place not found for investment "${name}". Notion page ID: ${relatedNotionPageId} (normalized: ${normalizedPageId})`);
                       // Log available places for debugging
@@ -722,6 +730,33 @@ async function syncDatabase(
   }
 }
 
+// Helper function to retry database lookups with exponential backoff
+async function retryLookup<T>(
+  lookupFn: () => Promise<{ data: T | null; error: any }>,
+  maxRetries: number = 3,
+  initialDelay: number = 100
+): Promise<{ data: T | null; error: any }> {
+  let lastError: any = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const result = await lookupFn();
+    
+    if (result.data || !result.error) {
+      return result;
+    }
+    
+    lastError = result.error;
+    
+    // If this isn't the last attempt, wait before retrying
+    if (attempt < maxRetries - 1) {
+      const delay = initialDelay * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  return { data: null, error: lastError };
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user ID from Clerk
@@ -741,15 +776,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Sync in order: Assets first, then Places (so investments can reference them), then Investments
+    // The syncDatabase calls are awaited sequentially, and retry logic inside syncDatabase handles replication lag
     const assetsResult = await syncDatabase(userId, dbIds.assets, 'finances_assets', 'Assets');
     
-    // Wait a bit to ensure assets are fully synced
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
     const placesResult = await syncDatabase(userId, dbIds.places, 'finances_places', 'Places');
-    
-    // Wait a bit to ensure places are fully synced before syncing investments
-    await new Promise(resolve => setTimeout(resolve, 500));
     
     const investmentsResult = await syncDatabase(
       userId,

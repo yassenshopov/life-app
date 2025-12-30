@@ -3,8 +3,6 @@ import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
-console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY);
-console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 const supabase = getSupabaseServiceRoleClient();
 
 export async function POST(req: Request) {

@@ -291,15 +291,19 @@ export function FinancesView() {
         fetch('/api/finances/places'),
       ]);
 
-      console.log('API Responses:', {
-        assets: { ok: assetsRes.ok, status: assetsRes.status },
-        investments: { ok: investmentsRes.ok, status: investmentsRes.status },
-        places: { ok: placesRes.ok, status: placesRes.status },
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('API Responses:', {
+          assets: { ok: assetsRes.ok, status: assetsRes.status },
+          investments: { ok: investmentsRes.ok, status: investmentsRes.status },
+          places: { ok: placesRes.ok, status: placesRes.status },
+        });
+      }
 
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
-        console.log('Assets data received:', assetsData);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Assets data received:', assetsData);
+        }
         setAssets(assetsData.data || []);
       } else {
         const errorData = await assetsRes.json().catch(() => ({ error: 'Unknown error' }));
@@ -313,7 +317,9 @@ export function FinancesView() {
 
       if (investmentsRes.ok) {
         const investmentsData = await investmentsRes.json();
-        console.log('Investments data received:', investmentsData);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Investments data received:', investmentsData);
+        }
         setInvestments(investmentsData.data || []);
       } else {
         const errorData = await investmentsRes.json().catch(() => ({ error: 'Unknown error' }));
@@ -322,7 +328,9 @@ export function FinancesView() {
 
       if (placesRes.ok) {
         const placesData = await placesRes.json();
-        console.log('Places data received:', placesData);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Places data received:', placesData);
+        }
         setPlaces(placesData.data || []);
       } else {
         const errorData = await placesRes.json().catch(() => ({ error: 'Unknown error' }));
@@ -1028,14 +1036,16 @@ export function FinancesView() {
               }
             });
 
-            // Debug logging
-            console.log('Assets tab - Total investments:', investments.length);
-            console.log('Assets tab - Investments with asset_id:', investments.filter(inv => inv.asset_id).length);
-            console.log('Assets tab - Asset worth map size:', assetWorthMap.size);
-            assetWorthMap.forEach((worth, assetId) => {
-              const asset = assets.find(a => a.id === assetId);
-              console.log(`Assets tab - Asset "${asset?.name || assetId}": calculated worth = ${worth}`);
-            });
+            // Debug logging (development only)
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Assets tab - Total investments:', investments.length);
+              console.log('Assets tab - Investments with asset_id:', investments.filter(inv => inv.asset_id).length);
+              console.log('Assets tab - Asset worth map size:', assetWorthMap.size);
+              assetWorthMap.forEach((worth, assetId) => {
+                const asset = assets.find(a => a.id === assetId);
+                console.log(`Assets tab - Asset "${asset?.name || assetId}": calculated worth = ${worth}`);
+              });
+            }
 
             // Enhance assets with calculated worth from investments and attach investments
             const assetsWithCalculatedWorth = assets.map((asset) => {
@@ -1045,8 +1055,8 @@ export function FinancesView() {
               // Attach investments to asset for AssetMiniChart
               const assetInvestments = investments.filter(inv => inv.asset_id === asset.id);
               
-              // Debug logging for assets
-              if (calculatedWorth === 0 && asset.total_worth === 0) {
+              // Debug logging for assets (development only)
+              if (process.env.NODE_ENV === 'development' && calculatedWorth === 0 && asset.total_worth === 0) {
                 console.log(`Assets tab - Asset "${asset.name}" has ${assetInvestments.length} investments but worth is 0`);
                 assetInvestments.forEach(inv => {
                   console.log(`  - Investment "${inv.name}": current_worth=${inv.current_worth}, current_value=${inv.current_value}, current_price=${inv.current_price}, quantity=${inv.quantity}`);
