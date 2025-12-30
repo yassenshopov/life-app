@@ -24,6 +24,7 @@ import { getDominantColor, getIconUrl } from '@/lib/notion-color';
 import { NetWorthChart } from '@/components/NetWorthChart';
 import { AssetMiniChart } from '@/components/AssetMiniChart';
 import { AssetDistributionChart } from '@/components/AssetDistributionChart';
+import { NetWorthProjectionChart } from '@/components/NetWorthProjectionChart';
 
 interface Asset {
   id: string;
@@ -609,6 +610,7 @@ export function FinancesView() {
           <TabsTrigger value="assets">Assets</TabsTrigger>
           <TabsTrigger value="investments">Investments</TabsTrigger>
           <TabsTrigger value="places">Accounts</TabsTrigger>
+          <TabsTrigger value="projection">Projection</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -1851,6 +1853,15 @@ export function FinancesView() {
               </>
             );
           })()}
+        </TabsContent>
+
+        {/* Projection Tab */}
+        <TabsContent value="projection" className="space-y-4">
+          <NetWorthProjectionChart 
+            investments={investments} 
+            selectedCurrency={selectedCurrency}
+            exchangeRates={exchangeRates}
+          />
         </TabsContent>
       </Tabs>
     </div>
