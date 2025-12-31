@@ -12,10 +12,17 @@ interface Person {
   id: string;
   name: string;
   tier: string[] | Array<{ name: string; color?: string }> | null;
+  origin_of_connection: string[] | null;
+  star_sign: string | null;
+  currently_at: string | null;
+  from_location: string | null;
   birth_date: string | null;
+  occupation: string | null;
+  contact_freq: string | null;
   image: any;
   image_url?: string | null;
-  star_sign: string | null;
+  age: any;
+  birthday: any;
 }
 
 interface BirthdayMonthlyViewProps {

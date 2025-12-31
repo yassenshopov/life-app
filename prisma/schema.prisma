@@ -128,7 +128,7 @@ model people {
   image                 Json?
   currently_at          String?
   age                   Json?
-  tier                  String[]
+  tier                  Json?
   occupation            String?
   birthday              Json?
   contact_freq          String?

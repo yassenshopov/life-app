@@ -25,6 +25,7 @@ import { FilterState } from '@/types/filters';
 import { cn } from '@/lib/utils';
 import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 import { BirthdayMonthlyView } from '@/app/people/BirthdayMonthlyView';
+import { PeopleActivitySummary } from '@/components/PeopleActivitySummary';
 
 // Zodiac sign symbols mapping
 const zodiacSymbols: Record<string, string> = {
@@ -126,7 +127,7 @@ interface Person {
   birthday: any;
 }
 
-type ViewType = 'default' | 'card' | 'birthdays';
+type ViewType = 'activity' | 'default' | 'card' | 'birthdays';
 
 // Properties for filter menu
 const properties = {
@@ -151,7 +152,7 @@ const columns = [
 ];
 
 export function PeopleView() {
-  const [viewType, setViewType] = useState<ViewType>('card');
+  const [viewType, setViewType] = useState<ViewType>('activity');
   const [filters, setFilters] = useState<FilterState>({ groups: [] });
   const [people, setPeople] = useState<Person[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -422,6 +423,7 @@ export function PeopleView() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <Tabs value={viewType} onValueChange={(v) => setViewType(v as ViewType)}>
             <TabsList>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
               <TabsTrigger value="default">Default view</TabsTrigger>
               <TabsTrigger value="card">Card</TabsTrigger>
               <TabsTrigger value="birthdays">Birthdays</TabsTrigger>
@@ -476,6 +478,21 @@ export function PeopleView() {
             </Button>
           </div>
         </div>
+
+        {/* Activity Summary View */}
+        {viewType === 'activity' && (
+          <PeopleActivitySummary
+            people={filteredAndSortedData}
+            onPersonClick={(person) => {
+              setSelectedPerson(person);
+              setIsPersonModalOpen(true);
+              // Fetch events when opening modal
+              if (!personEvents[person.id]) {
+                fetchPersonEvents(person.id);
+              }
+            }}
+          />
+        )}
 
         {/* People Grid - Grouped by Tier */}
         {viewType === 'card' && (() => {
