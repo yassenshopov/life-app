@@ -1120,9 +1120,9 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
         totalContributions = contributionsUpToDate;
       }
 
-      const dataPoint: { date: string; netWorth?: number; projectedNetWorth?: number; contributions?: number; projectedContributions?: number; isProjection?: boolean; [assetId: string]: number | string | boolean | undefined } = {
+      const dataPoint: { date: string; netWorth: number; projectedNetWorth?: number; contributions?: number; projectedContributions?: number; isProjection?: boolean; [assetId: string]: number | string | boolean | undefined } = {
         date: dateKey,
-        netWorth: isProjectionDate ? undefined : totalNetWorth,
+        netWorth: isProjectionDate ? totalNetWorth : totalNetWorth,
         projectedNetWorth: isProjectionDate ? totalNetWorth : (isToday && projectionDate ? totalNetWorth : undefined),
         contributions: isProjectionDate ? undefined : totalContributions,
         projectedContributions: isProjectionDate ? totalContributions : (isToday && projectionDate ? totalContributions : undefined),
@@ -2014,10 +2014,10 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
         const endNetWorth = calculateSelectedValue(endData, viewMode === 'contributions');
         
         // For contributions, use the total (not filtered by assets)
-        const todayContributions = chartDataArray.find(d => d.date === format(startOfDay(new Date()), 'yyyy-MM-dd'))?.contributions || 0;
+        const todayContributions = Number(chartDataArray.find(d => d.date === format(startOfDay(new Date()), 'yyyy-MM-dd'))?.contributions) || 0;
         const endContributions = chartDataArray[chartDataArray.length - 1].projectedContributions !== undefined 
-          ? chartDataArray[chartDataArray.length - 1].projectedContributions 
-          : (chartDataArray[chartDataArray.length - 1].contributions || 0);
+          ? Number(chartDataArray[chartDataArray.length - 1].projectedContributions) 
+          : (Number(chartDataArray[chartDataArray.length - 1].contributions) || 0);
         
         // For net worth value, calculate from selected assets
         const todayNetWorthValue = calculateSelectedValue(todayData, false);
@@ -2026,9 +2026,6 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
         const daysDiff = Math.ceil((projectionDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
         const yearsDiff = daysDiff / 365;
         const totalYears = Math.ceil(yearsDiff);
-        
-        // State for selected year in contribution breakdown
-        const [selectedYear, setSelectedYear] = React.useState(1);
         
         const totalGrowth = endNetWorth - todayNetWorth;
         const growthPercent = todayNetWorth > 0 ? ((endNetWorth - todayNetWorth) / todayNetWorth) * 100 : 0;
@@ -2293,7 +2290,7 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
                     <div className="space-y-1.5">
                       {chartAssets
                         .map((asset) => {
-                          const value = todayData[asset.id] || 0;
+                          const value = Number(todayData[asset.id]) || 0;
                           return { asset, value };
                         })
                         .filter(({ value }) => value > 0)
@@ -2319,14 +2316,14 @@ export function NetWorthProjectionChart({ investments, selectedCurrency, exchang
                     <div className="space-y-1.5">
                       {chartAssets
                         .map((asset) => {
-                          const value = endData[asset.id] || 0;
+                          const value = Number(endData[asset.id]) || 0;
                           return { asset, value };
                         })
                         .filter(({ value }) => value > 0)
                         .sort((a, b) => b.value - a.value)
                         .map(({ asset, value }) => {
                           const percentage = endNetWorthValue > 0 ? (value / endNetWorthValue) * 100 : 0;
-                          const todayValue = todayData[asset.id] || 0;
+                          const todayValue = Number(todayData[asset.id]) || 0;
                           const change = todayValue > 0 ? ((value - todayValue) / todayValue) * 100 : 0;
                           const color = assetColors.get(asset.id) || '#8b5cf6';
                           return (
