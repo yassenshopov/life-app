@@ -3,19 +3,16 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseServiceRoleClient();
 
 // Helper function to extract property value
-function getPropertyValue(property: any, propertyType: string): any {
+function getPropertyValue(property: any, propertyType: string, propertyName?: string): any {
   if (!property) return null;
 
   switch (propertyType) {
@@ -26,6 +23,14 @@ function getPropertyValue(property: any, propertyType: string): any {
     case 'select':
       return property.select?.name || null;
     case 'multi_select':
+      // For Tier property, return objects with name and color
+      // For other multi_select properties, return just names (strings)
+      if (propertyName === 'Tier') {
+        return property.multi_select?.map((item: any) => ({
+          name: item.name,
+          color: item.color || 'default',
+        })) || [];
+      }
       return property.multi_select?.map((item: any) => item.name) || [];
     case 'date':
       return property.date?.start || null;
@@ -267,7 +272,7 @@ export async function POST(request: NextRequest) {
         const propertyValue = pageProperties[key];
         if (!propertyValue) return;
 
-        const value = getPropertyValue(propertyValue, prop.type);
+        const value = getPropertyValue(propertyValue, prop.type, key);
         
         // Map to database column names
         switch (key) {

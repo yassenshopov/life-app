@@ -1,40 +1,37 @@
 /**
- * Maps Notion color names to our CSS classes
+ * Maps Notion color names to Tailwind CSS classes
+ * Uses the shared color mapping utility for consistency
  */
-export function getNotionColorClass(color: string): string {
-  const colorMap: Record<string, string> = {
-    default: 'notion-color-default',
-    gray: 'notion-color-gray',
-    brown: 'notion-color-brown',
-    orange: 'notion-color-orange',
-    yellow: 'notion-color-yellow',
-    green: 'notion-color-green',
-    blue: 'notion-color-blue',
-    purple: 'notion-color-purple',
-    pink: 'notion-color-pink',
-    red: 'notion-color-red',
-  };
-
-  return colorMap[color] || 'notion-color-default';
-}
+import { getNotionOptionColor } from './notion-color-mapping';
 
 /**
  * Gets the color class for a multi-select option
+ * @deprecated Use getNotionOptionColor from './notion-color-mapping' instead
  */
-export function getMultiSelectColorClass(option: { name: string; color?: string }): string {
-  return getNotionColorClass(option.color || 'default');
+export function getMultiSelectColorClass(option: { name: string; color?: string } | string): string {
+  return getNotionOptionColor(option, 'outline');
 }
 
 /**
  * Gets the color class for a select option
+ * @deprecated Use getNotionOptionColor from './notion-color-mapping' instead
  */
 export function getSelectColorClass(option: { name: string; color: string }): string {
-  return getNotionColorClass(option.color);
+  return getNotionOptionColor(option, 'outline');
 }
 
 /**
  * Gets the color class for a status option
+ * @deprecated Use getNotionOptionColor from './notion-color-mapping' instead
  */
 export function getStatusColorClass(option: { name: string; color: string }): string {
-  return getNotionColorClass(option.color);
+  return getNotionOptionColor(option, 'outline');
+}
+
+/**
+ * Maps Notion color names to our CSS classes
+ * @deprecated Use getNotionBadgeColor from './notion-color-mapping' instead
+ */
+export function getNotionColorClass(color: string): string {
+  return getNotionOptionColor({ name: '', color: color as any }, 'outline');
 }

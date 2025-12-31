@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays } from 'lucide-react';
+import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Outfit } from 'next/font/google';
@@ -56,6 +56,7 @@ export default function HQSidebar() {
   const isMediaActive = pathname === '/media';
   const isTrackingActive = pathname === '/tracking';
   const isCalendarActive = pathname === '/calendar';
+  const isFinancesActive = pathname === '/finances';
 
   return (
     <div
@@ -183,6 +184,18 @@ export default function HQSidebar() {
         >
           <Calendar className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Tracking</span>}
+        </Link>
+        <Link
+          href="/finances"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            'hover:bg-accent hover:text-accent-foreground',
+            isFinancesActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+        >
+          <Wallet className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">Finances</span>}
         </Link>
       </div>
 

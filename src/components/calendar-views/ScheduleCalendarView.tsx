@@ -305,6 +305,7 @@ interface ScheduleCalendarViewProps {
   timeFormat: TimeFormat;
   onNavigate: (date: Date) => void;
   onEventClick?: (event: CalendarEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
   people?: Person[];
   onPersonClick?: (person: Person) => void;
 }
@@ -319,6 +320,7 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
   timeFormat,
   onNavigate,
   onEventClick,
+  onEventRightClick,
   people = [],
   onPersonClick,
 }, ref) => {
@@ -872,7 +874,7 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
   const sortedDates = Array.from(groupedEvents.keys()).sort();
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-full">
       <div 
         ref={scrollContainerRef}
         className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
@@ -923,6 +925,11 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                             if (onEventClick) {
                               onEventClick(event);
                             }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onEventRightClick?.(event, e);
                           }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors hover:opacity-80"
                           style={{
@@ -1126,6 +1133,11 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                       onNavigate(new Date(event.start));
                                     }
                                   }}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onEventRightClick?.(event, e);
+                                  }}
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     {/* Title and details */}
@@ -1278,6 +1290,11 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                                     onNavigate(new Date(childEvent.start));
                                                   }
                                                 }}
+                                                onContextMenu={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  onEventRightClick?.(childEvent, e);
+                                                }}
                                               >
                                                 {/* Small colored dot */}
                                                 <div
@@ -1314,6 +1331,11 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                         if (onEventClick) {
                                           onEventClick(event);
                                         }
+                                      }}
+                                      onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onEventRightClick?.(event, e);
                                       }}
                                     >
                                       <MoreVertical className="h-4 w-4 text-muted-foreground" />

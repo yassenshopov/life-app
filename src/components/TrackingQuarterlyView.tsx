@@ -253,34 +253,34 @@ export function TrackingQuarterlyView({
                 </span>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-red-500">
-                    <Heart className="w-3 h-3" />
-                    <span className="text-muted-foreground">RHR</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-red-100 dark:bg-red-900/40 px-3 py-2 rounded-xl flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-red-700 dark:text-red-300 font-medium truncate">RHR</div>
+                    <div className="text-sm font-bold text-red-900 dark:text-red-100 truncate">{averages.rhr !== null && averages.rhr !== 0 ? `${averages.rhr} bpm` : '-'}</div>
                   </div>
-                  <span className="font-medium">{averages.rhr !== null ? `${averages.rhr} bpm` : '-'}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-yellow-500">
-                    <Scale className="w-3 h-3" />
-                    <span className="text-muted-foreground">Weight</span>
+                <div className="bg-yellow-100 dark:bg-yellow-900/40 px-3 py-2 rounded-xl flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-yellow-700 dark:text-yellow-300 font-medium truncate">Weight</div>
+                    <div className="text-sm font-bold text-yellow-900 dark:text-yellow-100 truncate">{averages.weight !== null && averages.weight !== 0 ? `${averages.weight.toFixed(2)} kg` : '-'}</div>
                   </div>
-                  <span className="font-medium">{averages.weight !== null ? `${averages.weight.toFixed(2)} kg` : '-'}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-green-500">
-                    <Footprints className="w-3 h-3" />
-                    <span className="text-muted-foreground">Steps</span>
+                <div className="bg-green-100 dark:bg-green-900/40 px-3 py-2 rounded-xl flex items-center gap-2">
+                  <Footprints className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-green-700 dark:text-green-300 font-medium truncate">Steps</div>
+                    <div className="text-sm font-bold text-green-900 dark:text-green-100 truncate">{averages.steps !== null && averages.steps !== 0 ? averages.steps.toLocaleString() : '-'}</div>
                   </div>
-                  <span className="font-medium">{averages.steps !== null ? averages.steps.toLocaleString() : '-'}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-blue-500">
-                    <Bed className="w-3 h-3" />
-                    <span className="text-muted-foreground">Sleep</span>
+                <div className="bg-blue-100 dark:bg-blue-900/40 px-3 py-2 rounded-xl flex items-center gap-2">
+                  <Bed className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-blue-700 dark:text-blue-300 font-medium truncate">Sleep</div>
+                    <div className="text-sm font-bold text-blue-900 dark:text-blue-100 truncate">{averages.sleep !== null && averages.sleep !== 0 ? `${averages.sleep.toFixed(1)} h` : '-'}</div>
                   </div>
-                  <span className="font-medium">{averages.sleep !== null ? `${averages.sleep.toFixed(1)} h` : '-'}</span>
                 </div>
               </div>
             </Card>

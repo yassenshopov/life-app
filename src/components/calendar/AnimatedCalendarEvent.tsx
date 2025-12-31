@@ -15,6 +15,7 @@ interface AnimatedCalendarEventProps {
   style: React.CSSProperties;
   timeFormat: TimeFormat;
   onClick?: (event: CalendarEvent) => void;
+  onRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
   currentDate?: Date; // The date of the column this event is in (for calculating absolute position)
   isPreview?: boolean;
   touchingEvents?: {
@@ -33,6 +34,7 @@ export function AnimatedCalendarEvent({
   style,
   timeFormat,
   onClick,
+  onRightClick,
   currentDate,
   isPreview = false,
   touchingEvents,
@@ -46,6 +48,14 @@ export function AnimatedCalendarEvent({
   const handleClick = (e: React.MouseEvent) => {
     if (!isPreview) {
       onClick?.(event);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!isPreview && onRightClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      onRightClick(event, e);
     }
   };
 
@@ -95,6 +105,7 @@ export function AnimatedCalendarEvent({
         ease: 'easeOut',
       }}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       className={cn(
         "absolute left-1 right-1 px-2 text-xs pointer-events-auto overflow-hidden",
         // Less padding for short events (<=1hr)

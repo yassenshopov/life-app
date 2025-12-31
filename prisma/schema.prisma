@@ -28,6 +28,9 @@ model User {
   people                    people[]
   media                     media[]
   trackingMonthly           tracking_monthly[]
+  financesAssets            finances_assets[]
+  financesIndividualInvestments finances_individual_investments[]
+  financesPlaces            finances_places[]
 
   @@map("users")
 }
@@ -125,7 +128,7 @@ model people {
   image                 Json?
   currently_at          String?
   age                   Json?
-  tier                  String[]
+  tier                  Json?
   occupation            String?
   birthday              Json?
   contact_freq          String?
@@ -196,4 +199,95 @@ model media {
   @@index([notion_database_id], map: "idx_media_notion_database_id")
   @@index([monthly_tracking_id], map: "idx_media_monthly_tracking_id")
   @@map("media")
+}
+
+model finances_assets {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  name              String
+  symbol            String?
+  current_price     Decimal? @db.Decimal(20, 2)
+  summary           String?
+  currency          String?  @default("USD")
+  icon              Json?
+  icon_url          String?
+  color_settings    Json?
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  individual_investments finances_individual_investments[]
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_finances_assets_user_id")
+  @@index([notion_page_id], map: "idx_finances_assets_notion_page_id")
+  @@index([notion_database_id], map: "idx_finances_assets_notion_database_id")
+  @@index([symbol], map: "idx_finances_assets_symbol")
+  @@map("finances_assets")
+}
+
+model finances_individual_investments {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  name              String
+  asset_id          String?  @db.Uuid
+  place_id          String?  @db.Uuid
+  quantity          Decimal? @db.Decimal(20, 8)
+  purchase_price    Decimal? @db.Decimal(20, 2)
+  purchase_date     DateTime? @db.Timestamptz(6)
+  current_price     Decimal? @db.Decimal(20, 2)
+  current_value     Decimal? @db.Decimal(20, 2)
+  currency          String?  @default("USD")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  asset             finances_assets? @relation(fields: [asset_id], references: [id], onDelete: SetNull)
+  place             finances_places? @relation(fields: [place_id], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_finances_investments_user_id")
+  @@index([notion_page_id], map: "idx_finances_investments_notion_page_id")
+  @@index([notion_database_id], map: "idx_finances_investments_notion_database_id")
+  @@index([asset_id], map: "idx_finances_investments_asset_id")
+  @@index([place_id], map: "idx_finances_investments_place_id")
+  @@index([purchase_date], map: "idx_finances_investments_purchase_date")
+  @@map("finances_individual_investments")
+}
+
+model finances_places {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  name              String
+  place_type        String?
+  balance           Decimal? @db.Decimal(20, 2)
+  total_value       Decimal? @db.Decimal(20, 2)
+  currency          String?  @default("USD")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  investments       finances_individual_investments[]
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_finances_places_user_id")
+  @@index([notion_page_id], map: "idx_finances_places_notion_page_id")
+  @@index([notion_database_id], map: "idx_finances_places_notion_database_id")
+  @@index([place_type], map: "idx_finances_places_place_type")
+  @@map("finances_places")
 }

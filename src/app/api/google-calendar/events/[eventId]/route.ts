@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
 // Dynamic import for googleapis
 let google: any;
@@ -11,10 +11,7 @@ try {
   console.warn('googleapis package not installed');
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseServiceRoleClient();
 
 interface GoogleCalendarCredentials {
   access_token: string;
@@ -49,6 +46,79 @@ function getColorFromColorId(colorId: string | undefined | null, calendarColor: 
   return colorMap[colorId] || calendarColor; // Fall back to calendar color if colorId not recognized
 }
 
+/**
+ * Map hex color to Google Calendar colorId
+ */
+function getColorIdFromHex(hexColor: string): string | undefined {
+  const normalizedHex = hexColor.toLowerCase().startsWith('#') ? hexColor.toLowerCase() : `#${hexColor.toLowerCase()}`;
+  
+  const colorMap: Record<string, string> = {
+    '#a4bdfc': '1', // Lavender
+    '#7ae7bf': '2', // Sage
+    '#dbadff': '3', // Grape
+    '#ff887c': '4', // Flamingo
+    '#fbd75b': '5', // Banana
+    '#ffb878': '6', // Tangerine
+    '#46d6db': '7', // Peacock
+    '#e1e1e1': '8', // Graphite
+    '#5484ed': '9', // Blueberry
+    '#51b749': '10', // Basil
+    '#dc2127': '11', // Tomato
+  };
+
+  return colorMap[normalizedHex];
+}
+
+/**
+ * Find the closest Google Calendar colorId for a custom color
+ * This is used when a custom color is provided but Google Calendar only supports predefined colors
+ */
+function findClosestColorId(hexColor: string): string | undefined {
+  const normalizedHex = hexColor.toLowerCase().startsWith('#') ? hexColor.toLowerCase() : `#${hexColor.toLowerCase()}`;
+  
+  // Parse RGB values
+  const r = parseInt(normalizedHex.slice(1, 3), 16);
+  const g = parseInt(normalizedHex.slice(3, 5), 16);
+  const b = parseInt(normalizedHex.slice(5, 7), 16);
+  
+  // Calculate distance to each predefined color
+  const colors = [
+    { id: '1', hex: '#a4bdfc' },
+    { id: '2', hex: '#7ae7bf' },
+    { id: '3', hex: '#dbadff' },
+    { id: '4', hex: '#ff887c' },
+    { id: '5', hex: '#fbd75b' },
+    { id: '6', hex: '#ffb878' },
+    { id: '7', hex: '#46d6db' },
+    { id: '8', hex: '#e1e1e1' },
+    { id: '9', hex: '#5484ed' },
+    { id: '10', hex: '#51b749' },
+    { id: '11', hex: '#dc2127' },
+  ];
+  
+  let minDistance = Infinity;
+  let closestId: string | undefined;
+  
+  for (const color of colors) {
+    const colorHex = color.hex.toLowerCase();
+    const cr = parseInt(colorHex.slice(1, 3), 16);
+    const cg = parseInt(colorHex.slice(3, 5), 16);
+    const cb = parseInt(colorHex.slice(5, 7), 16);
+    
+    // Calculate Euclidean distance in RGB space
+    const distance = Math.sqrt(
+      Math.pow(r - cr, 2) + Math.pow(g - cg, 2) + Math.pow(b - cb, 2)
+    );
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestId = color.id;
+    }
+  }
+  
+  return closestId;
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ eventId: string }> }
@@ -61,7 +131,7 @@ export async function PATCH(
 
     const { eventId } = await params;
     const body = await req.json();
-    const { calendarId, startTime, endTime, isAllDay, newCalendarId, location } = body;
+    const { calendarId, startTime, endTime, isAllDay, newCalendarId, location, color, useCalendarDefault } = body;
 
     // If updating calendar, newCalendarId is required
     if (newCalendarId && !calendarId) {
@@ -100,9 +170,9 @@ export async function PATCH(
     }
 
     // At least one field must be provided
-    if (!startTime && !endTime && !newCalendarId && location === undefined) {
+    if (!startTime && !endTime && !newCalendarId && location === undefined && color === undefined) {
       return NextResponse.json(
-        { error: 'At least one field (startTime, endTime, newCalendarId, or location) must be provided' },
+        { error: 'At least one field (startTime, endTime, newCalendarId, location, or color) must be provided' },
         { status: 400 }
       );
     }
@@ -255,13 +325,36 @@ export async function PATCH(
           ...eventDataWithoutId,
         };
         
-        // Update location if provided
-        if (location !== undefined) {
-          eventToMove.location = location || undefined;
+      // Update location if provided
+      if (location !== undefined) {
+        eventToMove.location = location || undefined;
+      }
+      
+      // Update color if provided
+      if (color !== undefined) {
+        if (useCalendarDefault) {
+          // Remove colorId to use calendar default
+          delete eventToMove.colorId;
+        } else {
+          const colorId = getColorIdFromHex(color);
+          if (colorId) {
+            // Use predefined Google Calendar colorId
+            eventToMove.colorId = colorId;
+          } else {
+            // Custom color - Google Calendar doesn't support custom colors directly
+            // We'll store it in the event_data and use it in our UI
+            // For Google Calendar API, we'll use the closest predefined color
+            // but store the custom color in our database
+            const closestColorId = findClosestColorId(color);
+            if (closestColorId) {
+              eventToMove.colorId = closestColorId;
+            }
+          }
         }
-        
-        // Update times if provided
-        if (startTime && endTime) {
+      }
+      
+      // Update times if provided
+      if (startTime && endTime) {
           const shouldBeAllDay = isAllDay !== undefined ? isAllDay : (existingEvent.start?.date ? true : false);
           const newStart = new Date(startTime);
           const newEnd = new Date(endTime);
@@ -355,6 +448,29 @@ export async function PATCH(
         updatedEvent.location = location || undefined;
       }
       
+      // Update color if provided
+      if (color !== undefined) {
+        if (useCalendarDefault) {
+          // Remove colorId to use calendar default
+          delete updatedEvent.colorId;
+        } else {
+          const colorId = getColorIdFromHex(color);
+          if (colorId) {
+            // Use predefined Google Calendar colorId
+            updatedEvent.colorId = colorId;
+          } else {
+            // Custom color - Google Calendar doesn't support custom colors directly
+            // We'll store it in the event_data and use it in our UI
+            // For Google Calendar API, we'll use the closest predefined color
+            // but store the custom color in our database
+            const closestColorId = findClosestColorId(color);
+            if (closestColorId) {
+              updatedEvent.colorId = closestColorId;
+            }
+          }
+        }
+      }
+      
       // Update times if provided
       if (startTime && endTime) {
         const newStart = new Date(startTime);
@@ -418,7 +534,23 @@ export async function PATCH(
       ? new Date(googleEvent.end.date + 'T00:00:00Z')
       : new Date(googleEvent.end.dateTime);
 
-    const eventColor = getColorFromColorId(googleEvent.colorId, calendarColor);
+    // Determine event color:
+    // - If useCalendarDefault is true, use calendar color (colorId was removed)
+    // - If color was provided, use that color (even if custom)
+    // - Otherwise, use colorId from Google event (or calendar color as fallback)
+    let eventColor: string;
+    let isCustomColor = false;
+    if (useCalendarDefault) {
+      // Use calendar color when resetting to default
+      eventColor = calendarColor;
+    } else if (color !== undefined) {
+      // Check if it's a custom color (not in predefined list)
+      const colorId = getColorIdFromHex(color);
+      isCustomColor = !colorId;
+      eventColor = color; // Use the provided color (custom or predefined)
+    } else {
+      eventColor = getColorFromColorId(googleEvent.colorId, calendarColor);
+    }
 
     // Upsert event in Supabase cache (use target calendar and event ID)
     const finalEventId = googleEvent.id || eventId;

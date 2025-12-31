@@ -1249,6 +1249,51 @@ export function HealthMetricsTrends({
   );
   const hasAnyData = hasRHR || hasWeight || hasSteps || hasSleep || hasSleepStages;
 
+  // Get latest values from entries for the metric cards
+  const latestValues = useMemo(() => {
+    if (entries.length === 0) return { rhr: null, weight: null, steps: null, sleep: null };
+
+    // Sort entries by date (most recent first)
+    const sortedEntries = [...entries].sort((a, b) => {
+      const dateA = extractEntryDate(a);
+      const dateB = extractEntryDate(b);
+      if (!dateA || !dateB) return 0;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+
+    // Find the most recent entry with each metric
+    let rhr: number | null = null;
+    let weight: number | null = null;
+    let steps: number | null = null;
+    let sleep: number | null = null;
+
+    for (const entry of sortedEntries) {
+      if (rhr === null) {
+        const rhrProp = entry.properties?.['RHR [bpm]'] || entry.properties?.['RHR'];
+        const rhrValue = extractPropertyValue(rhrProp);
+        if (typeof rhrValue === 'number') rhr = rhrValue;
+      }
+      if (weight === null) {
+        const weightProp = entry.properties?.['Weight [kg]'] || entry.properties?.['Weight'];
+        const weightValue = extractPropertyValue(weightProp);
+        if (typeof weightValue === 'number') weight = weightValue;
+      }
+      if (steps === null) {
+        const stepsProp = entry.properties?.['Steps'];
+        const stepsValue = extractPropertyValue(stepsProp);
+        if (typeof stepsValue === 'number') steps = stepsValue;
+      }
+      if (sleep === null) {
+        const sleepProp = entry.properties?.['Sleep [h]'] || entry.properties?.['Sleep'];
+        const sleepValue = extractPropertyValue(sleepProp);
+        if (typeof sleepValue === 'number') sleep = sleepValue;
+      }
+      if (rhr !== null && weight !== null && steps !== null && sleep !== null) break;
+    }
+
+    return { rhr, weight, steps, sleep };
+  }, [entries]);
+
   // Apply color palette to card if available
   const cardStyle = colorPalette
     ? {
@@ -1366,6 +1411,67 @@ export function HealthMetricsTrends({
                 ))}
           </div>
         </div>
+
+        {/* Metric Cards */}
+        {(latestValues.rhr !== null ||
+          latestValues.weight !== null ||
+          latestValues.steps !== null ||
+          latestValues.sleep !== null) && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {latestValues.rhr !== null && (
+              <div className="bg-red-100 dark:bg-red-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Heart className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-red-700 dark:text-red-300 font-medium">
+                    Resting Heart Rate
+                  </div>
+                  <div className="text-xl font-bold text-red-900 dark:text-red-100">
+                    {latestValues.rhr} bpm
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.weight !== null && (
+              <div className="bg-yellow-100 dark:bg-yellow-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">
+                    Weight
+                  </div>
+                  <div className="text-xl font-bold text-yellow-900 dark:text-yellow-100">
+                    {latestValues.weight.toFixed(1)} kg
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.sleep !== null && (
+              <div className="bg-purple-100 dark:bg-purple-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Moon className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-purple-700 dark:text-purple-300 font-medium">
+                    Sleep
+                  </div>
+                  <div className="text-xl font-bold text-purple-900 dark:text-purple-100">
+                    {latestValues.sleep.toFixed(1)} h
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.steps !== null && (
+              <div className="bg-green-100 dark:bg-green-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Footprints className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-green-700 dark:text-green-300 font-medium">
+                    Steps
+                  </div>
+                  <div className="text-xl font-bold text-green-900 dark:text-green-100">
+                    {latestValues.steps.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {!hasAnyData ? (
           <div className="py-12 text-center">
@@ -1810,94 +1916,142 @@ export function HealthMetricsTrends({
             )}
 
             {/* Sleep Stages Chart */}
-            {hasSleepStages && (
-              <div className="space-y-3 md:col-span-2">
-                <div className="flex items-center gap-2">
-                  <Moon className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm font-semibold text-foreground">Sleep Stages</span>
-                </div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="deepSleepGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#9333ea" stopOpacity={0.8} />
-                        <stop offset="100%" stopColor="#9333ea" stopOpacity={0.3} />
-                      </linearGradient>
-                      <linearGradient id="lightSleepGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8} />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      </linearGradient>
-                      <linearGradient id="remSleepGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.8} />
-                        <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.3} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                    <YAxis
-                      domain={[0, 100]}
-                      tick={{ fontSize: 10 }}
-                      ticks={[0, 25, 50, 75, 100]}
-                      label={{
-                        value: '%',
-                        angle: -90,
-                        position: 'insideLeft',
-                        style: { fontSize: 10 },
-                      }}
-                    />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
-                          return (
-                            <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                              <p className="text-xs font-medium mb-2">
-                                {data.date} {year && !data.date.includes(year) && `(${year})`}
-                              </p>
-                              {data.deepSleep !== null && (
-                                <p className="text-xs text-purple-600">
-                                  Deep: {Number(data.deepSleep).toFixed(1)}%
-                                </p>
-                              )}
-                              {data.lightSleep !== null && (
-                                <p className="text-xs text-blue-500">
-                                  Light: {Number(data.lightSleep).toFixed(1)}%
-                                </p>
-                              )}
-                              {data.remSleep !== null && (
-                                <p className="text-xs text-cyan-400">
-                                  REM: {Number(data.remSleep).toFixed(1)}%
-                                </p>
-                              )}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar
-                      dataKey="deepSleep"
-                      stackId="sleep"
-                      fill="url(#deepSleepGradient)"
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="lightSleep"
-                      stackId="sleep"
-                      fill="url(#lightSleepGradient)"
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="remSleep"
-                      stackId="sleep"
-                      fill="url(#remSleepGradient)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            {hasSleepStages &&
+              (() => {
+                // Transform chartData to show actual sleep hours instead of percentages
+                const sleepStagesData = chartData.map((d) => {
+                  const totalSleep = d.sleep || 0;
+                  return {
+                    ...d,
+                    deepSleepHours:
+                      d.deepSleep !== null && totalSleep > 0
+                        ? (d.deepSleep / 100) * totalSleep
+                        : null,
+                    lightSleepHours:
+                      d.lightSleep !== null && totalSleep > 0
+                        ? (d.lightSleep / 100) * totalSleep
+                        : null,
+                    remSleepHours:
+                      d.remSleep !== null && totalSleep > 0
+                        ? (d.remSleep / 100) * totalSleep
+                        : null,
+                  };
+                });
+
+                // Calculate max sleep hours for Y-axis domain
+                const maxSleepHours = Math.max(
+                  ...sleepStagesData.map((d) => {
+                    const total =
+                      (d.deepSleepHours || 0) + (d.lightSleepHours || 0) + (d.remSleepHours || 0);
+                    return total;
+                  }),
+                  0
+                );
+
+                return (
+                  <div className="space-y-3 md:col-span-2">
+                    <div className="flex items-center gap-2">
+                      <Moon className="w-4 h-4 text-purple-500" />
+                      <span className="text-sm font-semibold text-foreground">Sleep Stages</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart
+                        data={sleepStagesData}
+                        margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                      >
+                        <defs>
+                          <linearGradient id="deepSleepGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#9333ea" stopOpacity={0.8} />
+                            <stop offset="100%" stopColor="#9333ea" stopOpacity={0.3} />
+                          </linearGradient>
+                          <linearGradient id="lightSleepGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8} />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.3} />
+                          </linearGradient>
+                          <linearGradient id="remSleepGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.8} />
+                            <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.3} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                        <YAxis
+                          domain={[0, maxSleepHours > 0 ? maxSleepHours + 1 : 10]}
+                          tick={{ fontSize: 10 }}
+                          tickFormatter={(value) => `${value.toFixed(1)}h`}
+                          label={{
+                            value: 'hours',
+                            angle: -90,
+                            position: 'insideLeft',
+                            style: { fontSize: 10 },
+                          }}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
+                              return (
+                                <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                  <p className="text-xs font-medium mb-2">
+                                    {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                  </p>
+                                  {data.deepSleepHours !== null && (
+                                    <p className="text-xs text-purple-600">
+                                      Deep: {Number(data.deepSleepHours).toFixed(2)}h (
+                                      {data.deepSleep !== null
+                                        ? Number(data.deepSleep).toFixed(1)
+                                        : '-'}
+                                      %)
+                                    </p>
+                                  )}
+                                  {data.lightSleepHours !== null && (
+                                    <p className="text-xs text-blue-500">
+                                      Light: {Number(data.lightSleepHours).toFixed(2)}h (
+                                      {data.lightSleep !== null
+                                        ? Number(data.lightSleep).toFixed(1)
+                                        : '-'}
+                                      %)
+                                    </p>
+                                  )}
+                                  {data.remSleepHours !== null && (
+                                    <p className="text-xs text-cyan-400">
+                                      REM: {Number(data.remSleepHours).toFixed(2)}h (
+                                      {data.remSleep !== null
+                                        ? Number(data.remSleep).toFixed(1)
+                                        : '-'}
+                                      %)
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar
+                          dataKey="deepSleepHours"
+                          stackId="sleep"
+                          fill="url(#deepSleepGradient)"
+                          radius={[0, 0, 0, 0]}
+                        />
+                        <Bar
+                          dataKey="lightSleepHours"
+                          stackId="sleep"
+                          fill="url(#lightSleepGradient)"
+                          radius={[0, 0, 0, 0]}
+                        />
+                        <Bar
+                          dataKey="remSleepHours"
+                          stackId="sleep"
+                          fill="url(#remSleepGradient)"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
           </div>
         )}
       </div>

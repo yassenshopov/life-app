@@ -24,6 +24,8 @@ import { useTableFilters } from '@/hooks/useTableFilters';
 import { FilterState } from '@/types/filters';
 import { cn } from '@/lib/utils';
 import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
+import { BirthdayMonthlyView } from '@/app/people/BirthdayMonthlyView';
+import { PeopleActivitySummary } from '@/components/PeopleActivitySummary';
 
 // Zodiac sign symbols mapping
 const zodiacSymbols: Record<string, string> = {
@@ -58,15 +60,7 @@ function extractFlag(location: string | null): { flag: string; text: string } {
   return { flag, text };
 }
 
-// Helper to get tier color
-function getTierColor(tier: string[] | null): string {
-  if (!tier || tier.length === 0) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-  const tierStr = tier[0] || '';
-  if (tierStr.includes('Me')) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-  if (tierStr.includes('CR')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-  if (tierStr.includes('F')) return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200';
-  return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-}
+import { getTierColor, getTierName, getTierBgColor } from '@/lib/tier-colors';
 
 // Helper to format date
 function formatDate(dateString: string | null): string {
@@ -119,7 +113,7 @@ function getImageUrl(person: Person): string | null {
 interface Person {
   id: string;
   name: string;
-  tier: string[] | null;
+  tier: string[] | Array<{ name: string; color?: string }> | null;
   origin_of_connection: string[] | null;
   star_sign: string | null;
   currently_at: string | null;
@@ -133,7 +127,7 @@ interface Person {
   birthday: any;
 }
 
-type ViewType = 'default' | 'card';
+type ViewType = 'activity' | 'default' | 'card' | 'birthdays';
 
 // Properties for filter menu
 const properties = {
@@ -158,7 +152,7 @@ const columns = [
 ];
 
 export function PeopleView() {
-  const [viewType, setViewType] = useState<ViewType>('card');
+  const [viewType, setViewType] = useState<ViewType>('activity');
   const [filters, setFilters] = useState<FilterState>({ groups: [] });
   const [people, setPeople] = useState<Person[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -429,8 +423,10 @@ export function PeopleView() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <Tabs value={viewType} onValueChange={(v) => setViewType(v as ViewType)}>
             <TabsList>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
               <TabsTrigger value="default">Default view</TabsTrigger>
               <TabsTrigger value="card">Card</TabsTrigger>
+              <TabsTrigger value="birthdays">Birthdays</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -483,11 +479,26 @@ export function PeopleView() {
           </div>
         </div>
 
+        {/* Activity Summary View */}
+        {viewType === 'activity' && (
+          <PeopleActivitySummary
+            people={filteredAndSortedData}
+            onPersonClick={(person) => {
+              setSelectedPerson(person);
+              setIsPersonModalOpen(true);
+              // Fetch events when opening modal
+              if (!personEvents[person.id]) {
+                fetchPersonEvents(person.id);
+              }
+            }}
+          />
+        )}
+
         {/* People Grid - Grouped by Tier */}
         {viewType === 'card' && (() => {
           // Group people by tier
           const groupedByTier = filteredAndSortedData.reduce((acc, person) => {
-            const tier = person.tier && person.tier.length > 0 ? person.tier[0] : 'Other';
+            const tier = getTierName(person.tier) || 'Other';
             if (!acc[tier]) {
               acc[tier] = [];
             }
@@ -528,7 +539,7 @@ export function PeopleView() {
                         variant="secondary"
                         className={cn('text-sm px-3 py-1', getTierColor(firstPerson.tier))}
                       >
-                        {tier}
+                        {String(tier)}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
                         {peopleInTier.length} {peopleInTier.length === 1 ? 'person' : 'people'}
@@ -546,7 +557,10 @@ export function PeopleView() {
                         return (
                           <Card
                             key={person.id}
-                            className="group overflow-hidden hover:shadow-lg transition-all cursor-pointer"
+                            className={cn(
+                              "group overflow-hidden hover:shadow-lg transition-all cursor-pointer",
+                              getTierBgColor(person.tier)
+                            )}
                             onClick={async () => {
                               setSelectedPerson(person);
                               setIsPersonModalOpen(true);
@@ -692,7 +706,7 @@ export function PeopleView() {
                       const currentlyAt = extractFlag(person.currently_at);
                       const fromLocation = extractFlag(person.from_location);
                       const age = calculateAge(person.birth_date);
-                      const tier = person.tier && person.tier.length > 0 ? person.tier[0] : '';
+                      const tier = getTierName(person.tier);
                       const imageUrl = getImageUrl(person);
                       const events = personEvents[person.id] || [];
 
@@ -746,7 +760,7 @@ export function PeopleView() {
                                 variant="secondary"
                                 className={cn('text-xs px-2 py-0.5', getTierColor(person.tier))}
                               >
-                                {tier}
+                                {String(tier)}
                               </Badge>
                             )}
                           </TableCell>
@@ -800,7 +814,7 @@ export function PeopleView() {
             <div className="border-t border-border bg-muted/30 px-4 py-2 flex items-center gap-4 text-xs text-muted-foreground">
               <span>COUNT {filteredAndSortedData.length}</span>
               {searchQuery && <span>(filtered from {people.length})</span>}
-              <span>UNIQUE {new Set(filteredAndSortedData.map((p) => p.tier?.[0] || '').filter(Boolean)).size}</span>
+              <span>UNIQUE {new Set(filteredAndSortedData.map((p) => getTierName(p.tier)).filter(Boolean)).size}</span>
               {filteredAndSortedData.length > 0 && (
                 <span>
                   AVERAGE{' '}
@@ -815,6 +829,21 @@ export function PeopleView() {
               )}
             </div>
           </Card>
+        )}
+
+        {/* Birthdays View */}
+        {viewType === 'birthdays' && (
+          <BirthdayMonthlyView
+            people={filteredAndSortedData}
+            onPersonClick={(person) => {
+              setSelectedPerson(person);
+              setIsPersonModalOpen(true);
+              // Fetch events when opening modal
+              if (!personEvents[person.id]) {
+                fetchPersonEvents(person.id);
+              }
+            }}
+          />
         )}
       </div>
 
