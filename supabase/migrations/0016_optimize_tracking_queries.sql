@@ -29,3 +29,5 @@ CREATE INDEX IF NOT EXISTS idx_tracking_quarterly_properties_date_lower ON track
 CREATE INDEX IF NOT EXISTS idx_tracking_yearly_properties_date ON tracking_yearly USING GIN ((properties -> 'Date'));
 CREATE INDEX IF NOT EXISTS idx_tracking_yearly_properties_date_lower ON tracking_yearly USING GIN ((properties -> 'date'));
 
+
+

@@ -26,14 +26,7 @@ function extractFlag(location: string | null): { flag: string; text: string } {
   return { flag, text };
 }
 
-function getTierColor(tier: string[] | null): string {
-  if (!tier || tier.length === 0) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-  const tierStr = tier[0] || '';
-  if (tierStr.includes('Me')) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-  if (tierStr.includes('CR')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-  if (tierStr.includes('F')) return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200';
-  return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-}
+import { getTierColor, getTierName } from '@/lib/tier-colors';
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return '';
@@ -81,7 +74,7 @@ function getImageUrl(person: Person): string | null {
 interface Person {
   id: string;
   name: string;
-  tier: string[] | null;
+  tier: string[] | Array<{ name: string; color?: string }> | null;
   origin_of_connection: string[] | null;
   star_sign: string | null;
   currently_at: string | null;
@@ -160,7 +153,7 @@ export function PersonDetailsModal({
   const currentlyAt = extractFlag(person.currently_at);
   const fromLocation = extractFlag(person.from_location);
   const age = calculateAge(person.birth_date);
-  const tier = person.tier && person.tier.length > 0 ? person.tier[0] : '';
+  const tier = getTierName(person.tier);
   const tierColorClass = getTierColor(person.tier);
 
   // Get initials for avatar fallback
@@ -217,7 +210,7 @@ export function PersonDetailsModal({
                 </DialogTitle>
                 {tier && (
                   <Badge className={tierColorClass}>
-                    {tier}
+                    {String(tier)}
                   </Badge>
                 )}
               </div>

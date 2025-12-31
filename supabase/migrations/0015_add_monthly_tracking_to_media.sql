@@ -18,3 +18,5 @@ CREATE INDEX IF NOT EXISTS idx_media_monthly_tracking_id ON media(monthly_tracki
 -- Add comment
 COMMENT ON COLUMN media.monthly_tracking_id IS 'Reference to the monthly tracking entry when this media was consumed';
 
+
+

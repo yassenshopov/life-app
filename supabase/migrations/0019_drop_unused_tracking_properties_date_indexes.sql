@@ -26,3 +26,5 @@ DROP INDEX IF EXISTS idx_tracking_quarterly_properties_date_lower;
 DROP INDEX IF EXISTS idx_tracking_yearly_properties_date;
 DROP INDEX IF EXISTS idx_tracking_yearly_properties_date_lower;
 
+
+

@@ -72,10 +72,11 @@ function extractFlag(location: string | null): { flag: string; text: string } {
 }
 
 import { Person } from '@/lib/people-matching';
+import { getTierColor, getTierName } from '@/lib/tier-colors';
 
 // Extend Person interface for full details
 interface PersonWithDetails extends Person {
-  tier?: string[] | null;
+  tier?: string[] | Array<{ name: string; color?: string }> | null;
   origin_of_connection?: string[] | null;
   star_sign?: string | null;
   currently_at?: string | null;
@@ -208,11 +209,15 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
             {person.tier && person.tier.length > 0 && (
               <Field label="Tier" icon={Award}>
                 <div className="flex flex-wrap gap-1">
-                  {person.tier.map((t, idx) => (
-                    <Badge key={idx} variant="secondary" className="bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100">
-                      {t}
-                    </Badge>
-                  ))}
+                  {person.tier.map((t, idx) => {
+                    const tierOption = typeof t === 'string' ? { name: t, color: 'default' } : t;
+                    const tierName = typeof t === 'string' ? t : t.name;
+                    return (
+                      <Badge key={idx} variant="secondary" className={getTierColor([tierOption])}>
+                        {tierName}
+                      </Badge>
+                    );
+                  })}
                 </div>
               </Field>
             )}

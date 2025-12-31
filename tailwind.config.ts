@@ -6,6 +6,21 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  safelist: [
+    // Ensure purple, orange, and pink dark mode classes are always generated
+    'dark:bg-purple-400',
+    'dark:bg-purple-900',
+    'dark:text-purple-900',
+    'dark:text-purple-300',
+    'dark:text-purple-800',
+    'dark:bg-orange-900',
+    'dark:text-orange-200',
+    'dark:text-orange-300',
+    'dark:bg-pink-900',
+    'dark:text-pink-200',
+    'dark:text-pink-300',
   ],
   theme: {
   	extend: {

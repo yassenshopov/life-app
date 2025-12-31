@@ -42,3 +42,5 @@ COMMENT ON INDEX idx_google_calendar_events_user_start_date IS
 COMMENT ON INDEX idx_event_people_user_event_person IS 
 'Covering index for batch event-people queries. Includes person_id to avoid table lookups';
 
+
+
