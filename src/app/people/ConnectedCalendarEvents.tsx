@@ -114,10 +114,12 @@ function getEventColor(event: CalendarEvent, calendarColor?: string): string {
 export function ConnectedCalendarEvents({ events, isLoading = false }: ConnectedCalendarEventsProps) {
   const [showFutureEvents, setShowFutureEvents] = useState(false);
 
-  // Sort events chronologically (most recent at top)
-  const sortedEvents = useMemo(() => {
+  // Group events by year (most recent year first)
+  const eventsByYear = useMemo(() => {
     const now = new Date();
-    return [...events]
+    const yearMap = new Map<number, Array<{ event: CalendarEvent; startDate: Date }>>();
+
+    [...events]
       .map((event) => {
         const startDate = parseEventStart(event);
         return { event, startDate };
@@ -130,11 +132,22 @@ export function ConnectedCalendarEvents({ events, isLoading = false }: Connected
         }
         return true;
       })
-      .sort((a, b) => {
-        // Most recent first (descending order)
-        return b.startDate!.getTime() - a.startDate!.getTime();
-      })
-      .map(({ event }) => event);
+      .forEach(({ event, startDate }) => {
+        const year = startDate!.getFullYear();
+        if (!yearMap.has(year)) {
+          yearMap.set(year, []);
+        }
+        yearMap.get(year)!.push({ event, startDate: startDate! });
+      });
+
+    // Sort events within each year (most recent first)
+    yearMap.forEach((events) => {
+      events.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+    });
+
+    // Sort years (most recent first) and return as array of [year, events]
+    return Array.from(yearMap.entries())
+      .sort(([yearA], [yearB]) => yearB - yearA);
   }, [events, showFutureEvents]);
 
   // Count future events
@@ -199,68 +212,68 @@ export function ConnectedCalendarEvents({ events, isLoading = false }: Connected
             : `No past events found. ${futureEventsCount} upcoming event${futureEventsCount !== 1 ? 's' : ''} available.`}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-4">
           {timeSinceLastEvent && (
             <div className="text-xs text-muted-foreground pb-1 border-b border-border/50">
               Last interaction: {timeSinceLastEvent}
             </div>
           )}
-          <div className="space-y-1">
-        {sortedEvents.map((event) => {
-          const eventStart = parseEventStart(event);
-          
-          // Skip invalid events
-          if (!eventStart || isNaN(eventStart.getTime())) {
-            return null;
-          }
-
-          const dateStr = eventStart.toISOString().split('T')[0];
-          const isAllDay = 
-            (typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.date) || 
-            !(typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.dateTime);
-          
-          const eventColor = getEventColor(event);
-          const timeAgo = formatDistanceToNow(eventStart, { addSuffix: true });
-
-          return (
-            <Link
-              key={event.id}
-              href={`/hq?date=${dateStr}`}
-              className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors group"
-            >
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: eventColor }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {event.summary || event.title || 'Untitled Event'}
-                </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>
-                      {isAllDay 
-                        ? format(eventStart, 'MMM d, yyyy')
-                        : `${format(eventStart, 'MMM d, yyyy')} at ${format(eventStart, 'h:mm a')}`
-                      }
-                    </span>
-                  </div>
-                  <span className="text-muted-foreground/70">
-                    {timeAgo}
-                  </span>
-                  {event.location && (
-                    <div className="flex items-center gap-1 min-w-0 max-w-[120px]">
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate text-xs">{event.location}</span>
-                    </div>
-                  )}
-                </div>
+          {eventsByYear.map(([year, eventsInYear]) => (
+            <div key={year} className="space-y-2">
+              <div className="text-sm font-semibold text-muted-foreground border-b border-border/50 pb-1">
+                {year}
               </div>
-            </Link>
-          );
-        })}
-          </div>
+              <div className="space-y-1">
+                {eventsInYear.map(({ event, startDate: eventStart }) => {
+                  const dateStr = eventStart.toISOString().split('T')[0];
+                  const isAllDay =
+                    (typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.date) ||
+                    !(typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.dateTime);
+
+                  const eventColor = getEventColor(event);
+                  const timeAgo = formatDistanceToNow(eventStart, { addSuffix: true });
+
+                  return (
+                    <Link
+                      key={event.id}
+                      href={`/hq?date=${dateStr}`}
+                      className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors group"
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: eventColor }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {event.summary || event.title || 'Untitled Event'}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {isAllDay
+                                ? format(eventStart, 'MMM d')
+                                : `${format(eventStart, 'MMM d')} at ${format(eventStart, 'h:mm a')}`
+                              }
+                            </span>
+                          </div>
+                          <span className="text-muted-foreground/70">
+                            {timeAgo}
+                          </span>
+                          {event.location && (
+                            <div className="flex items-center gap-1 min-w-0 max-w-[120px]">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate text-xs">{event.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

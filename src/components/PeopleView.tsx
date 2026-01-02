@@ -2,7 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Users, Calendar, Plus, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Database, Clock, MapPin } from 'lucide-react';
+import {
+  Users,
+  Calendar,
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  RefreshCw,
+  Database,
+  Clock,
+  MapPin,
+} from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -26,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 import { BirthdayMonthlyView } from '@/app/people/BirthdayMonthlyView';
 import { PeopleActivitySummary } from '@/components/PeopleActivitySummary';
+import { FlagImage } from '@/lib/flag-utils';
 
 // Zodiac sign symbols mapping
 const zodiacSymbols: Record<string, string> = {
@@ -53,14 +65,59 @@ function extractZodiacSign(starSign: string | null): string {
 // Helper to extract flag from location string
 function extractFlag(location: string | null): { flag: string; text: string } {
   if (!location) return { flag: '', text: '' };
-  // Extract flag emoji (usually at the end)
+
+  // Try to match flag emoji (regional indicator symbols)
   const flagMatch = location.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u);
-  const flag = flagMatch ? flagMatch[0] : '';
-  const text = location.replace(/[\u{1F1E6}-\u{1F1FF}]{2}/u, '').trim();
+  let flag = flagMatch ? flagMatch[0] : '';
+
+  // If no flag found, try to extract country code in parentheses or brackets
+  if (!flag) {
+    const countryMatch = location.match(/\(([A-Z]{2})\)|\[([A-Z]{2})\]|([A-Z]{2})$/);
+    if (countryMatch) {
+      const countryCode = countryMatch[1] || countryMatch[2] || countryMatch[3];
+      // Convert country code back to flag emoji
+      flag = countryCodeToEmoji(countryCode);
+    }
+  }
+
+  const text = location
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/u, '')
+    .replace(/\([A-Z]{2}\)|\[[A-Z]{2}\]|[A-Z]{2}$/, '')
+    .trim();
+
   return { flag, text };
 }
 
+// Helper to convert country code to flag emoji
+function countryCodeToEmoji(countryCode: string): string {
+  if (!countryCode || countryCode.length !== 2) return '';
+  return String.fromCodePoint(
+    ...countryCode
+      .toUpperCase()
+      .split('')
+      .map((char) => 0x1f1e6 + char.charCodeAt(0) - 65)
+  );
+}
+
 import { getTierColor, getTierName, getTierBgColor } from '@/lib/tier-colors';
+
+// Function to get tier options from Supabase database properties
+async function getTierOptions(): Promise<string[]> {
+  try {
+    const response = await fetch('/api/people/connection');
+    const data = await response.json();
+
+    if (data.connected && data.database?.properties?.Tier?.multi_select?.options) {
+      // Return the options in the order they appear in Notion
+      return data.database.properties.Tier.multi_select.options.map((option: any) => option.name);
+    }
+  } catch (error) {
+    console.error('Error fetching tier options:', error);
+  }
+
+  // Fallback to hardcoded order if API fails
+  return ['Tier Me', 'Tier L', 'Tier CR', 'Tier F', 'Tier MU', 'Tier SA', 'Tier A'];
+}
 
 // Helper to format date
 function formatDate(dateString: string | null): string {
@@ -92,7 +149,7 @@ function getImageUrl(person: Person): string | null {
   if (person.image_url) {
     return person.image_url;
   }
-  
+
   // Fallback to extracting from Notion JSONB (for backward compatibility)
   const imageData = person.image;
   if (!imageData || !Array.isArray(imageData) || imageData.length === 0) {
@@ -166,6 +223,15 @@ export function PeopleView() {
   const [loadingPersonEvents, setLoadingPersonEvents] = useState<string | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
+  const [tierOptions, setTierOptions] = useState<string[]>([
+    'Tier Me',
+    'Tier L',
+    'Tier CR',
+    'Tier F',
+    'Tier MU',
+    'Tier SA',
+    'Tier A',
+  ]);
 
   // Check connection status
   useEffect(() => {
@@ -186,10 +252,14 @@ export function PeopleView() {
     try {
       const response = await fetch('/api/people/connection');
       const data = await response.json();
-      
+
       if (data.connected) {
         setIsConnected(true);
         setConnectionInfo(data.database);
+
+        // Fetch tier options from the database properties
+        const options = await getTierOptions();
+        setTierOptions(options);
       } else {
         setIsConnected(false);
       }
@@ -218,7 +288,7 @@ export function PeopleView() {
         method: 'POST',
       });
       const data = await response.json();
-      
+
       if (data.success) {
         await fetchPeople();
         await checkConnection(); // Update last_sync time
@@ -249,7 +319,11 @@ export function PeopleView() {
   };
 
   const handleLinkEvents = async () => {
-    if (!confirm('This will link all existing calendar events to people based on title matching. Continue?')) {
+    if (
+      !confirm(
+        'This will link all existing calendar events to people based on title matching. Continue?'
+      )
+    ) {
       return;
     }
 
@@ -272,7 +346,9 @@ export function PeopleView() {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`✅ Success! Linked ${data.linked} events to people.\nTotal events processed: ${data.totalEvents}`);
+        alert(
+          `✅ Success! Linked ${data.linked} events to people.\nTotal events processed: ${data.totalEvents}`
+        );
         // Refresh person events to show newly linked ones
         Object.keys(personEvents).forEach((personId) => {
           fetchPersonEvents(personId);
@@ -288,9 +364,9 @@ export function PeopleView() {
     }
   };
 
-  const handleConnected = () => {
+  const handleConnected = async () => {
     setIsConnected(true);
-    checkConnection();
+    await checkConnection();
     fetchPeople();
   };
 
@@ -311,6 +387,13 @@ export function PeopleView() {
         if (key === 'age') {
           return calculateAge(item.birth_date);
         }
+        if (key === 'tier') {
+          // Use the tier order from the database
+          const tierName = getTierName(item.tier) || 'Other';
+          const tierIndex = tierOptions.indexOf(tierName);
+          // Return index for known tiers, or a high number for unknown tiers to sort them last
+          return tierIndex !== -1 ? tierIndex : tierOptions.length;
+        }
         return item[key as keyof Person];
       },
     });
@@ -320,7 +403,9 @@ export function PeopleView() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+        const searchInput = document.querySelector(
+          'input[placeholder*="Search"]'
+        ) as HTMLInputElement;
         searchInput?.focus();
       }
       if (e.key === 'Escape' && searchQuery) {
@@ -495,182 +580,199 @@ export function PeopleView() {
         )}
 
         {/* People Grid - Grouped by Tier */}
-        {viewType === 'card' && (() => {
-          // Group people by tier
-          const groupedByTier = filteredAndSortedData.reduce((acc, person) => {
-            const tier = getTierName(person.tier) || 'Other';
-            if (!acc[tier]) {
-              acc[tier] = [];
+        {viewType === 'card' &&
+          (() => {
+            // Group people by tier
+            const groupedByTier = filteredAndSortedData.reduce((acc, person) => {
+              const tier = getTierName(person.tier) || 'Other';
+              if (!acc[tier]) {
+                acc[tier] = [];
+              }
+              acc[tier].push(person);
+              return acc;
+            }, {} as Record<string, typeof filteredAndSortedData>);
+
+            // Sort tiers using the order from the database
+            const sortedTiers = Object.keys(groupedByTier).sort((a, b) => {
+              const aIndex = tierOptions.indexOf(a);
+              const bIndex = tierOptions.indexOf(b);
+              if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+              if (aIndex !== -1) return -1;
+              if (bIndex !== -1) return 1;
+              return a.localeCompare(b);
+            });
+
+            if (sortedTiers.length === 0) {
+              return (
+                <Card className="p-12 text-center">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No people found</p>
+                </Card>
+              );
             }
-            acc[tier].push(person);
-            return acc;
-          }, {} as Record<string, typeof filteredAndSortedData>);
 
-          // Sort tiers: Me first, then alphabetically
-          const tierOrder = ['Tier Me', 'Tier L', 'Tier CR', 'Tier F', 'Tier MU', 'Tier SA', 'Tier A'];
-          const sortedTiers = Object.keys(groupedByTier).sort((a, b) => {
-            const aIndex = tierOrder.indexOf(a);
-            const bIndex = tierOrder.indexOf(b);
-            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-            if (aIndex !== -1) return -1;
-            if (bIndex !== -1) return 1;
-            return a.localeCompare(b);
-          });
-
-          if (sortedTiers.length === 0) {
             return (
-              <Card className="p-12 text-center">
-                <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No people found</p>
-              </Card>
-            );
-          }
+              <div className="space-y-6">
+                {sortedTiers.map((tier) => {
+                  const peopleInTier = groupedByTier[tier];
+                  const firstPerson = peopleInTier[0];
+                  return (
+                    <div key={tier} className="space-y-3">
+                      {/* Tier Header */}
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className={cn('text-sm px-3 py-1', getTierColor(firstPerson.tier))}
+                        >
+                          {String(tier)}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {peopleInTier.length} {peopleInTier.length === 1 ? 'person' : 'people'}
+                        </span>
+                      </div>
 
-          return (
-            <div className="space-y-6">
-              {sortedTiers.map((tier) => {
-                const peopleInTier = groupedByTier[tier];
-                const firstPerson = peopleInTier[0];
-                return (
-                  <div key={tier} className="space-y-3">
-                    {/* Tier Header */}
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className={cn('text-sm px-3 py-1', getTierColor(firstPerson.tier))}
-                      >
-                        {String(tier)}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {peopleInTier.length} {peopleInTier.length === 1 ? 'person' : 'people'}
-                      </span>
-                    </div>
+                      {/* Cards Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                        {peopleInTier.map((person) => {
+                          const zodiacSign = extractZodiacSign(person.star_sign);
+                          const currentlyAt = extractFlag(person.currently_at);
+                          const age = calculateAge(person.birth_date);
+                          const imageUrl = getImageUrl(person);
 
-                    {/* Cards Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-                      {peopleInTier.map((person) => {
-                        const zodiacSign = extractZodiacSign(person.star_sign);
-                        const currentlyAt = extractFlag(person.currently_at);
-                        const age = calculateAge(person.birth_date);
-                        const imageUrl = getImageUrl(person);
-
-                        return (
-                          <Card
-                            key={person.id}
-                            className={cn(
-                              "group overflow-hidden hover:shadow-lg transition-all cursor-pointer",
-                              getTierBgColor(person.tier)
-                            )}
-                            onClick={async () => {
-                              setSelectedPerson(person);
-                              setIsPersonModalOpen(true);
-                              // Fetch events when opening modal
-                              if (!personEvents[person.id]) {
-                                fetchPersonEvents(person.id);
-                              }
-                            }}
-                          >
-                            {/* Profile Image - Smaller */}
-                            <div className="h-20 w-full overflow-hidden bg-muted/20 relative">
-                              {imageUrl ? (
-                                <>
-                                  {/* Blurred background image */}
-                                  <div className="absolute inset-0">
-                                    <Image
-                                      src={imageUrl}
-                                      alt=""
-                                      fill
-                                      className="object-cover blur-md scale-110 opacity-50"
-                                      unoptimized
-                                      aria-hidden="true"
-                                    />
-                                  </div>
-                                  {/* Actual image - centered and fitted */}
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="relative w-16 h-16 rounded-full overflow-hidden">
+                          return (
+                            <Card
+                              key={person.id}
+                              className={cn(
+                                'group overflow-hidden hover:shadow-lg transition-all cursor-pointer',
+                                getTierBgColor(person.tier)
+                              )}
+                              onClick={async () => {
+                                setSelectedPerson(person);
+                                setIsPersonModalOpen(true);
+                                // Fetch events when opening modal
+                                if (!personEvents[person.id]) {
+                                  fetchPersonEvents(person.id);
+                                }
+                              }}
+                            >
+                              {/* Profile Image - Smaller */}
+                              <div className="h-20 w-full overflow-hidden bg-muted/20 relative">
+                                {imageUrl ? (
+                                  <>
+                                    {/* Blurred background image */}
+                                    <div className="absolute inset-0">
                                       <Image
                                         src={imageUrl}
-                                        alt={person.name}
+                                        alt=""
                                         fill
-                                        className="object-cover"
+                                        className="object-cover blur-md scale-110 opacity-50"
                                         unoptimized
-                                        onError={(e) => {
-                                          // Fallback to initials if image fails to load
-                                          const target = e.target as HTMLImageElement;
-                                          target.closest('.relative')?.parentElement?.style.setProperty('display', 'none');
-                                          const fallback = target.closest('.h-20')?.querySelector('.fallback-initials') as HTMLElement;
-                                          if (fallback) fallback.style.display = 'flex';
-                                        }}
+                                        aria-hidden="true"
                                       />
                                     </div>
+                                    {/* Actual image - centered and fitted */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="relative w-16 h-16 rounded-full overflow-hidden">
+                                        <Image
+                                          src={imageUrl}
+                                          alt={person.name}
+                                          fill
+                                          className="object-cover"
+                                          unoptimized
+                                          onError={(e) => {
+                                            // Fallback to initials if image fails to load
+                                            const target = e.target as HTMLImageElement;
+                                            target
+                                              .closest('.relative')
+                                              ?.parentElement?.style.setProperty('display', 'none');
+                                            const fallback = target
+                                              .closest('.h-20')
+                                              ?.querySelector('.fallback-initials') as HTMLElement;
+                                            if (fallback) fallback.style.display = 'flex';
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : null}
+                                <div
+                                  className={cn(
+                                    'fallback-initials w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900',
+                                    imageUrl && 'hidden'
+                                  )}
+                                >
+                                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <span className="text-lg font-semibold text-primary">
+                                      {person.name.charAt(0)}
+                                    </span>
                                   </div>
-                                </>
-                              ) : null}
-                              <div
-                                className={cn(
-                                  'fallback-initials w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900',
-                                  imageUrl && 'hidden'
-                                )}
-                              >
-                                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                                  <span className="text-lg font-semibold text-primary">
-                                    {person.name.charAt(0)}
-                                  </span>
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Card Content */}
-                            <div className="p-3 space-y-2">
-                              {/* Name */}
-                              <h3 className="font-semibold text-xs leading-tight group-hover:text-primary transition-colors line-clamp-1">
-                                {person.name}
-                              </h3>
+                              {/* Card Content */}
+                              <div className="p-3 space-y-2">
+                                {/* Name */}
+                                <h3 className="font-semibold text-xs leading-tight group-hover:text-primary transition-colors line-clamp-1">
+                                  {person.name}
+                                </h3>
 
-                              {/* Birth Date */}
-                              {person.birth_date && (
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <Calendar className="w-3 h-3 flex-shrink-0" />
-                                  <span className="truncate">{formatDate(person.birth_date)}</span>
-                                </div>
-                              )}
+                                {/* Birth Date */}
+                                {person.birth_date && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Calendar className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate">
+                                      {formatDate(person.birth_date)}
+                                    </span>
+                                  </div>
+                                )}
 
-                              {/* Star Sign */}
-                              {zodiacSign && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <span className="text-sm">
-                                    {zodiacSymbols[zodiacSign] || '⭐'}
-                                  </span>
-                                  <span className="truncate">{zodiacSign}</span>
-                                </div>
-                              )}
+                                {/* Star Sign */}
+                                {zodiacSign && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <span className="text-sm">
+                                      {zodiacSymbols[zodiacSign] || '⭐'}
+                                    </span>
+                                    <span className="truncate">{zodiacSign}</span>
+                                  </div>
+                                )}
 
-                              {/* Location */}
-                              {currentlyAt.text && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  {currentlyAt.flag && <span>{currentlyAt.flag}</span>}
-                                  <span className="truncate">{currentlyAt.text}</span>
-                                </div>
-                              )}
+                                {/* Location */}
+                                {currentlyAt.text && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    {currentlyAt.flag && (
+                                      <FlagImage
+                                        flagEmoji={currentlyAt.flag}
+                                        width={16}
+                                        height={12}
+                                        className="mr-1"
+                                        alt="Country flag"
+                                      />
+                                    )}
+                                    <span className="truncate">{currentlyAt.text}</span>
+                                  </div>
+                                )}
 
-                              {/* Calendar Events Count */}
-                              {personEvents[person.id] && personEvents[person.id].length > 0 && (
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <Calendar className="w-3 h-3 flex-shrink-0" />
-                                  <span>{personEvents[person.id].length} event{personEvents[person.id].length !== 1 ? 's' : ''}</span>
-                                </div>
-                              )}
-                            </div>
-                          </Card>
-                        );
-                      })}
+                                {/* Calendar Events Count */}
+                                {personEvents[person.id] && personEvents[person.id].length > 0 && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Calendar className="w-3 h-3 flex-shrink-0" />
+                                    <span>
+                                      {personEvents[person.id].length} event
+                                      {personEvents[person.id].length !== 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </Card>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+                  );
+                })}
+              </div>
+            );
+          })()}
 
         {/* Default/Table View */}
         {viewType === 'default' && (
@@ -696,7 +798,10 @@ export function PeopleView() {
                 <TableBody>
                   {filteredAndSortedData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
+                      <TableCell
+                        colSpan={columns.length}
+                        className="text-center py-8 text-muted-foreground"
+                      >
                         No people found
                       </TableCell>
                     </TableRow>
@@ -723,87 +828,104 @@ export function PeopleView() {
                               }
                             }}
                           >
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-                                {imageUrl ? (
-                                  <Image
-                                    src={imageUrl}
-                                    alt={person.name}
-                                    fill
-                                    className="object-cover rounded-full"
-                                    unoptimized
-                                    onError={(e) => {
-                                      // Fallback to initials if image fails to load
-                                      const target = e.target as HTMLImageElement;
-                                      target.style.display = 'none';
-                                      const fallback = target.nextElementSibling as HTMLElement;
-                                      if (fallback) fallback.style.display = 'flex';
-                                    }}
-                                  />
-                                ) : null}
-                                <span
-                                  className={cn(
-                                    'text-xs font-medium text-primary',
-                                    imageUrl && 'hidden'
-                                  )}
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+                                  {imageUrl ? (
+                                    <Image
+                                      src={imageUrl}
+                                      alt={person.name}
+                                      fill
+                                      className="object-cover rounded-full"
+                                      unoptimized
+                                      onError={(e) => {
+                                        // Fallback to initials if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const fallback = target.nextElementSibling as HTMLElement;
+                                        if (fallback) fallback.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span
+                                    className={cn(
+                                      'text-xs font-medium text-primary',
+                                      imageUrl && 'hidden'
+                                    )}
+                                  >
+                                    {person.name.charAt(0)}
+                                  </span>
+                                </div>
+                                <span className="text-sm font-medium">{person.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {tier && (
+                                <Badge
+                                  variant="secondary"
+                                  className={cn('text-xs px-2 py-0.5', getTierColor(person.tier))}
                                 >
-                                  {person.name.charAt(0)}
-                                </span>
-                              </div>
-                              <span className="text-sm font-medium">{person.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {tier && (
-                              <Badge
-                                variant="secondary"
-                                className={cn('text-xs px-2 py-0.5', getTierColor(person.tier))}
-                              >
-                                {String(tier)}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {person.origin_of_connection && person.origin_of_connection.length > 0 && (
-                              <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                                {person.origin_of_connection.join(', ')}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {person.birth_date ? formatDate(person.birth_date) : ''}
-                          </TableCell>
-                          <TableCell>
-                            {zodiacSign && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                <span className="text-base">
-                                  {zodiacSymbols[zodiacSign] || '⭐'}
-                                </span>
-                                <span>{zodiacSign}</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">{age !== null ? age : ''}</TableCell>
-                          <TableCell>
-                            {currentlyAt.text && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                {currentlyAt.flag && <span className="text-base">{currentlyAt.flag}</span>}
-                                <span>{currentlyAt.text}</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {fromLocation.text && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                {fromLocation.flag && <span className="text-base">{fromLocation.flag}</span>}
-                                <span>{fromLocation.text}</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">{person.occupation || ''}</TableCell>
-                        </TableRow>
-                      </React.Fragment>
+                                  {String(tier)}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {person.origin_of_connection &&
+                                person.origin_of_connection.length > 0 && (
+                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                    {person.origin_of_connection.join(', ')}
+                                  </Badge>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {person.birth_date ? formatDate(person.birth_date) : ''}
+                            </TableCell>
+                            <TableCell>
+                              {zodiacSign && (
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <span className="text-base">
+                                    {zodiacSymbols[zodiacSign] || '⭐'}
+                                  </span>
+                                  <span>{zodiacSign}</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">{age !== null ? age : ''}</TableCell>
+                            <TableCell>
+                              {currentlyAt.text && (
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  {currentlyAt.flag && (
+                                    <FlagImage
+                                      flagEmoji={currentlyAt.flag}
+                                      width={20}
+                                      height={15}
+                                      className="mr-1"
+                                      alt="Country flag"
+                                    />
+                                  )}
+                                  <span>{currentlyAt.text}</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {fromLocation.text && (
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  {fromLocation.flag && (
+                                    <FlagImage
+                                      flagEmoji={fromLocation.flag}
+                                      width={20}
+                                      height={15}
+                                      className="mr-1"
+                                      alt="Country flag"
+                                    />
+                                  )}
+                                  <span>{fromLocation.text}</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">{person.occupation || ''}</TableCell>
+                          </TableRow>
+                        </React.Fragment>
                       );
                     })
                   )}
@@ -814,7 +936,13 @@ export function PeopleView() {
             <div className="border-t border-border bg-muted/30 px-4 py-2 flex items-center gap-4 text-xs text-muted-foreground">
               <span>COUNT {filteredAndSortedData.length}</span>
               {searchQuery && <span>(filtered from {people.length})</span>}
-              <span>UNIQUE {new Set(filteredAndSortedData.map((p) => getTierName(p.tier)).filter(Boolean)).size}</span>
+              <span>
+                UNIQUE{' '}
+                {
+                  new Set(filteredAndSortedData.map((p) => getTierName(p.tier)).filter(Boolean))
+                    .size
+                }
+              </span>
               {filteredAndSortedData.length > 0 && (
                 <span>
                   AVERAGE{' '}
@@ -856,8 +984,8 @@ export function PeopleView() {
           setSelectedPerson(null);
         }}
         onFetchEvents={fetchPersonEvents}
-        events={selectedPerson ? (personEvents[selectedPerson.id] || []) : []}
-        isLoadingEvents={selectedPerson ? (loadingPersonEvents === selectedPerson.id) : false}
+        events={selectedPerson ? personEvents[selectedPerson.id] || [] : []}
+        isLoadingEvents={selectedPerson ? loadingPersonEvents === selectedPerson.id : false}
       />
     </div>
   );

@@ -90,7 +90,20 @@ export async function GET(request: Request) {
       });
     });
 
+    // Get artist images from spotify_artists table
+    const artistNames = Array.from(artistCounts.keys());
+    const { data: artistImages } = await supabase
+      .from('spotify_artists')
+      .select('name, image_url')
+      .in('name', artistNames);
+
+    const artistImageMap = new Map(artistImages?.map(a => [a.name, a.image_url]) || []);
+
     const topArtistsList = Array.from(artistCounts.values())
+      .map(artist => ({
+        ...artist,
+        image_url: artistImageMap.get(artist.name)
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
