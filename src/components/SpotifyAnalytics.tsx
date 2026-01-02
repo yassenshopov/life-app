@@ -4,8 +4,305 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Clock, Music, Users, Calendar, Zap, RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TrendingUp, Clock, Music, Users, Calendar, Zap, RefreshCw, ExternalLink } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
+import { getDefaultBgColor, getDominantColor } from '@/lib/spotify-color';
+
+// Top Track Card Component with album art and color extraction
+function TopTrackCard({ track }: {
+  track: {
+    id: string;
+    name: string;
+    rank: number;
+    album_image_url?: string;
+    artist_names?: string[];
+    album_name?: string;
+    external_url?: string;
+  };
+}) {
+  const [bgColor, setBgColor] = React.useState<string>(() => getDefaultBgColor());
+  const imageUrl = track.album_image_url;
+
+  React.useEffect(() => {
+    if (imageUrl) {
+      getDominantColor(imageUrl)
+        .then((color) => {
+          setBgColor(color);
+        })
+        .catch(() => {
+          setBgColor(getDefaultBgColor());
+        });
+    } else {
+      setBgColor(getDefaultBgColor());
+    }
+  }, [imageUrl]);
+
+  return (
+    <div
+      className="rounded-lg border border-white/10 transition-all duration-500 overflow-hidden cursor-pointer hover:scale-[1.02]"
+      style={
+        {
+          backgroundColor: bgColor || getDefaultBgColor(),
+          background: bgColor || getDefaultBgColor(),
+        } as React.CSSProperties
+      }
+      onClick={() => {
+        if (track.external_url) {
+          window.open(track.external_url, '_blank');
+        }
+      }}
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={track.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-white/20 flex items-center justify-center">
+                <Music className="w-6 h-6 text-white/60" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{track.name}</div>
+            <p className="text-white/80 text-xs truncate">
+              {track.artist_names?.join(', ') || 'Unknown Artist'}
+            </p>
+            {track.album_name && (
+              <p className="text-white/60 text-xs truncate">{track.album_name}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-white/80 text-xs font-bold">#{track.rank}</span>
+            {track.external_url && (
+              <ExternalLink className="w-4 h-4 text-white/60" />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Top Artist Card Component
+function TopArtistCard({ artist }: {
+  artist: {
+    id: string;
+    name: string;
+    rank: number;
+    image_url?: string;
+    external_url?: string;
+  };
+}) {
+  const [bgColor, setBgColor] = React.useState<string>(() => getDefaultBgColor());
+  const imageUrl = artist.image_url;
+
+  React.useEffect(() => {
+    if (imageUrl) {
+      getDominantColor(imageUrl)
+        .then((color) => {
+          setBgColor(color);
+        })
+        .catch(() => {
+          setBgColor(getDefaultBgColor());
+        });
+    } else {
+      setBgColor(getDefaultBgColor());
+    }
+  }, [imageUrl]);
+
+  return (
+    <div
+      className="rounded-lg border border-white/10 transition-all duration-500 overflow-hidden cursor-pointer hover:scale-[1.02]"
+      style={
+        {
+          backgroundColor: bgColor || getDefaultBgColor(),
+          background: bgColor || getDefaultBgColor(),
+        } as React.CSSProperties
+      }
+      onClick={() => {
+        if (artist.external_url) {
+          window.open(artist.external_url, '_blank');
+        }
+      }}
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={artist.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-white/20 flex items-center justify-center">
+                <Users className="w-6 h-6 text-white/60" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{artist.name}</div>
+            <div className="text-white/60 text-xs truncate">&nbsp;</div> {/* Spacer for height matching */}
+            <div className="text-white/60 text-xs truncate">&nbsp;</div> {/* Spacer for height matching */}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-white/80 text-xs font-bold">#{artist.rank}</span>
+            {artist.external_url && (
+              <ExternalLink className="w-4 h-4 text-white/60" />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Personal Track Card Component (for user's listening history)
+function PersonalTrackCard({ item, index }: {
+  item: {
+    count: number;
+    track: {
+      id: string;
+      name: string;
+      artists: string[];
+      image: string;
+    };
+    lastPlayed: Date;
+  };
+  index: number;
+}) {
+  const [bgColor, setBgColor] = React.useState<string>(() => getDefaultBgColor());
+  const imageUrl = item.track.image;
+
+  React.useEffect(() => {
+    if (imageUrl) {
+      getDominantColor(imageUrl)
+        .then((color) => {
+          setBgColor(color);
+        })
+        .catch(() => {
+          setBgColor(getDefaultBgColor());
+        });
+    } else {
+      setBgColor(getDefaultBgColor());
+    }
+  }, [imageUrl]);
+
+  return (
+    <div
+      className="rounded-lg border border-white/10 transition-all duration-500 overflow-hidden cursor-pointer hover:scale-[1.02]"
+      style={
+        {
+          backgroundColor: bgColor || getDefaultBgColor(),
+          background: bgColor || getDefaultBgColor(),
+        } as React.CSSProperties
+      }
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={item.track.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-white/20 flex items-center justify-center">
+                <Music className="w-6 h-6 text-white/60" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{item.track.name}</div>
+            <p className="text-white/80 text-xs truncate">
+              {item.track.artists.join(', ')}
+            </p>
+            <div className="text-white/60 text-xs truncate">
+              {item.count} plays
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-white/80 text-xs font-bold">#{index + 1}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Personal Artist Card Component (for user's listening history)
+function PersonalArtistCard({ artist, index }: {
+  artist: {
+    count: number;
+    name: string;
+    image_url?: string;
+  };
+  index: number;
+}) {
+  const [bgColor, setBgColor] = React.useState<string>(() => getDefaultBgColor());
+  const imageUrl = artist.image_url;
+
+  React.useEffect(() => {
+    if (imageUrl) {
+      getDominantColor(imageUrl)
+        .then((color) => {
+          setBgColor(color);
+        })
+        .catch(() => {
+          setBgColor(getDefaultBgColor());
+        });
+    } else {
+      setBgColor(getDefaultBgColor());
+    }
+  }, [imageUrl]);
+
+  return (
+    <div
+      className="rounded-lg border border-white/10 transition-all duration-500 overflow-hidden cursor-pointer hover:scale-[1.02]"
+      style={
+        {
+          backgroundColor: bgColor || getDefaultBgColor(),
+          background: bgColor || getDefaultBgColor(),
+        } as React.CSSProperties
+      }
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={artist.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-white/20 flex items-center justify-center">
+                <Users className="w-6 h-6 text-white/60" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm truncate">{artist.name}</div>
+            <div className="text-white/60 text-xs truncate">&nbsp;</div> {/* Spacer for height matching */}
+            <div className="text-white/60 text-xs truncate">
+              {artist.count} plays
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-white/80 text-xs font-bold">#{index + 1}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface AnalyticsData {
   totalMinutes: number;
@@ -25,6 +322,7 @@ interface AnalyticsData {
   topArtists: Array<{
     count: number;
     name: string;
+    image_url?: string;
   }>;
   listeningByHour: number[];
   listeningByDay: number[];
@@ -34,11 +332,17 @@ interface AnalyticsData {
     id: string;
     name: string;
     rank: number;
+    album_image_url?: string;
+    artist_names?: string[];
+    album_name?: string;
+    external_url?: string;
   }>>;
   topArtistsByTimeRange?: Record<string, Array<{
     id: string;
     name: string;
     rank: number;
+    image_url?: string;
+    external_url?: string;
   }>>;
 }
 
@@ -325,31 +629,10 @@ export function SpotifyAnalytics() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {analytics.topTracks.length > 0 ? (
-                analytics.topTracks.map((item, index) => (
-                  <div
-                    key={item.track.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="w-8 text-center font-bold text-muted-foreground">
-                      {index + 1}
-                    </div>
-                    {item.track.image && (
-                      <img
-                        src={item.track.image}
-                        alt={item.track.name}
-                        className="w-12 h-12 rounded"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold truncate">{item.track.name}</h4>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {item.track.artists.join(', ')}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{item.count} plays</Badge>
-                  </div>
+                analytics.topTracks.slice(0, 5).map((item, index) => (
+                  <PersonalTrackCard key={item.track.id} item={item} index={index} />
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -370,22 +653,10 @@ export function SpotifyAnalytics() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {analytics.topArtists.length > 0 ? (
-                analytics.topArtists.map((artist, index) => (
-                  <div
-                    key={artist.name}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="w-8 text-center font-bold text-muted-foreground">
-                      {index + 1}
-                    </div>
-                    <Users className="w-8 h-8 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold truncate">{artist.name}</h4>
-                    </div>
-                    <Badge variant="secondary">{artist.count} plays</Badge>
-                  </div>
+                analytics.topArtists.slice(0, 5).map((artist, index) => (
+                  <PersonalArtistCard key={artist.name} artist={artist} index={index} />
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -407,61 +678,64 @@ export function SpotifyAnalytics() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {(['short_term', 'medium_term', 'long_term'] as const).map((timeRange) => {
-              const rangeLabels = {
-                short_term: 'Last 4 Weeks',
-                medium_term: 'Last 6 Months',
-                long_term: 'All Time',
-              };
-
-              const tracks = analytics.topTracksByTimeRange?.[timeRange] || [];
-              const artists = analytics.topArtistsByTimeRange?.[timeRange] || [];
-
-              if (tracks.length === 0 && artists.length === 0) return null;
-
-              return (
-                <Card key={timeRange}>
-                  <CardHeader>
-                    <CardTitle>{rangeLabels[timeRange]}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {tracks.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2">Top Tracks</h4>
-                        <div className="space-y-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Tracks Section */}
+            {analytics.topTracksByTimeRange && Object.values(analytics.topTracksByTimeRange).some(arr => arr.length > 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Tracks</CardTitle>
+                  <CardDescription>Your most played songs by time period</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="short_term" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="short_term">4 Weeks</TabsTrigger>
+                      <TabsTrigger value="medium_term">6 Months</TabsTrigger>
+                      <TabsTrigger value="long_term">All Time</TabsTrigger>
+                    </TabsList>
+                    {(['short_term', 'medium_term', 'long_term'] as const).map((timeRange) => {
+                      const tracks = analytics.topTracksByTimeRange?.[timeRange] || [];
+                      return (
+                        <TabsContent key={timeRange} value={timeRange} className="space-y-2 mt-4">
                           {tracks.slice(0, 5).map((track) => (
-                            <div
-                              key={track.id}
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <span className="w-6 text-muted-foreground">#{track.rank}</span>
-                              <span className="flex-1 truncate">{track.name}</span>
-                            </div>
+                            <TopTrackCard key={track.id} track={track} />
                           ))}
-                        </div>
-                      </div>
-                    )}
-                    {artists.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2">Top Artists</h4>
-                        <div className="space-y-2">
+                        </TabsContent>
+                      );
+                    })}
+                  </Tabs>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Top Artists Section */}
+            {analytics.topArtistsByTimeRange && Object.values(analytics.topArtistsByTimeRange).some(arr => arr.length > 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Artists</CardTitle>
+                  <CardDescription>Your most listened artists by time period</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="short_term" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="short_term">4 Weeks</TabsTrigger>
+                      <TabsTrigger value="medium_term">6 Months</TabsTrigger>
+                      <TabsTrigger value="long_term">All Time</TabsTrigger>
+                    </TabsList>
+                    {(['short_term', 'medium_term', 'long_term'] as const).map((timeRange) => {
+                      const artists = analytics.topArtistsByTimeRange?.[timeRange] || [];
+                      return (
+                        <TabsContent key={timeRange} value={timeRange} className="space-y-2 mt-4">
                           {artists.slice(0, 5).map((artist) => (
-                            <div
-                              key={artist.id}
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <span className="w-6 text-muted-foreground">#{artist.rank}</span>
-                              <span className="flex-1 truncate">{artist.name}</span>
-                            </div>
+                            <TopArtistCard key={artist.id} artist={artist} />
                           ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        </TabsContent>
+                      );
+                    })}
+                  </Tabs>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}

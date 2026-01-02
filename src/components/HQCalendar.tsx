@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, MoreVertical, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreVertical, Maximize2, Minimize2, HelpCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -597,6 +597,92 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     return Array.from(eventMap.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
   };
 
+  // Calculate current view's date range
+  const getCurrentViewRange = (): { timeMin: Date; timeMax: Date } | null => {
+    let timeMin: Date;
+    let timeMax: Date;
+
+    if (viewMode === 'daily') {
+      timeMin = new Date(currentDate);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'weekly') {
+      timeMin = new Date(currentDate);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate);
+      timeMax.setDate(currentDate.getDate() + 7);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'monthly') {
+      timeMin = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'year') {
+      timeMin = new Date(currentDate.getFullYear(), 0, 1);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate.getFullYear(), 11, 31);
+      timeMax.setHours(23, 59, 59, 999);
+    } else if (viewMode === 'schedule') {
+      timeMin = new Date(currentDate);
+      timeMin.setHours(0, 0, 0, 0);
+      timeMax = new Date(currentDate);
+      timeMax.setDate(currentDate.getDate() + 30);
+      timeMax.setHours(23, 59, 59, 999);
+    } else {
+      return null;
+    }
+
+    return { timeMin, timeMax };
+  };
+
+  // Refresh events for current view only
+  const handleRefreshCurrentView = React.useCallback(() => {
+    const viewRange = getCurrentViewRange();
+    if (!viewRange) return;
+
+    const { timeMin, timeMax } = viewRange;
+
+    // Remove events from cache that overlap with current view range
+    allCachedEventsRef.current = allCachedEventsRef.current.filter(event => {
+      // Keep events that don't overlap with the current view range
+      return !(event.start <= timeMax && event.end >= timeMin);
+    });
+
+    // Update cached range to exclude the current view range
+    if (cachedRangeRef.current) {
+      const cached = cachedRangeRef.current;
+      
+      // If the cached range is exactly the view range, clear it
+      if (cached.min.getTime() === timeMin.getTime() && cached.max.getTime() === timeMax.getTime()) {
+        cachedRangeRef.current = null;
+      } else {
+        // Otherwise, shrink the cached range to exclude the view range
+        // This is a simplification - we'll just invalidate the cache for this range
+        // by setting it to null if the view range overlaps significantly
+        if (timeMin >= cached.min && timeMax <= cached.max) {
+          // View range is within cached range - we'll need to refetch just this part
+          // For simplicity, we'll just clear the cache for this range
+          cachedRangeRef.current = null;
+        } else {
+          // View range extends beyond cached range - clear cache
+          cachedRangeRef.current = null;
+        }
+      }
+    }
+
+    // Clear displayed events for current view
+    setEvents([]);
+    
+    // Force refresh and trigger refetch
+    setShouldStopRetrying(false);
+    fetchingRef.current = false;
+    setForceRefresh(true);
+    
+    // Trigger refetch by updating currentDate slightly to force useEffect to run
+    setCurrentDate((prev) => new Date(prev.getTime()));
+  }, [viewMode, currentDate]);
+
   // Fetch events from Google Calendar based on current view and date
   React.useEffect(() => {
     // Don't fetch if we're already fetching or should stop retrying
@@ -1092,6 +1178,15 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
             </Select>
             <Button variant="outline" size="sm" onClick={goToToday}>
               Today
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefreshCurrentView}
+              title="Refresh current view"
+              disabled={loadingEvents}
+            >
+              <RefreshCw className={cn("h-4 w-4", loadingEvents && "animate-spin")} />
             </Button>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" onClick={goToPrevious}>

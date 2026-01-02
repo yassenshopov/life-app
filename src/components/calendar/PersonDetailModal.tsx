@@ -73,6 +73,7 @@ function extractFlag(location: string | null): { flag: string; text: string } {
 
 import { Person } from '@/lib/people-matching';
 import { getTierColor, getTierName } from '@/lib/tier-colors';
+import { FlagImage } from '@/lib/flag-utils';
 
 // Extend Person interface for full details
 interface PersonWithDetails extends Person {
@@ -228,7 +229,15 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
                 icon={MapPin}
               >
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-100">
-                  {currentlyAt.flag && <span className="mr-1">{currentlyAt.flag}</span>}
+                  {currentlyAt.flag && (
+                    <FlagImage
+                      flagEmoji={currentlyAt.flag}
+                      width={16}
+                      height={12}
+                      className="mr-1"
+                      alt="Country flag"
+                    />
+                  )}
                   {currentlyAt.text}
                 </Badge>
               </Field>
@@ -255,7 +264,15 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
                 icon={MapPin}
               >
                 <Badge variant="secondary" className="bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100">
-                  {fromLocation.flag && <span className="mr-1">{fromLocation.flag}</span>}
+                  {fromLocation.flag && (
+                    <FlagImage
+                      flagEmoji={fromLocation.flag}
+                      width={16}
+                      height={12}
+                      className="mr-1"
+                      alt="Country flag"
+                    />
+                  )}
                   {fromLocation.text}
                 </Badge>
               </Field>
@@ -283,7 +300,15 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
                 icon={Globe}
               >
                 <div className="flex items-center gap-1">
-                  {fromLocation.flag && <span>{fromLocation.flag}</span>}
+                  {fromLocation.flag && (
+                    <FlagImage
+                      flagEmoji={fromLocation.flag}
+                      width={16}
+                      height={12}
+                      className="mr-1"
+                      alt="Country flag"
+                    />
+                  )}
                   <span>{fromLocation.text}</span>
                 </div>
               </Field>

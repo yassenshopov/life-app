@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays, Wallet } from 'lucide-react';
+import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays, Wallet, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Outfit } from 'next/font/google';
@@ -57,6 +57,7 @@ export default function HQSidebar() {
   const isTrackingActive = pathname === '/tracking';
   const isCalendarActive = pathname === '/calendar';
   const isFinancesActive = pathname === '/finances';
+  const isActionZoneActive = pathname === '/action-zone';
 
   return (
     <div
@@ -172,6 +173,18 @@ export default function HQSidebar() {
         >
           <CalendarDays className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Calendar</span>}
+        </Link>
+        <Link
+          href="/action-zone"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            'hover:bg-accent hover:text-accent-foreground',
+            isActionZoneActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+        >
+          <CheckSquare className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">Action Zone</span>}
         </Link>
         <Link
           href="/tracking"
