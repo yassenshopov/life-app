@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { Outfit } from 'next/font/google';
+import { motion, useMotionValue, useAnimationFrame, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +15,8 @@ import { Music, ExternalLink, Play, Pause, SkipBack, SkipForward } from 'lucide-
 import { Spinner } from '@/components/ui/spinner';
 
 import { getDefaultBgColor, getDominantColor } from '@/lib/spotify-color';
+
+const outfit = Outfit({ subsets: ['latin'] });
 
 interface CurrentlyPlaying {
   isPlaying: boolean;
@@ -39,78 +43,37 @@ function SpotifyWaveform({
 }) {
   const barCount = compact ? 16 : 32;
   const bars = Array.from({ length: barCount }, (_, i) => i);
-  const [heights, setHeights] = React.useState<number[]>(
-    Array.from({ length: barCount }, () => 15)
-  );
-  const animationRef = React.useRef<number>();
-  const lastUpdateRef = React.useRef<number>(0);
-  const timeRef = React.useRef<number>(0);
+  const time = useMotionValue(Math.random());
+  const baseSpeed = 1;
 
-  React.useEffect(() => {
-    if (!isPlaying) {
-      setHeights(Array.from({ length: barCount }, () => 15));
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-      return;
+  useAnimationFrame((delta) => {
+    if (isPlaying) {
+      time.set(time.get() + delta / 1000);
+    } else {
+      time.set(0);
     }
-
-    timeRef.current = 0;
-    lastUpdateRef.current = performance.now();
-
-    const animate = (currentTime: number) => {
-      // Throttle updates to ~30fps to prevent overload
-      const elapsed = currentTime - lastUpdateRef.current;
-      if (elapsed < 33) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-
-      lastUpdateRef.current = currentTime;
-      timeRef.current += elapsed / 1000; // Convert to seconds
-
-      const baseSpeed = 0.5; // Slower, smoother animation
-
-      // Simplified waveform - single smooth sine wave with position offset
-      // This creates synchronized adjacent bars that flow smoothly
-      const newHeights = bars.map((_, i) => {
-        const position = i / barCount; // Normalized position 0-1
-
-        // Single smooth wave that flows across bars
-        // Adjacent bars are in sync, creating a realistic waveform
-        const wave = Math.sin(timeRef.current * baseSpeed + position * Math.PI * 1.5);
-
-        // Normalize to 20-80% height range for smoother appearance
-        const normalized = (wave + 1) / 2; // Convert from -1,1 to 0,1
-        const height = 20 + normalized * 60; // Scale to 20-80%
-
-        return Math.max(20, Math.min(80, height));
-      });
-
-      setHeights(newHeights);
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isPlaying, barCount]);
+  });
 
   return (
-    <div className={`flex items-end justify-center gap-0.5 ${compact ? 'h-6' : 'h-12'}`}>
-      {bars.map((_, i) => (
-        <div
-          key={i}
-          className="w-0.5 bg-white/80 rounded-full transition-all duration-200 ease-out"
-          style={{
-            height: `${heights[i] || 20}%`,
-          }}
-        />
-      ))}
+    <div className={`flex items-end justify-evenly w-full ${compact ? 'h-6' : 'h-12'}`}>
+      {bars.map((_, i) => {
+        const position = i / barCount;
+        const height = useTransform(time, (t) => {
+          if (!isPlaying) return '10%';
+          const wave = Math.cos(t * baseSpeed + position * Math.PI * 5);
+          const normalized = (wave + 1) / 2;
+          const h = 20 + normalized * 60;
+          return `${Math.max(20, Math.min(80, h))}%`;
+        });
+
+        return (
+          <motion.div
+            key={i}
+            className="w-1 bg-white/80 rounded-full flex-shrink-0"
+            style={{ height }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -349,7 +312,7 @@ export function SpotifyPlayer() {
       {/* Mini Widget - Fixed Width */}
       <div className="fixed bottom-4 right-4 z-50">
         <div
-          className="w-80 rounded-lg shadow-2xl border border-white/10 transition-all duration-500 cursor-pointer overflow-hidden"
+          className={`relative w-80 rounded-lg shadow-2xl border border-white/10 transition-all duration-500 cursor-pointer overflow-hidden ${outfit.className}`}
           style={
             {
               backgroundColor: bgColor || getDefaultBgColor(),
@@ -358,7 +321,14 @@ export function SpotifyPlayer() {
           }
           onClick={() => setIsOpen(true)}
         >
-          <div className="p-3">
+          {/* Background Waveform */}
+          <div className="absolute inset-0 flex items-end justify-center opacity-20 pointer-events-none pb-0">
+            <div className="w-full px-4">
+              <SpotifyWaveform isPlaying={isPlaying} compact={false} />
+            </div>
+          </div>
+
+          <div className="relative p-3 z-10">
             <div className="flex items-center gap-3">
               <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
                 <img
@@ -372,10 +342,6 @@ export function SpotifyPlayer() {
                 <p className="text-white/80 text-xs truncate">
                   {track.artists.map((a) => a.name).join(', ')}
                 </p>
-              </div>
-              {/* Waveform on same row */}
-              <div className="flex-shrink-0 w-20">
-                <SpotifyWaveform isPlaying={isPlaying} compact={true} />
               </div>
               {/* Controls: Previous, Play/Pause, Next */}
               <div className="flex-shrink-0 flex items-center gap-1">
@@ -418,7 +384,7 @@ export function SpotifyPlayer() {
       {/* Expanded Modal - Fixed Height, Wider, Compact */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent
-          className="sm:max-w-[700px] h-[500px] p-0 border-white/10 overflow-hidden"
+          className={`sm:max-w-[700px] h-[500px] p-0 border-0 overflow-hidden ${outfit.className}`}
           style={
             {
               backgroundColor: bgColor,

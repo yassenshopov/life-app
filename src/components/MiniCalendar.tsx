@@ -114,8 +114,8 @@ export function MiniCalendar({ selectedDate, onDateSelect }: MiniCalendarProps) 
   }
 
   return (
-    <div className="w-full">
-      <div className="p-2">
+    <div className="w-full" style={{ pointerEvents: 'auto' }}>
+      <div className="p-2" style={{ pointerEvents: 'auto' }}>
         {/* Header with month and navigation */}
         <div className="flex items-center justify-between mb-3">
           <div className="text-xs font-medium">

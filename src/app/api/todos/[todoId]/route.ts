@@ -55,18 +55,31 @@ function getPropertyValue(property: any, propertyType: string): any {
   }
 }
 
-export async function POST(request: NextRequest) {
+// PATCH: Update a todo
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ todoId: string }> }
+) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { todoId } = await params;
     const body = await request.json();
-    const { title, status, priority, do_date, due_date, mega_tags } = body;
+    const { title, status, priority, do_date, due_date } = body;
 
-    if (!title || !title.trim()) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    // Get the todo from Supabase to find the Notion page ID
+    const { data: todo, error: todoError } = await supabase
+      .from('todos')
+      .select('*')
+      .eq('id', todoId)
+      .eq('user_id', userId)
+      .single();
+
+    if (todoError || !todo) {
+      return NextResponse.json({ error: 'Todo not found' }, { status: 404 });
     }
 
     // Get user's databases
@@ -100,7 +113,7 @@ export async function POST(request: NextRequest) {
     if (!todosDb) {
       return NextResponse.json(
         {
-          error: 'To-Do List database not connected. Please connect your To-Do List database in settings.',
+          error: 'To-Do List database not connected',
         },
         { status: 404 }
       );
@@ -108,142 +121,83 @@ export async function POST(request: NextRequest) {
 
     const databaseId = todosDb.database_id;
 
-    // Get database properties to find the title property name
+    // Get database properties to find property keys
     const database = await notion.databases.retrieve({ database_id: databaseId });
     const properties = (database as any).properties || {};
 
-    // Find title property
+    // Find property keys
     const titleProp = Object.entries(properties).find(
       ([_, prop]: [string, any]) => prop.type === 'title'
     );
     const titlePropertyKey = titleProp ? titleProp[0] : 'Action Item';
 
-    // Get the actual workspace user (not bot) to set as default assignee
-    // Try to get the database creator first, then fall back to listing workspace users
-    let currentNotionUserId: string | null = null;
-    try {
-      // First, try to get the database creator
-      if ((database as any).created_by && (database as any).created_by.id) {
-        const creatorId = (database as any).created_by.id;
-        // Check if it's not a bot
-        if ((database as any).created_by.type === 'user') {
-          currentNotionUserId = creatorId;
-        }
-      }
+    // Build Notion properties for update
+    const notionProperties: Record<string, any> = {};
 
-      // If we don't have a user yet, try to list workspace users and find a real user
-      if (!currentNotionUserId) {
-        const usersResponse = await notion.users.list({});
-        const realUser = usersResponse.results.find(
-          (user: any) => user.type === 'person' && user.id
-        );
-        if (realUser && 'id' in realUser) {
-          currentNotionUserId = realUser.id;
-        }
-      }
-    } catch (error) {
-      console.warn('Could not fetch Notion user for assignee:', error);
-      // Continue without setting assignee if we can't get the user
+    if (title !== undefined) {
+      notionProperties[titlePropertyKey] = {
+        title: [{ text: { content: title.trim() } }],
+      };
     }
 
-    // Build Notion properties
-    const notionProperties: Record<string, any> = {
-      [titlePropertyKey]: {
-        title: [{ text: { content: title.trim() } }],
-      },
-    };
-
-    // Add optional properties
-    if (status) {
+    if (status !== undefined) {
       const statusProp = Object.entries(properties).find(
         ([_, prop]: [string, any]) => prop.name === 'Status' || prop.type === 'status'
       );
       if (statusProp) {
-        notionProperties[statusProp[0]] = {
-          status: { name: status },
-        };
+        notionProperties[statusProp[0]] = status
+          ? { status: { name: status } }
+          : { status: null };
       }
     }
 
-    if (priority) {
+    if (priority !== undefined) {
       const priorityProp = Object.entries(properties).find(
         ([_, prop]: [string, any]) => prop.name === 'Priority' || (prop.type === 'select' && prop.name?.toLowerCase().includes('priority'))
       );
       if (priorityProp) {
-        notionProperties[priorityProp[0]] = {
-          select: { name: priority },
-        };
+        notionProperties[priorityProp[0]] = priority
+          ? { select: { name: priority } }
+          : { select: null };
       }
     }
 
-    if (do_date) {
+    if (do_date !== undefined) {
       const doDateProp = Object.entries(properties).find(
         ([_, prop]: [string, any]) => prop.name === 'Do-Date' || (prop.type === 'date' && prop.name?.toLowerCase().includes('do'))
       );
       if (doDateProp) {
-        notionProperties[doDateProp[0]] = {
-          date: { start: do_date },
-        };
+        notionProperties[doDateProp[0]] = do_date
+          ? { date: { start: do_date } }
+          : { date: null };
       }
     }
 
-    if (due_date) {
+    if (due_date !== undefined) {
       const dueDateProp = Object.entries(properties).find(
         ([_, prop]: [string, any]) => prop.name === 'Due-Date' || (prop.type === 'date' && prop.name?.toLowerCase().includes('due'))
       );
       if (dueDateProp) {
-        notionProperties[dueDateProp[0]] = {
-          date: { start: due_date },
-        };
+        notionProperties[dueDateProp[0]] = due_date
+          ? { date: { start: due_date } }
+          : { date: null };
       }
     }
 
-    if (mega_tags && Array.isArray(mega_tags) && mega_tags.length > 0) {
-      const tagsProp = Object.entries(properties).find(
-        ([_, prop]: [string, any]) => prop.name === 'Mega Tag' || (prop.type === 'multi_select' && prop.name?.toLowerCase().includes('tag'))
-      );
-      if (tagsProp) {
-        notionProperties[tagsProp[0]] = {
-          multi_select: mega_tags.map((tag: string) => ({ name: tag })),
-        };
-      }
-    }
-
-    // Set default assignee to current workspace user (not bot)
-    if (currentNotionUserId) {
-      const assigneeProp = Object.entries(properties).find(
-        ([_, prop]: [string, any]) => prop.name === 'Assignee' || (prop.type === 'people' && prop.name?.toLowerCase().includes('assign'))
-      );
-      if (assigneeProp) {
-        notionProperties[assigneeProp[0]] = {
-          people: [
-            {
-              id: currentNotionUserId,
-            },
-          ],
-        };
-      }
-    }
-
-    // Create page in Notion
-    const notionPage = await notion.pages.create({
-      parent: { database_id: databaseId },
+    // Update page in Notion
+    const notionPage = await notion.pages.update({
+      page_id: todo.notion_page_id,
       properties: notionProperties,
     });
 
-    // Fetch the created page to get all properties (including formulas)
-    const createdPage = await notion.pages.retrieve({ page_id: notionPage.id });
-    const pageProperties = (createdPage as any).properties || {};
+    // Fetch the updated page to get all properties (including formulas)
+    const updatedPage = await notion.pages.retrieve({ page_id: notionPage.id });
+    const pageProperties = (updatedPage as any).properties || {};
 
     // Map properties to our database schema
     const todoData: any = {
-      user_id: userId,
-      notion_page_id: notionPage.id,
-      notion_database_id: databaseId,
-      title: title.trim(),
       updated_at: new Date().toISOString(),
       last_synced_at: new Date().toISOString(),
-      properties: {} as Record<string, any>,
     };
 
     // Extract all properties
@@ -267,12 +221,16 @@ export async function POST(request: NextRequest) {
           if (value) {
             const date = new Date(value);
             todoData.do_date = isNaN(date.getTime()) ? null : date.toISOString();
+          } else {
+            todoData.do_date = null;
           }
           break;
         case 'Due-Date':
           if (value) {
             const date = new Date(value);
             todoData.due_date = isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+          } else {
+            todoData.due_date = null;
           }
           break;
         case 'Mega Tag':
@@ -305,6 +263,10 @@ export async function POST(request: NextRequest) {
           todoData.projects = value;
           break;
         default:
+          // Store other properties in the properties JSON field
+          if (!todoData.properties) {
+            todoData.properties = {};
+          }
           todoData.properties[key] = {
             type: prop.type,
             value: value,
@@ -312,35 +274,33 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Insert into Supabase
-    const { data: insertedTodo, error: insertError } = await supabase
+    // Update in Supabase
+    const { data: updatedTodo, error: updateError } = await supabase
       .from('todos')
-      .insert(todoData)
+      .update(todoData)
+      .eq('id', todoId)
+      .eq('user_id', userId)
       .select()
       .single();
 
-    if (insertError) {
-      console.error('Error inserting todo into Supabase:', insertError);
-      // Still return the Notion page even if Supabase insert fails
-      return NextResponse.json({
-        success: true,
-        notion_page: notionPage,
-        todo: todoData,
-        warning: 'Created in Notion but failed to sync to database',
-      });
+    if (updateError) {
+      console.error('Error updating todo in Supabase:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update todo in database' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      todo: insertedTodo,
-      notion_page: notionPage,
+      todo: updatedTodo,
     });
   } catch (error: any) {
-    console.error('Error creating todo:', error);
+    console.error('Error updating todo:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create todo',
+        error: error instanceof Error ? error.message : 'Failed to update todo',
       },
       { status: 500 }
     );

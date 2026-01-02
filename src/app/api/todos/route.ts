@@ -20,33 +20,53 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority');
     const search = searchParams.get('search');
 
-    // Build query
-    let query = supabase
-      .from('todos')
-      .select('*')
-      .eq('user_id', userId);
+    // Fetch all todos with pagination (Supabase default limit is 1000)
+    let allTodos: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    // Apply filters
-    if (status) {
-      query = query.eq('status', status);
+    while (hasMore) {
+      // Build query for each page
+      let query = supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', userId);
+
+      // Apply filters
+      if (status) {
+        query = query.eq('status', status);
+      }
+      if (priority) {
+        query = query.eq('priority', priority);
+      }
+
+      // Order by do_date (ascending, nulls last), then by priority
+      query = query.order('do_date', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false });
+
+      // Apply pagination
+      const { data: todos, error } = await query
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching todos:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch todos' },
+          { status: 500 }
+        );
+      }
+
+      if (todos && todos.length > 0) {
+        allTodos = [...allTodos, ...todos];
+        hasMore = todos.length === pageSize;
+        page++;
+      } else {
+        hasMore = false;
+      }
     }
-    if (priority) {
-      query = query.eq('priority', priority);
-    }
 
-    // Order by do_date (ascending, nulls last), then by priority
-    query = query.order('do_date', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: false });
-
-    const { data: todos, error } = await query;
-
-    if (error) {
-      console.error('Error fetching todos:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch todos' },
-        { status: 500 }
-      );
-    }
+    const todos = allTodos;
 
     // Apply search filter if provided
     let filteredTodos = todos || [];
