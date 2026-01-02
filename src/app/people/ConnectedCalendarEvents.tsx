@@ -205,7 +205,7 @@ export function ConnectedCalendarEvents({ events, isLoading = false }: Connected
         <div className="flex items-center justify-center py-8">
           <Spinner size="md" />
         </div>
-      ) : sortedEvents.length === 0 ? (
+      ) : eventsByYear.length === 0 ? (
         <div className="text-sm text-muted-foreground py-4">
           {showFutureEvents || futureEventsCount === 0
             ? 'No connected calendar events found.'
