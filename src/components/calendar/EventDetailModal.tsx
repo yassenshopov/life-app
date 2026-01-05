@@ -29,6 +29,7 @@ import { Switch } from '@/components/ui/switch';
 import { formatTimeForInput } from '@/lib/time-format-utils';
 import { TimePicker } from '@/components/ui/time-picker';
 import { PersonAvatar } from './PersonAvatar';
+import { PersonSelectorPopover } from './PersonSelectorPopover';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDown } from 'lucide-react';

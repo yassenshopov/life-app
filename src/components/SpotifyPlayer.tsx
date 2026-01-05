@@ -44,13 +44,20 @@ function WaveformBar({
   isPlaying: boolean;
 }) {
   const baseSpeed = 1;
-  const height = useTransform(time, (t) => {
-    if (!isPlaying) return '10%';
-    const wave = Math.cos(t * baseSpeed + position * Math.PI * 5);
-    const normalized = (wave + 1) / 2;
-    const h = 20 + normalized * 60;
-    return `${Math.max(20, Math.min(80, h))}%`;
-  });
+  
+  // Define transform function separately to avoid linter issues
+  const transformHeight = React.useCallback(
+    (t: number) => {
+      if (!isPlaying) return '10%';
+      const wave = Math.cos(t * baseSpeed + position * Math.PI * 5);
+      const normalized = (wave + 1) / 2;
+      const h = 20 + normalized * 60;
+      return `${Math.max(20, Math.min(80, h))}%`;
+    },
+    [isPlaying, position, baseSpeed]
+  );
+  
+  const height = useTransform(time, transformHeight);
 
   return (
     <motion.div
