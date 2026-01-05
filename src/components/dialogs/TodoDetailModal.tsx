@@ -26,17 +26,7 @@ import { cn } from '@/lib/utils';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
 import { Person } from '@/lib/people-matching';
 import { PeopleTitleInput } from '@/components/ui/people-title-input';
-
-interface Todo {
-  id: string;
-  title: string;
-  status: string | null;
-  priority: string | null;
-  do_date: string | null;
-  due_date: string | null;
-  mega_tags: string[];
-  linkedPeople?: Array<{ id: string; name: string; image?: any; image_url?: string | null }>;
-}
+import { Todo } from '@/components/ActionZoneView';
 
 interface TodoDetailModalProps {
   todo: Todo | null;

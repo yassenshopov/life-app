@@ -312,14 +312,15 @@ export function CreatePersonDialog({ isOpen, onClose, onSuccess }: CreatePersonD
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <MiniCalendar
-                  mode="single"
-                  selected={birthDate}
-                  onSelect={(date) => {
+                  selectedDate={birthDate}
+                  onDateSelect={(date) => {
+                    // Prevent selecting future dates
+                    if (date > new Date()) {
+                      return;
+                    }
                     setBirthDate(date);
                     setBirthDatePopoverOpen(false);
                   }}
-                  disabled={(date) => date > new Date()}
-                  initialFocus
                 />
               </PopoverContent>
             </Popover>

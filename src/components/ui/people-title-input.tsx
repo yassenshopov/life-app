@@ -137,34 +137,6 @@ export function PeopleTitleInput({
       return;
     }
 
-    // Build content with avatars
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-
-    positions.forEach(({ person, startIndex, endIndex, matchedName }, idx) => {
-      // Add text before the person's name
-      if (startIndex > lastIndex) {
-        parts.push(value.substring(lastIndex, startIndex));
-      }
-
-      // Add avatar before the name (we'll render this as HTML)
-      const avatarKey = `avatar-${person.id}-${idx}`;
-      // We'll create a span with the avatar
-      parts.push({
-        type: 'avatar',
-        key: avatarKey,
-        person,
-        matchedName,
-      });
-
-      lastIndex = endIndex;
-    });
-
-    // Add remaining text
-    if (lastIndex < value.length) {
-      parts.push(value.substring(lastIndex));
-    }
-
     // Create HTML string with avatars
     let html = '';
     let partIndex = 0;

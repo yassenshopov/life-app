@@ -39,7 +39,7 @@ import { Person } from '@/lib/people-matching';
 import { Checkbox } from '@/components/ui/checkbox';
 import confetti from 'canvas-confetti';
 
-interface Todo {
+export interface Todo {
   id: string;
   title: string;
   status: string | null;
