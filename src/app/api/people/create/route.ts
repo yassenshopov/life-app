@@ -195,7 +195,8 @@ export async function POST(request: NextRequest) {
 
     // Map other properties
     for (const [key, prop] of Object.entries(properties)) {
-      if (prop.type === 'title') continue; // Already handled
+      const typedProp = prop as any;
+      if (typedProp.type === 'title') continue; // Already handled
       if (key === 'Image') continue; // Already handled
 
       switch (key) {
@@ -203,11 +204,11 @@ export async function POST(request: NextRequest) {
           if (originOfConnection) {
             const values = originOfConnection.split(',').map((v) => v.trim()).filter(Boolean);
             if (values.length > 0) {
-              if (prop.type === 'multi_select') {
+              if (typedProp.type === 'multi_select') {
                 notionProperties[key] = {
                   multi_select: values.map((v) => ({ name: v })),
                 };
-              } else if (prop.type === 'select') {
+              } else if (typedProp.type === 'select') {
                 notionProperties[key] = {
                   select: { name: values[0] },
                 };
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
           break;
         case 'Star sign':
           if (starSign) {
-            if (prop.type === 'select') {
+            if (typedProp.type === 'select') {
               notionProperties[key] = {
                 select: { name: starSign },
               };
@@ -226,7 +227,7 @@ export async function POST(request: NextRequest) {
           break;
         case 'Currently at':
           if (currentlyAt) {
-            if (prop.type === 'rich_text') {
+            if (typedProp.type === 'rich_text') {
               notionProperties[key] = {
                 rich_text: [{ text: { content: currentlyAt } }],
               };
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
         case 'Tier':
           if (tier) {
             const tierValues = tier.split(',').map((v) => v.trim()).filter(Boolean);
-            if (tierValues.length > 0 && prop.type === 'multi_select') {
+            if (tierValues.length > 0 && typedProp.type === 'multi_select') {
               notionProperties[key] = {
                 multi_select: tierValues.map((v) => ({ name: v })),
               };
@@ -245,7 +246,7 @@ export async function POST(request: NextRequest) {
           break;
         case 'Occupation':
           if (occupation) {
-            if (prop.type === 'rich_text') {
+            if (typedProp.type === 'rich_text') {
               notionProperties[key] = {
                 rich_text: [{ text: { content: occupation } }],
               };
@@ -255,11 +256,11 @@ export async function POST(request: NextRequest) {
         case 'Contact Freq.':
         case 'Contact Freq':
           if (contactFreq) {
-            if (prop.type === 'rich_text') {
+            if (typedProp.type === 'rich_text') {
               notionProperties[key] = {
                 rich_text: [{ text: { content: contactFreq } }],
               };
-            } else if (prop.type === 'select') {
+            } else if (typedProp.type === 'select') {
               notionProperties[key] = {
                 select: { name: contactFreq },
               };
@@ -268,7 +269,7 @@ export async function POST(request: NextRequest) {
           break;
         case 'From':
           if (fromLocation) {
-            if (prop.type === 'rich_text') {
+            if (typedProp.type === 'rich_text') {
               notionProperties[key] = {
                 rich_text: [{ text: { content: fromLocation } }],
               };
@@ -278,7 +279,7 @@ export async function POST(request: NextRequest) {
         case 'Birth Date':
         case 'Birth date':
           if (birthDate) {
-            if (prop.type === 'date') {
+            if (typedProp.type === 'date') {
               notionProperties[key] = {
                 date: { start: birthDate },
               };
