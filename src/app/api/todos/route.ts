@@ -21,12 +21,35 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
 
     // Fetch all todos with pagination (Supabase default limit is 1000)
+    const MAX_PAGES = 1000;
     let allTodos: any[] = [];
     let page = 0;
     const pageSize = 1000;
     let hasMore = true;
 
     while (hasMore) {
+      // Guard against infinite loops
+      if (page >= MAX_PAGES) {
+        const error = new Error(
+          `Pagination exceeded maximum pages (${MAX_PAGES}). Possible infinite loop detected.`
+        );
+        console.error('Pagination error:', error.message, {
+          userId,
+          page,
+          pageSize,
+          allTodosCount: allTodos.length,
+          hasMore,
+        });
+        // Return partial results with a warning
+        return NextResponse.json(
+          {
+            todos: allTodos,
+            warning: `Pagination limit reached. Returning partial results (${allTodos.length} todos).`,
+          },
+          { status: 206 } // 206 Partial Content
+        );
+      }
+
       // Build query for each page
       let query = supabase
         .from('todos')

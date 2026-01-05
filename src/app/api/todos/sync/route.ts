@@ -253,6 +253,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Delete removed entries
+    let deletionStatus: 'success' | 'error' = 'success';
+    let deletionError: any = null;
     if (removed.length > 0) {
       const { error: deleteError } = await supabase
         .from('todos')
@@ -263,6 +265,20 @@ export async function POST(request: NextRequest) {
 
       if (deleteError) {
         console.error('Error deleting removed todos:', deleteError);
+        deletionStatus = 'error';
+        deletionError = deleteError;
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Failed to delete removed todos',
+            deletions: {
+              status: 'error',
+              error: deleteError.message,
+              details: deleteError,
+            },
+          },
+          { status: 500 }
+        );
       }
     }
 
@@ -286,6 +302,11 @@ export async function POST(request: NextRequest) {
       synced: todosToUpsert.length,
       added: added.length,
       removed: removed.length,
+      deletions: {
+        status: deletionStatus,
+        count: removed.length,
+        ...(deletionError && { error: deletionError.message }),
+      },
       last_synced_at: new Date().toISOString(),
     });
   } catch (error: any) {

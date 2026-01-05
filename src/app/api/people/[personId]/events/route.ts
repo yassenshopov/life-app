@@ -144,12 +144,10 @@ export async function GET(
       // Batch requests to avoid overwhelming the API (max 20 concurrent)
       const BATCH_SIZE = 20;
       const fetchPromises: Promise<void>[] = [];
+      const eventById = new Map<string, any>();
       
       for (const calendarId of calendarsToFetch) {
         for (const eventId of eventIds) {
-          // Skip if we've already found this event
-          if (foundEventIds.has(eventId)) continue;
-
           fetchPromises.push(
             calendarApi.events
               .get({
@@ -158,10 +156,14 @@ export async function GET(
               })
               .then((response) => {
                 const event = response.data;
-                if (event && eventIdSet.has(event.id)) {
-                  linkedEvents.push(event);
-                  foundEventIds.add(event.id);
-                  eventCalendarMap.set(event.id, calendarId);
+                if (event && event.id && eventIdSet.has(event.id)) {
+                  // Atomically check and add - only process if this is the first time we see this event.id
+                  if (!eventById.has(event.id)) {
+                    eventById.set(event.id, event);
+                    linkedEvents.push(event);
+                    foundEventIds.add(event.id);
+                    eventCalendarMap.set(event.id, calendarId);
+                  }
                 }
               })
               .catch((error: any) => {

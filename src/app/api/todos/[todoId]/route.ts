@@ -4,56 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { getPropertyValue } from '@/lib/notion-helpers';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
 });
 
 const supabase = getSupabaseServiceRoleClient();
-
-// Helper function to extract property value (same as in sync route)
-function getPropertyValue(property: any, propertyType: string): any {
-  if (!property) return null;
-
-  switch (propertyType) {
-    case 'title':
-      return property.title?.[0]?.plain_text || '';
-    case 'rich_text':
-      return property.rich_text?.[0]?.plain_text || '';
-    case 'select':
-      return property.select?.name || null;
-    case 'multi_select':
-      return property.multi_select?.map((item: any) => item.name) || [];
-    case 'status':
-      return property.status?.name || null;
-    case 'date':
-      if (property.date?.start) {
-        return property.date.start;
-      }
-      return null;
-    case 'number':
-      return property.number;
-    case 'checkbox':
-      return property.checkbox || false;
-    case 'people':
-      return property.people || [];
-    case 'relation':
-      return property.relation || [];
-    case 'formula':
-      if (property.formula?.type === 'date' && property.formula.date) {
-        return property.formula.date.start || null;
-      }
-      if (property.formula?.type === 'number') {
-        return property.formula.number;
-      }
-      if (property.formula?.type === 'string') {
-        return property.formula.string;
-      }
-      return null;
-    default:
-      return null;
-  }
-}
 
 // PATCH: Update a todo
 export async function PATCH(

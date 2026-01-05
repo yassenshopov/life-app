@@ -78,12 +78,19 @@ function SpotifyWaveform({
   const barCount = compact ? 16 : 32;
   const bars = Array.from({ length: barCount }, (_, i) => i);
   const time = useMotionValue(Math.random());
+  const prevIsPlayingRef = React.useRef(isPlaying);
+
+  // Reset time only when transitioning from playing to paused
+  React.useEffect(() => {
+    if (prevIsPlayingRef.current === true && isPlaying === false) {
+      time.set(0);
+    }
+    prevIsPlayingRef.current = isPlaying;
+  }, [isPlaying, time]);
 
   useAnimationFrame((delta) => {
     if (isPlaying) {
       time.set(time.get() + delta / 1000);
-    } else {
-      time.set(0);
     }
   });
 

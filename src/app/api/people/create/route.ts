@@ -114,7 +114,27 @@ export async function POST(request: NextRequest) {
     const contactFreq = formData.get('contact_freq') as string;
     const fromLocation = formData.get('from_location') as string;
     const birthDate = formData.get('birth_date') as string;
-    const imageFile = formData.get('image') as File | null;
+    const imageEntry = formData.get('image');
+    
+    // Validate that image is a File if provided
+    let imageFile: File | null = null;
+    if (imageEntry !== null) {
+      if (imageEntry instanceof File) {
+        imageFile = imageEntry;
+      } else if (typeof imageEntry === 'string') {
+        // If it's a string, it's likely a URL or invalid input
+        return NextResponse.json(
+          { error: 'Invalid image format. Expected file upload, received string.' },
+          { status: 400 }
+        );
+      } else {
+        // Unexpected type
+        return NextResponse.json(
+          { error: 'Invalid image format. Expected file upload.' },
+          { status: 400 }
+        );
+      }
+    }
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
