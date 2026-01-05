@@ -33,6 +33,7 @@ import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDown } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
+import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
 
 interface EventDetailModalProps {
   event: CalendarEvent | null;
@@ -141,6 +142,7 @@ export function EventDetailModal({
   );
   const [badgeColors, setBadgeColors] = React.useState<Map<string, string>>(new Map());
   const personSelectorTriggerRef = React.useRef<HTMLDivElement>(null);
+  const [showCreatePersonDialog, setShowCreatePersonDialog] = React.useState(false);
 
   // State for calendar and location editing
   const [calendars, setCalendars] = React.useState<
@@ -904,9 +906,8 @@ export function EventDetailModal({
                       </button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-56 p-1"
+                      className="w-56 p-1 z-[10006]"
                       align="start"
-                      style={{ zIndex: 10002 }}
                       onInteractOutside={(e) => {
                         // Allow clicks inside the dialog but prevent closing when clicking outside
                         const target = e.target as HTMLElement;
@@ -994,10 +995,9 @@ export function EventDetailModal({
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent
-                            className="w-64 p-0"
+                            className="w-64 p-0 z-[10006]"
                             align="end"
                             side="bottom"
-                            style={{ zIndex: 10002 }}
                             onPointerDownOutside={(e) => {
                               const target = e.target as HTMLElement;
                               // Don't close when clicking inside the dialog
@@ -1063,6 +1063,21 @@ export function EventDetailModal({
                                 </div>
                               )}
                             </div>
+                            {/* Create new person button */}
+                            <div className="p-2 border-t">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start"
+                                onClick={() => {
+                                  setShowPersonSelector(false);
+                                  setShowCreatePersonDialog(true);
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create New Person
+                              </Button>
+                            </div>
                           </PopoverContent>
                         </Popover>
                       )}
@@ -1113,10 +1128,9 @@ export function EventDetailModal({
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent
-                          className="w-64 p-0"
+                          className="w-64 p-0 z-[10006]"
                           align="end"
                           side="bottom"
-                          style={{ zIndex: 10002 }}
                           onPointerDownOutside={(e) => {
                             const target = e.target as HTMLElement;
                             // Don't close when clicking inside the dialog
@@ -1181,6 +1195,21 @@ export function EventDetailModal({
                                   : 'No people available'}
                               </div>
                             )}
+                          </div>
+                          {/* Create new person button */}
+                          <div className="p-2 border-t">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                setShowPersonSelector(false);
+                                setShowCreatePersonDialog(true);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create New Person
+                            </Button>
                           </div>
                         </PopoverContent>
                       </Popover>
@@ -1449,6 +1478,21 @@ export function EventDetailModal({
           </div>
         )}
       </DialogContent>
+
+      {/* Create Person Dialog */}
+      <CreatePersonDialog
+        isOpen={showCreatePersonDialog}
+        onClose={() => setShowCreatePersonDialog(false)}
+        onSuccess={async (person) => {
+          // Automatically link the new person to the event
+          if (displayEvent?.id) {
+            // Use handleAddPerson which will make the API call
+            await handleAddPerson(person.id);
+          }
+          
+          setShowCreatePersonDialog(false);
+        }}
+      />
     </Dialog>
   );
 }

@@ -38,6 +38,7 @@ import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 import { BirthdayMonthlyView } from '@/app/people/BirthdayMonthlyView';
 import { PeopleActivitySummary } from '@/components/PeopleActivitySummary';
 import { FlagImage } from '@/lib/flag-utils';
+import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
 
 // Zodiac sign symbols mapping
 const zodiacSymbols: Record<string, string> = {
@@ -223,6 +224,7 @@ export function PeopleView() {
   const [loadingPersonEvents, setLoadingPersonEvents] = useState<string | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [tierOptions, setTierOptions] = useState<string[]>([
     'Tier Me',
     'Tier L',
@@ -557,7 +559,7 @@ export function PeopleView() {
               onFiltersChange={setFilters}
               onClearFilters={handleClearFilters}
             />
-            <Button>
+            <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="w-4 h-4 mr-2" />
               New
             </Button>
@@ -986,6 +988,17 @@ export function PeopleView() {
         onFetchEvents={fetchPersonEvents}
         events={selectedPerson ? personEvents[selectedPerson.id] || [] : []}
         isLoadingEvents={selectedPerson ? loadingPersonEvents === selectedPerson.id : false}
+      />
+
+      {/* Create Person Dialog */}
+      <CreatePersonDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onSuccess={(person) => {
+          // Optimistically add the new person to the list
+          setPeople((prev) => [...prev, person]);
+          setShowCreateDialog(false);
+        }}
       />
     </div>
   );
