@@ -35,6 +35,9 @@ import { ChevronDown } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
 import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
 
+// Cache for dominant colors keyed by imageUrl to avoid repeated network requests
+const colorCache = new Map<string, string>();
+
 interface EventDetailModalProps {
   event: CalendarEvent | null;
   isOpen: boolean;
@@ -178,24 +181,51 @@ export function EventDetailModal({
 
   // Extract badge colors from linked people's images
   React.useEffect(() => {
+    let isCancelled = false;
+
     const extractColors = async () => {
       const colorMap = new Map<string, string>();
 
-      for (const person of linkedPeople) {
+      // Create promises for all color extractions to run in parallel
+      const colorPromises = linkedPeople.map(async (person) => {
         const imageUrl = getImageUrl(person);
+        
+        // Check cache first
+        if (imageUrl && colorCache.has(imageUrl)) {
+          return { personId: person.id, color: colorCache.get(imageUrl)! };
+        }
+
         if (imageUrl) {
           try {
             const color = await getDominantColor(imageUrl);
-            colorMap.set(person.id, color);
+            // Store in cache for future use
+            colorCache.set(imageUrl, color);
+            return { personId: person.id, color };
           } catch (error) {
             // Use default muted color if extraction fails
-            colorMap.set(person.id, 'hsl(var(--muted))');
+            const defaultColor = 'hsl(var(--muted))';
+            // Cache the default to avoid retrying failed extractions
+            colorCache.set(imageUrl, defaultColor);
+            return { personId: person.id, color: defaultColor };
           }
         } else {
           // Use default muted color if no image
-          colorMap.set(person.id, 'hsl(var(--muted))');
+          return { personId: person.id, color: 'hsl(var(--muted))' };
         }
+      });
+
+      // Wait for all color extractions to complete in parallel
+      const results = await Promise.all(colorPromises);
+
+      // Check if effect was cancelled before updating state
+      if (isCancelled) {
+        return;
       }
+
+      // Build color map from results
+      results.forEach(({ personId, color }) => {
+        colorMap.set(personId, color);
+      });
 
       setBadgeColors(colorMap);
     };
@@ -205,6 +235,11 @@ export function EventDetailModal({
     } else {
       setBadgeColors(new Map());
     }
+
+    // Cleanup: mark as cancelled if effect is cleaned up or linkedPeople changes
+    return () => {
+      isCancelled = true;
+    };
   }, [linkedPeople, getImageUrl]);
 
   // Fetch calendars when modal opens
@@ -987,99 +1022,26 @@ export function EventDetailModal({
                     <div className="relative flex items-center justify-between mb-2">
                       <div className="text-sm font-medium text-muted-foreground">People</div>
                       {availablePeople.length > 0 && linkedPeople.length > 0 && (
-                        <Popover open={showPersonSelector} onOpenChange={setShowPersonSelector}>
-                          <PopoverTrigger asChild>
+                        <PersonSelectorPopover
+                          open={showPersonSelector}
+                          onOpenChange={setShowPersonSelector}
+                          availablePeople={availablePeople}
+                          personSearchQuery={personSearchQuery}
+                          onSearchChange={setPersonSearchQuery}
+                          onAddPerson={handleAddPerson}
+                          onCreateNew={() => {
+                            setShowPersonSelector(false);
+                            setShowCreatePersonDialog(true);
+                          }}
+                          isAdding={isAddingPerson}
+                          peopleWithRecentDates={peopleWithRecentDates}
+                          triggerButton={
                             <Button variant="ghost" size="sm" className="h-7 px-2">
                               <Plus className="h-4 w-4 mr-1" />
                               Add
                             </Button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-64 p-0 z-[10006]"
-                            align="end"
-                            side="bottom"
-                            onPointerDownOutside={(e) => {
-                              const target = e.target as HTMLElement;
-                              // Don't close when clicking inside the dialog
-                              if (target.closest('[role="dialog"]')) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onFocusOutside={(e) => {
-                              const target = e.target as HTMLElement;
-                              // Don't close when focusing inside the dialog
-                              if (target.closest('[role="dialog"]')) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onOpenAutoFocus={(e) => {
-                              // Prevent auto focus to allow manual focus on input
-                              e.preventDefault();
-                            }}
-                          >
-                            {/* Search bar */}
-                            <div className="p-2 border-b">
-                              <Input
-                                placeholder="Search people..."
-                                value={personSearchQuery}
-                                onChange={(e) => setPersonSearchQuery(e.target.value)}
-                                className="h-8 text-sm"
-                                autoFocus
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            {/* People list */}
-                            <div
-                              className="max-h-48 overflow-y-auto"
-                              style={{ pointerEvents: 'auto' }}
-                            >
-                              {availablePeople.length > 0 ? (
-                                availablePeople.map((person) => (
-                                  <button
-                                    key={person.id}
-                                    onClick={() => handleAddPerson(person.id)}
-                                    disabled={isAddingPerson}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
-                                    style={{ pointerEvents: 'auto' }}
-                                  >
-                                    <PersonAvatar person={person} size="sm" onClick={undefined} />
-                                    <span className="text-sm">{person.name}</span>
-                                    {peopleWithRecentDates.has(person.id) && (
-                                      <span className="text-xs text-muted-foreground ml-auto">
-                                        {format(
-                                          new Date(peopleWithRecentDates.get(person.id)!),
-                                          'MMM d, yyyy'
-                                        )}
-                                      </span>
-                                    )}
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="p-4 text-sm text-muted-foreground text-center">
-                                  {personSearchQuery.trim()
-                                    ? 'No people found'
-                                    : 'No people available'}
-                                </div>
-                              )}
-                            </div>
-                            {/* Create new person button */}
-                            <div className="p-2 border-t">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-full justify-start"
-                                onClick={() => {
-                                  setShowPersonSelector(false);
-                                  setShowCreatePersonDialog(true);
-                                }}
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create New Person
-                              </Button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                          }
+                        />
                       )}
                     </div>
 
@@ -1120,99 +1082,26 @@ export function EventDetailModal({
                         })}
                       </div>
                     ) : availablePeople.length > 0 ? (
-                      <Popover open={showPersonSelector} onOpenChange={setShowPersonSelector}>
-                        <PopoverTrigger asChild>
+                      <PersonSelectorPopover
+                        open={showPersonSelector}
+                        onOpenChange={setShowPersonSelector}
+                        availablePeople={availablePeople}
+                        personSearchQuery={personSearchQuery}
+                        onSearchChange={setPersonSearchQuery}
+                        onAddPerson={handleAddPerson}
+                        onCreateNew={() => {
+                          setShowPersonSelector(false);
+                          setShowCreatePersonDialog(true);
+                        }}
+                        isAdding={isAddingPerson}
+                        peopleWithRecentDates={peopleWithRecentDates}
+                        triggerButton={
                           <Button variant="ghost" size="sm" className="h-7 px-2">
                             <Plus className="h-4 w-4 mr-1" />
                             Add people
                           </Button>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-64 p-0 z-[10006]"
-                          align="end"
-                          side="bottom"
-                          onPointerDownOutside={(e) => {
-                            const target = e.target as HTMLElement;
-                            // Don't close when clicking inside the dialog
-                            if (target.closest('[role="dialog"]')) {
-                              e.preventDefault();
-                            }
-                          }}
-                          onFocusOutside={(e) => {
-                            const target = e.target as HTMLElement;
-                            // Don't close when focusing inside the dialog
-                            if (target.closest('[role="dialog"]')) {
-                              e.preventDefault();
-                            }
-                          }}
-                          onOpenAutoFocus={(e) => {
-                            // Prevent auto focus to allow manual focus on input
-                            e.preventDefault();
-                          }}
-                        >
-                          {/* Search bar */}
-                          <div className="p-2 border-b">
-                            <Input
-                              placeholder="Search people..."
-                              value={personSearchQuery}
-                              onChange={(e) => setPersonSearchQuery(e.target.value)}
-                              className="h-8 text-sm"
-                              autoFocus
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onPointerDown={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          {/* People list */}
-                          <div
-                            className="max-h-48 overflow-y-auto"
-                            style={{ pointerEvents: 'auto' }}
-                          >
-                            {availablePeople.length > 0 ? (
-                              availablePeople.map((person) => (
-                                <button
-                                  key={person.id}
-                                  onClick={() => handleAddPerson(person.id)}
-                                  disabled={isAddingPerson}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
-                                  style={{ pointerEvents: 'auto' }}
-                                >
-                                  <PersonAvatar person={person} size="sm" onClick={undefined} />
-                                  <span className="text-sm">{person.name}</span>
-                                  {peopleWithRecentDates.has(person.id) && (
-                                    <span className="text-xs text-muted-foreground ml-auto">
-                                      {format(
-                                        new Date(peopleWithRecentDates.get(person.id)!),
-                                        'MMM d, yyyy'
-                                      )}
-                                    </span>
-                                  )}
-                                </button>
-                              ))
-                            ) : (
-                              <div className="p-4 text-sm text-muted-foreground text-center">
-                                {personSearchQuery.trim()
-                                  ? 'No people found'
-                                  : 'No people available'}
-                              </div>
-                            )}
-                          </div>
-                          {/* Create new person button */}
-                          <div className="p-2 border-t">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full justify-start"
-                              onClick={() => {
-                                setShowPersonSelector(false);
-                                setShowCreatePersonDialog(true);
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Create New Person
-                            </Button>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                        }
+                      />
                     ) : (
                       <div className="text-sm text-muted-foreground">No people available</div>
                     )}
@@ -1448,22 +1337,6 @@ export function EventDetailModal({
               </div>
             )}
 
-            {/* Transparency */}
-            {displayEvent.transparency && displayEvent.transparency !== 'opaque' && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <div className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Transparency</div>
-                  <div className="text-base capitalize">
-                    {displayEvent.transparency === 'transparent'
-                      ? 'Shows as available'
-                      : displayEvent.transparency}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils';
 import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 import { BirthdayMonthlyView } from '@/app/people/BirthdayMonthlyView';
 import { PeopleActivitySummary } from '@/components/PeopleActivitySummary';
-import { FlagImage } from '@/lib/flag-utils';
+import { FlagImage, countryCodeToEmoji } from '@/lib/flag-utils';
 import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
 
 // Zodiac sign symbols mapping
@@ -87,17 +87,6 @@ function extractFlag(location: string | null): { flag: string; text: string } {
     .trim();
 
   return { flag, text };
-}
-
-// Helper to convert country code to flag emoji
-function countryCodeToEmoji(countryCode: string): string {
-  if (!countryCode || countryCode.length !== 2) return '';
-  return String.fromCodePoint(
-    ...countryCode
-      .toUpperCase()
-      .split('')
-      .map((char) => 0x1f1e6 + char.charCodeAt(0) - 65)
-  );
 }
 
 import { getTierColor, getTierName, getTierBgColor } from '@/lib/tier-colors';
@@ -234,6 +223,21 @@ export function PeopleView() {
     'Tier SA',
     'Tier A',
   ]);
+  const [failedImageLoads, setFailedImageLoads] = useState<Set<string>>(new Set());
+
+  // Handler for image load errors
+  const handleImageError = (personId: string) => {
+    setFailedImageLoads((prev) => new Set(prev).add(personId));
+  };
+
+  // Handler for successful image loads (clears error state if image loads successfully)
+  const handleImageLoad = (personId: string) => {
+    setFailedImageLoads((prev) => {
+      const next = new Set(prev);
+      next.delete(personId);
+      return next;
+    });
+  };
 
   // Check connection status
   useEffect(() => {
@@ -659,7 +663,7 @@ export function PeopleView() {
                             >
                               {/* Profile Image - Smaller */}
                               <div className="h-20 w-full overflow-hidden bg-muted/20 relative">
-                                {imageUrl ? (
+                                {imageUrl && !failedImageLoads.has(person.id) ? (
                                   <>
                                     {/* Blurred background image */}
                                     <div className="absolute inset-0">
@@ -681,34 +685,21 @@ export function PeopleView() {
                                           fill
                                           className="object-cover"
                                           unoptimized
-                                          onError={(e) => {
-                                            // Fallback to initials if image fails to load
-                                            const target = e.target as HTMLImageElement;
-                                            target
-                                              .closest('.relative')
-                                              ?.parentElement?.style.setProperty('display', 'none');
-                                            const fallback = target
-                                              .closest('.h-20')
-                                              ?.querySelector('.fallback-initials') as HTMLElement;
-                                            if (fallback) fallback.style.display = 'flex';
-                                          }}
+                                          onError={() => handleImageError(person.id)}
+                                          onLoad={() => handleImageLoad(person.id)}
                                         />
                                       </div>
                                     </div>
                                   </>
-                                ) : null}
-                                <div
-                                  className={cn(
-                                    'fallback-initials w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900',
-                                    imageUrl && 'hidden'
-                                  )}
-                                >
-                                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                                    <span className="text-lg font-semibold text-primary">
-                                      {person.name.charAt(0)}
-                                    </span>
+                                ) : (
+                                  <div className="fallback-initials w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900">
+                                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                                      <span className="text-lg font-semibold text-primary">
+                                        {person.name.charAt(0)}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                               </div>
 
                               {/* Card Content */}
@@ -833,30 +824,21 @@ export function PeopleView() {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-                                  {imageUrl ? (
+                                  {imageUrl && !failedImageLoads.has(person.id) ? (
                                     <Image
                                       src={imageUrl}
                                       alt={person.name}
                                       fill
                                       className="object-cover rounded-full"
                                       unoptimized
-                                      onError={(e) => {
-                                        // Fallback to initials if image fails to load
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        const fallback = target.nextElementSibling as HTMLElement;
-                                        if (fallback) fallback.style.display = 'flex';
-                                      }}
+                                      onError={() => handleImageError(person.id)}
+                                      onLoad={() => handleImageLoad(person.id)}
                                     />
-                                  ) : null}
-                                  <span
-                                    className={cn(
-                                      'text-xs font-medium text-primary',
-                                      imageUrl && 'hidden'
-                                    )}
-                                  >
-                                    {person.name.charAt(0)}
-                                  </span>
+                                  ) : (
+                                    <span className="text-xs font-medium text-primary">
+                                      {person.name.charAt(0)}
+                                    </span>
+                                  )}
                                 </div>
                                 <span className="text-sm font-medium">{person.name}</span>
                               </div>

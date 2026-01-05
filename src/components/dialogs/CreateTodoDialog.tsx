@@ -127,7 +127,7 @@ export function CreateTodoDialog({ isOpen, onClose, onSuccess }: CreateTodoDialo
           status: status || undefined,
           priority: priority || undefined,
           do_date: doDate ? doDate.toISOString() : undefined,
-          due_date: dueDate ? dueDate.toISOString().split('T')[0] : undefined,
+          due_date: dueDate ? dueDate.toISOString() : undefined,
         }),
       });
 

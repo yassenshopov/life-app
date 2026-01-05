@@ -33,6 +33,33 @@ interface CurrentlyPlaying {
   is_playing?: boolean;
 }
 
+// Individual bar component - allows hooks to be called at top level
+function WaveformBar({
+  time,
+  position,
+  isPlaying,
+}: {
+  time: ReturnType<typeof useMotionValue<number>>;
+  position: number;
+  isPlaying: boolean;
+}) {
+  const baseSpeed = 1;
+  const height = useTransform(time, (t) => {
+    if (!isPlaying) return '10%';
+    const wave = Math.cos(t * baseSpeed + position * Math.PI * 5);
+    const normalized = (wave + 1) / 2;
+    const h = 20 + normalized * 60;
+    return `${Math.max(20, Math.min(80, h))}%`;
+  });
+
+  return (
+    <motion.div
+      className="w-1 bg-white/80 rounded-full flex-shrink-0"
+      style={{ height }}
+    />
+  );
+}
+
 // Spotify waveform animation component
 function SpotifyWaveform({
   isPlaying,
@@ -44,7 +71,6 @@ function SpotifyWaveform({
   const barCount = compact ? 16 : 32;
   const bars = Array.from({ length: barCount }, (_, i) => i);
   const time = useMotionValue(Math.random());
-  const baseSpeed = 1;
 
   useAnimationFrame((delta) => {
     if (isPlaying) {
@@ -58,19 +84,12 @@ function SpotifyWaveform({
     <div className={`flex items-end justify-evenly w-full ${compact ? 'h-6' : 'h-12'}`}>
       {bars.map((_, i) => {
         const position = i / barCount;
-        const height = useTransform(time, (t) => {
-          if (!isPlaying) return '10%';
-          const wave = Math.cos(t * baseSpeed + position * Math.PI * 5);
-          const normalized = (wave + 1) / 2;
-          const h = 20 + normalized * 60;
-          return `${Math.max(20, Math.min(80, h))}%`;
-        });
-
         return (
-          <motion.div
+          <WaveformBar
             key={i}
-            className="w-1 bg-white/80 rounded-full flex-shrink-0"
-            style={{ height }}
+            time={time}
+            position={position}
+            isPlaying={isPlaying}
           />
         );
       })}

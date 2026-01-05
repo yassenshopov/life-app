@@ -66,7 +66,7 @@ async function uploadImageToStorage(
 }
 
 // Helper function to extract property value
-function getPropertyValue(property: any, propertyType: string): any {
+function getPropertyValue(property: any, propertyType: string, propertyName?: string): any {
   if (!property) return null;
 
   switch (propertyType) {
@@ -78,12 +78,13 @@ function getPropertyValue(property: any, propertyType: string): any {
       return property.select?.name || null;
     case 'multi_select':
       // For Tier property, return objects with name and color
-      if (propertyType === 'multi_select') {
+      if (propertyName === 'Tier') {
         return property.multi_select?.map((item: any) => ({
           name: item.name,
           color: item.color || 'default',
         })) || [];
       }
+      // For all other multi_select properties, return just the names
       return property.multi_select?.map((item: any) => item.name) || [];
     case 'date':
       return property.date?.start || null;
@@ -312,7 +313,7 @@ export async function POST(request: NextRequest) {
       const propertyValue = pageProperties[key];
       if (!propertyValue) return;
 
-      const value = getPropertyValue(propertyValue, prop.type);
+      const value = getPropertyValue(propertyValue, prop.type, key);
 
       // Map to database column names
       switch (key) {
@@ -391,10 +392,42 @@ export async function POST(request: NextRequest) {
 
       if (imageUrl) {
         // Update person with Supabase Storage URL
-        await supabase
+        const { error: updateError } = await supabase
           .from('people')
           .update({ image_url: imageUrl })
           .eq('id', insertedPerson.id);
+
+        if (updateError) {
+          console.error(
+            `Failed to update person with image URL. Person ID: ${insertedPerson.id}, Image URL: ${imageUrl}`,
+            updateError
+          );
+
+          // Attempt rollback: delete the previously inserted person
+          const { error: deleteError } = await supabase
+            .from('people')
+            .delete()
+            .eq('id', insertedPerson.id);
+
+          if (deleteError) {
+            console.error(
+              `Failed to rollback person creation. Person ID: ${insertedPerson.id}`,
+              deleteError
+            );
+          }
+
+          return NextResponse.json(
+            {
+              error: 'Failed to save image URL',
+              details: {
+                personId: insertedPerson.id,
+                imageUrl: imageUrl,
+                updateError: updateError.message,
+              },
+            },
+            { status: 500 }
+          );
+        }
       }
     }
 

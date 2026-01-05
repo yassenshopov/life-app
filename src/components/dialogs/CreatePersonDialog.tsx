@@ -342,7 +342,7 @@ export function CreatePersonDialog({ isOpen, onClose, onSuccess }: CreatePersonD
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Separate multiple values with commas
+                Select a tier
               </p>
             </div>
           )}

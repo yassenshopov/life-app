@@ -184,11 +184,57 @@ export async function PATCH(
       }
     }
 
-    // Update page in Notion
-    const notionPage = await notion.pages.update({
-      page_id: todo.notion_page_id,
-      properties: notionProperties,
-    });
+    // Validate notion_page_id before calling Notion API
+    const notionPageId = todo.notion_page_id;
+    
+    // Check if notion_page_id exists
+    if (!notionPageId) {
+      console.error('Todo missing notion_page_id:', { todoId, userId });
+      return NextResponse.json(
+        { error: 'Todo is missing a Notion page ID' },
+        { status: 400 }
+      );
+    }
+
+    // Validate UUID format (32 chars without hyphens or 36 chars with hyphens)
+    const uuidPattern = /^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(notionPageId)) {
+      console.error('Invalid notion_page_id format:', { todoId, userId, notion_page_id: notionPageId });
+      return NextResponse.json(
+        { error: `Invalid Notion page ID format: ${notionPageId}` },
+        { status: 400 }
+      );
+    }
+
+    // Update page in Notion with error handling
+    let notionPage;
+    try {
+      notionPage = await notion.pages.update({
+        page_id: notionPageId,
+        properties: notionProperties,
+      });
+    } catch (notionError: any) {
+      console.error('Error updating Notion page:', {
+        todoId,
+        userId,
+        notion_page_id: notionPageId,
+        error: notionError.message || notionError,
+        errorCode: notionError.code,
+      });
+      
+      // Handle specific Notion API errors
+      if (notionError.code === 'object_not_found' || notionError.status === 404) {
+        return NextResponse.json(
+          { error: `Notion page not found or deleted: ${notionPageId}` },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: `Failed to update Notion page ${notionPageId}: ${notionError.message || 'Unknown error'}` },
+        { status: 500 }
+      );
+    }
 
     // Fetch the updated page to get all properties (including formulas)
     const updatedPage = await notion.pages.retrieve({ page_id: notionPage.id });
@@ -206,71 +252,80 @@ export async function PATCH(
       if (!propertyValue) return;
 
       const value = getPropertyValue(propertyValue, prop.type);
+      const propName = (prop.name || key).toLowerCase();
 
-      switch (key) {
-        case titlePropertyKey:
-          todoData.title = value;
-          break;
-        case 'Status':
-          todoData.status = value;
-          break;
-        case 'Priority':
-          todoData.priority = value;
-          break;
-        case 'Do-Date':
-          if (value) {
-            const date = new Date(value);
-            todoData.do_date = isNaN(date.getTime()) ? null : date.toISOString();
-          } else {
-            todoData.do_date = null;
-          }
-          break;
-        case 'Due-Date':
-          if (value) {
-            const date = new Date(value);
-            todoData.due_date = isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-          } else {
-            todoData.due_date = null;
-          }
-          break;
-        case 'Mega Tag':
-          todoData.mega_tags = Array.isArray(value) ? value : [];
-          break;
-        case 'Assignee':
-          todoData.assignee = value;
-          break;
-        case 'GCal_ID':
-          todoData.gcal_id = value;
-          break;
-        case 'Duration (h)':
-          if (value !== null && value !== undefined) {
-            todoData.duration_hours = parseFloat(value);
-          }
-          break;
-        case 'Start':
-          if (value) {
-            const date = new Date(value);
-            todoData.start_date = isNaN(date.getTime()) ? null : date.toISOString();
-          }
-          break;
-        case 'End':
-          if (value) {
-            const date = new Date(value);
-            todoData.end_date = isNaN(date.getTime()) ? null : date.toISOString();
-          }
-          break;
-        case 'Projects':
-          todoData.projects = value;
-          break;
-        default:
-          // Store other properties in the properties JSON field
-          if (!todoData.properties) {
-            todoData.properties = {};
-          }
-          todoData.properties[key] = {
-            type: prop.type,
-            value: value,
-          };
+      // Use fuzzy matching for property names to handle variations
+      if (key === titlePropertyKey || prop.type === 'title') {
+        todoData.title = value;
+      } else if (prop.type === 'status' || propName.includes('status')) {
+        todoData.status = value;
+      } else if (
+        prop.type === 'select' &&
+        propName.includes('priority')
+      ) {
+        todoData.priority = value;
+      } else if (
+        prop.type === 'date' &&
+        propName.includes('do') &&
+        !propName.includes('due')
+      ) {
+        if (value) {
+          const date = new Date(value);
+          todoData.do_date = isNaN(date.getTime()) ? null : date.toISOString();
+        } else {
+          todoData.do_date = null;
+        }
+      } else if (prop.type === 'date' && propName.includes('due')) {
+        if (value) {
+          const date = new Date(value);
+          todoData.due_date = isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+        } else {
+          todoData.due_date = null;
+        }
+      } else if (
+        prop.type === 'multi_select' &&
+        propName.includes('tag')
+      ) {
+        todoData.mega_tags = Array.isArray(value) ? value : [];
+      } else if (
+        prop.type === 'people' &&
+        propName.includes('assign')
+      ) {
+        todoData.assignee = value;
+      } else if (propName.includes('gcal') || propName.includes('gcal_id')) {
+        todoData.gcal_id = value;
+      } else if (
+        prop.type === 'formula' &&
+        (propName.includes('duration') || propName.includes('hour'))
+      ) {
+        if (value !== null && value !== undefined) {
+          todoData.duration_hours = parseFloat(value);
+        }
+      } else if (
+        prop.type === 'formula' &&
+        propName.includes('start') &&
+        !propName.includes('end')
+      ) {
+        if (value) {
+          const date = new Date(value);
+          todoData.start_date = isNaN(date.getTime()) ? null : date.toISOString();
+        }
+      } else if (prop.type === 'formula' && propName.includes('end')) {
+        if (value) {
+          const date = new Date(value);
+          todoData.end_date = isNaN(date.getTime()) ? null : date.toISOString();
+        }
+      } else if (prop.type === 'relation' && propName.includes('project')) {
+        todoData.projects = value;
+      } else {
+        // Store other properties in the properties JSON field
+        if (!todoData.properties) {
+          todoData.properties = {};
+        }
+        todoData.properties[key] = {
+          type: prop.type,
+          value: value,
+        };
       }
     });
 

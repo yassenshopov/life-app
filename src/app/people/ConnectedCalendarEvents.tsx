@@ -226,9 +226,7 @@ export function ConnectedCalendarEvents({ events, isLoading = false }: Connected
               <div className="space-y-1">
                 {eventsInYear.map(({ event, startDate: eventStart }) => {
                   const dateStr = eventStart.toISOString().split('T')[0];
-                  const isAllDay =
-                    (typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.date) ||
-                    !(typeof event.start === 'object' && !(event.start instanceof Date) && event.start?.dateTime);
+                  const isAllDay = typeof event.start === 'object' && !(event.start instanceof Date) && 'date' in event.start;
 
                   const eventColor = getEventColor(event);
                   const timeAgo = formatDistanceToNow(eventStart, { addSuffix: true });

@@ -4,56 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { getPropertyValue } from '@/lib/notion-helpers';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
 });
 
 const supabase = getSupabaseServiceRoleClient();
-
-// Helper function to extract property value (same as in sync route)
-function getPropertyValue(property: any, propertyType: string): any {
-  if (!property) return null;
-
-  switch (propertyType) {
-    case 'title':
-      return property.title?.[0]?.plain_text || '';
-    case 'rich_text':
-      return property.rich_text?.[0]?.plain_text || '';
-    case 'select':
-      return property.select?.name || null;
-    case 'multi_select':
-      return property.multi_select?.map((item: any) => item.name) || [];
-    case 'status':
-      return property.status?.name || null;
-    case 'date':
-      if (property.date?.start) {
-        return property.date.start;
-      }
-      return null;
-    case 'number':
-      return property.number;
-    case 'checkbox':
-      return property.checkbox || false;
-    case 'people':
-      return property.people || [];
-    case 'relation':
-      return property.relation || [];
-    case 'formula':
-      if (property.formula?.type === 'date' && property.formula.date) {
-        return property.formula.date.start || null;
-      }
-      if (property.formula?.type === 'number') {
-        return property.formula.number;
-      }
-      if (property.formula?.type === 'string') {
-        return property.formula.string;
-      }
-      return null;
-    default:
-      return null;
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -252,63 +209,72 @@ export async function POST(request: NextRequest) {
       if (!propertyValue) return;
 
       const value = getPropertyValue(propertyValue, prop.type);
+      const propName = (prop.name || key).toLowerCase();
 
-      switch (key) {
-        case titlePropertyKey:
-          todoData.title = value;
-          break;
-        case 'Status':
-          todoData.status = value;
-          break;
-        case 'Priority':
-          todoData.priority = value;
-          break;
-        case 'Do-Date':
-          if (value) {
-            const date = new Date(value);
-            todoData.do_date = isNaN(date.getTime()) ? null : date.toISOString();
-          }
-          break;
-        case 'Due-Date':
-          if (value) {
-            const date = new Date(value);
-            todoData.due_date = isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-          }
-          break;
-        case 'Mega Tag':
-          todoData.mega_tags = Array.isArray(value) ? value : [];
-          break;
-        case 'Assignee':
-          todoData.assignee = value;
-          break;
-        case 'GCal_ID':
-          todoData.gcal_id = value;
-          break;
-        case 'Duration (h)':
-          if (value !== null && value !== undefined) {
-            todoData.duration_hours = parseFloat(value);
-          }
-          break;
-        case 'Start':
-          if (value) {
-            const date = new Date(value);
-            todoData.start_date = isNaN(date.getTime()) ? null : date.toISOString();
-          }
-          break;
-        case 'End':
-          if (value) {
-            const date = new Date(value);
-            todoData.end_date = isNaN(date.getTime()) ? null : date.toISOString();
-          }
-          break;
-        case 'Projects':
-          todoData.projects = value;
-          break;
-        default:
-          todoData.properties[key] = {
-            type: prop.type,
-            value: value,
-          };
+      // Use fuzzy matching for property names to handle variations
+      if (key === titlePropertyKey || prop.type === 'title') {
+        todoData.title = value;
+      } else if (prop.type === 'status' || propName.includes('status')) {
+        todoData.status = value;
+      } else if (
+        prop.type === 'select' &&
+        propName.includes('priority')
+      ) {
+        todoData.priority = value;
+      } else if (
+        prop.type === 'date' &&
+        propName.includes('do') &&
+        !propName.includes('due')
+      ) {
+        if (value) {
+          const date = new Date(value);
+          todoData.do_date = isNaN(date.getTime()) ? null : date.toISOString();
+        }
+      } else if (prop.type === 'date' && propName.includes('due')) {
+        if (value) {
+          const date = new Date(value);
+          todoData.due_date = isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+        }
+      } else if (
+        prop.type === 'multi_select' &&
+        propName.includes('tag')
+      ) {
+        todoData.mega_tags = Array.isArray(value) ? value : [];
+      } else if (
+        prop.type === 'people' &&
+        propName.includes('assign')
+      ) {
+        todoData.assignee = value;
+      } else if (propName.includes('gcal') || propName.includes('gcal_id')) {
+        todoData.gcal_id = value;
+      } else if (
+        prop.type === 'formula' &&
+        (propName.includes('duration') || propName.includes('hour'))
+      ) {
+        if (value !== null && value !== undefined) {
+          todoData.duration_hours = parseFloat(value);
+        }
+      } else if (
+        prop.type === 'formula' &&
+        propName.includes('start') &&
+        !propName.includes('end')
+      ) {
+        if (value) {
+          const date = new Date(value);
+          todoData.start_date = isNaN(date.getTime()) ? null : date.toISOString();
+        }
+      } else if (prop.type === 'formula' && propName.includes('end')) {
+        if (value) {
+          const date = new Date(value);
+          todoData.end_date = isNaN(date.getTime()) ? null : date.toISOString();
+        }
+      } else if (prop.type === 'relation' && propName.includes('project')) {
+        todoData.projects = value;
+      } else {
+        todoData.properties[key] = {
+          type: prop.type,
+          value: value,
+        };
       }
     });
 
@@ -322,12 +288,16 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error inserting todo into Supabase:', insertError);
       // Still return the Notion page even if Supabase insert fails
-      return NextResponse.json({
-        success: true,
-        notion_page: notionPage,
-        todo: todoData,
-        warning: 'Created in Notion but failed to sync to database',
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          partial: true,
+          notion_page: notionPage,
+          todo: todoData,
+          warning: 'Created in Notion but failed to sync to database',
+        },
+        { status: 207 }
+      );
     }
 
     return NextResponse.json({

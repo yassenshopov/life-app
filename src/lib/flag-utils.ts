@@ -105,7 +105,7 @@ export const FlagImage: React.FC<FlagImageProps> = ({
 }
 
 // Helper to convert country code to flag emoji
-function countryCodeToEmoji(countryCode: string): string {
+export function countryCodeToEmoji(countryCode: string): string {
   if (!countryCode || countryCode.length !== 2) return '';
   return String.fromCodePoint(
     ...countryCode

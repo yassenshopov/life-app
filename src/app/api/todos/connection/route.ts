@@ -24,9 +24,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const databases = Array.isArray(user.notion_databases)
-      ? user.notion_databases
-      : JSON.parse(user.notion_databases || '[]');
+    let databases: any[] = [];
+    if (Array.isArray(user.notion_databases)) {
+      databases = user.notion_databases;
+    } else if (typeof user.notion_databases === 'string' && user.notion_databases.trim()) {
+      try {
+        const parsed = JSON.parse(user.notion_databases);
+        databases = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        databases = [];
+      }
+    }
 
     // Find To-Do List database by checking database name (case-insensitive)
     // We look for databases with "to-do", "todo", "action", or "task" in the name

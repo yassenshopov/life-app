@@ -25,20 +25,30 @@ function TopTrackCard({ track }: {
   const imageUrl = track.album_image_url;
 
   React.useEffect(() => {
+    let mounted = true;
     if (imageUrl) {
       getDominantColor(imageUrl)
         .then((color) => {
-          setBgColor(color);
+          if (mounted) {
+            setBgColor(color);
+          }
         })
         .catch(() => {
-          setBgColor(getDefaultBgColor());
+          if (mounted) {
+            setBgColor(getDefaultBgColor());
+          }
         });
     } else {
-      setBgColor(getDefaultBgColor());
+      if (mounted) {
+        setBgColor(getDefaultBgColor());
+      }
     }
+    return () => {
+      mounted = false;
+    };
   }, [imageUrl]);
 
-  return (
+  const cardContent = (
     <div
       className="rounded-lg border border-white/10 transition-all duration-500 overflow-hidden cursor-pointer hover:scale-[1.02]"
       style={
@@ -47,11 +57,6 @@ function TopTrackCard({ track }: {
           background: bgColor || getDefaultBgColor(),
         } as React.CSSProperties
       }
-      onClick={() => {
-        if (track.external_url) {
-          window.open(track.external_url, '_blank');
-        }
-      }}
     >
       <div className="p-3">
         <div className="flex items-center gap-3">
@@ -87,6 +92,21 @@ function TopTrackCard({ track }: {
       </div>
     </div>
   );
+
+  if (track.external_url) {
+    return (
+      <a
+        href={track.external_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block"
+      >
+        {cardContent}
+      </a>
+    );
+  }
+
+  return cardContent;
 }
 
 // Top Artist Card Component
@@ -103,20 +123,30 @@ function TopArtistCard({ artist }: {
   const imageUrl = artist.image_url;
 
   React.useEffect(() => {
+    let mounted = true;
     if (imageUrl) {
       getDominantColor(imageUrl)
         .then((color) => {
-          setBgColor(color);
+          if (mounted) {
+            setBgColor(color);
+          }
         })
         .catch(() => {
-          setBgColor(getDefaultBgColor());
+          if (mounted) {
+            setBgColor(getDefaultBgColor());
+          }
         });
     } else {
-      setBgColor(getDefaultBgColor());
+      if (mounted) {
+        setBgColor(getDefaultBgColor());
+      }
     }
+    return () => {
+      mounted = false;
+    };
   }, [imageUrl]);
 
-  return (
+  const cardContent = (
     <div
       className="rounded-lg border border-white/10 transition-all duration-500 overflow-hidden cursor-pointer hover:scale-[1.02]"
       style={
@@ -125,11 +155,6 @@ function TopArtistCard({ artist }: {
           background: bgColor || getDefaultBgColor(),
         } as React.CSSProperties
       }
-      onClick={() => {
-        if (artist.external_url) {
-          window.open(artist.external_url, '_blank');
-        }
-      }}
     >
       <div className="p-3">
         <div className="flex items-center gap-3">
@@ -161,6 +186,21 @@ function TopArtistCard({ artist }: {
       </div>
     </div>
   );
+
+  if (artist.external_url) {
+    return (
+      <a
+        href={artist.external_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block"
+      >
+        {cardContent}
+      </a>
+    );
+  }
+
+  return cardContent;
 }
 
 // Personal Track Card Component (for user's listening history)
@@ -181,17 +221,27 @@ function PersonalTrackCard({ item, index }: {
   const imageUrl = item.track.image;
 
   React.useEffect(() => {
+    let mounted = true;
     if (imageUrl) {
       getDominantColor(imageUrl)
         .then((color) => {
-          setBgColor(color);
+          if (mounted) {
+            setBgColor(color);
+          }
         })
         .catch(() => {
-          setBgColor(getDefaultBgColor());
+          if (mounted) {
+            setBgColor(getDefaultBgColor());
+          }
         });
     } else {
-      setBgColor(getDefaultBgColor());
+      if (mounted) {
+        setBgColor(getDefaultBgColor());
+      }
     }
+    return () => {
+      mounted = false;
+    };
   }, [imageUrl]);
 
   return (
@@ -250,17 +300,27 @@ function PersonalArtistCard({ artist, index }: {
   const imageUrl = artist.image_url;
 
   React.useEffect(() => {
+    let mounted = true;
     if (imageUrl) {
       getDominantColor(imageUrl)
         .then((color) => {
-          setBgColor(color);
+          if (mounted) {
+            setBgColor(color);
+          }
         })
         .catch(() => {
-          setBgColor(getDefaultBgColor());
+          if (mounted) {
+            setBgColor(getDefaultBgColor());
+          }
         });
     } else {
-      setBgColor(getDefaultBgColor());
+      if (mounted) {
+        setBgColor(getDefaultBgColor());
+      }
     }
+    return () => {
+      mounted = false;
+    };
   }, [imageUrl]);
 
   return (

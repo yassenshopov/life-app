@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         query = query.eq('priority', priority);
       }
 
-      // Order by do_date (ascending, nulls last), then by priority
+      // Order by do_date (ascending, nulls last), then by created_at (descending)
       query = query.order('do_date', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 

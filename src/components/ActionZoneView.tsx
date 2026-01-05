@@ -410,6 +410,93 @@ export function ActionZoneView() {
     }
   };
 
+  // Check if a todo matches the current filters
+  const todoMatchesFilters = (todo: Todo): boolean => {
+    // Apply tab filter
+    if (activeTab === 'today') {
+      if (!todo.do_date) return false;
+      try {
+        const doDate = parseISO(todo.do_date);
+        const today = startOfDay(new Date());
+        const todoDate = startOfDay(doDate);
+        if (!isEqual(todoDate, today)) return false;
+      } catch (error) {
+        return false;
+      }
+    } else if (activeTab === 'upcoming') {
+      if (!todo.do_date) return false;
+      const doDate = parseISO(todo.do_date);
+      if (!isFuture(doDate)) return false;
+    } else if (activeTab === 'overdue') {
+      if (!todo.do_date) return false;
+      const doDate = parseISO(todo.do_date);
+      if (!(isPast(doDate) && !isToday(doDate) && todo.status !== 'Done')) return false;
+    } else if (activeTab === 'done') {
+      if (todo.status !== 'Done') return false;
+    }
+    // 'all' tab passes through
+
+    // Apply status filter
+    if (statusFilter !== 'all' && todo.status !== statusFilter) {
+      return false;
+    }
+
+    // Apply priority filter
+    if (priorityFilter !== 'all' && todo.priority !== priorityFilter) {
+      return false;
+    }
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesTitle = todo.title?.toLowerCase().includes(query);
+      const matchesTags = todo.mega_tags?.some((tag) => tag.toLowerCase().includes(query));
+      if (!matchesTitle && !matchesTags) return false;
+    }
+
+    return true;
+  };
+
+  // Get suggested tabs where the todo would be visible
+  const getSuggestedTabs = (todo: Todo): string[] => {
+    const suggestions: string[] = [];
+    
+    // Check if it would be visible in 'all' tab
+    if (statusFilter === 'all' && priorityFilter === 'all' && !searchQuery) {
+      suggestions.push('All');
+    }
+    
+    // Check tab-specific visibility
+    if (todo.do_date) {
+      try {
+        const doDate = parseISO(todo.do_date);
+        const today = startOfDay(new Date());
+        const todoDate = startOfDay(doDate);
+        
+        if (isEqual(todoDate, today)) {
+          suggestions.push('Today');
+        } else if (isFuture(doDate)) {
+          suggestions.push('Upcoming');
+        } else if (isPast(doDate) && !isToday(doDate) && todo.status !== 'Done') {
+          suggestions.push('Overdue');
+        }
+      } catch (error) {
+        // Invalid date, skip
+      }
+    }
+    
+    if (todo.status === 'Done') {
+      suggestions.push('Done');
+    }
+    
+    // If no specific suggestions, always suggest 'All'
+    if (suggestions.length === 0) {
+      suggestions.push('All');
+    }
+    
+    return suggestions;
+  };
+
   // Check if all To-Do items are done and trigger confetti
   const checkAllTodosDone = (updatedTodos: Todo[]) => {
     if (activeTab !== 'today') return;
@@ -838,12 +925,29 @@ export function ActionZoneView() {
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         onSuccess={(newTodo) => {
-          // Optimistically add the new todo to the list
-          setTodos((prev) => [newTodo, ...prev]);
-          toast({
-            title: 'Todo Created',
-            description: 'Your todo has been created and synced to Notion',
-          });
+          // Check if the new todo matches current filters
+          if (todoMatchesFilters(newTodo)) {
+            // Optimistically add the new todo to the list
+            setTodos((prev) => [newTodo, ...prev]);
+            toast({
+              title: 'Todo Created',
+              description: 'Your todo has been created and synced to Notion',
+            });
+          } else {
+            // Add to state but don't show in current view
+            setTodos((prev) => [newTodo, ...prev]);
+            
+            // Show toast with information about where to find it
+            const suggestedTabs = getSuggestedTabs(newTodo);
+            const tabMessage = suggestedTabs.length > 0 
+              ? `View in ${suggestedTabs.join(' or ')}`
+              : 'View in All';
+            
+            toast({
+              title: 'Todo Created',
+              description: `Your todo has been created. ${tabMessage}.`,
+            });
+          }
         }}
       />
 

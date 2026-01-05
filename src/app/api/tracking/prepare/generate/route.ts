@@ -14,7 +14,7 @@ const supabase = getSupabaseServiceRoleClient();
 interface GenerateProgress {
   current: number;
   total: number;
-  status: 'preparing' | 'generating' | 'completed' | 'error';
+  status: 'preparing' | 'generating' | 'completed' | 'partial' | 'error';
   message: string;
   error?: string;
 }
@@ -45,13 +45,18 @@ function getWeekNumber(date: Date): number {
 
 function getStartOfWeek(year: number, weekNumber: number): Date {
   const firstDayOfYear = new Date(Date.UTC(year, 0, 1));
-  const firstWeekStart = new Date(firstDayOfYear);
   
-  // Adjust to the first Monday of the year (or the Monday of week 1)
+  // Find the Monday that makes Jan 1 part of week 1 (consistent with getWeekNumber)
+  // Week 1 always includes January 1st, so we need to find the Monday of that week
   const dayOfWeek = firstDayOfYear.getUTCDay();
-  const daysToMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek; // If Sunday, go to next Monday
+  // Calculate days to subtract to get to the Monday of week 1
+  // If Jan 1 is Monday (1): 0 days back
+  // If Jan 1 is Tuesday (2): 1 day back
+  // If Jan 1 is Sunday (0): 6 days back (to previous Monday)
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   
-  firstWeekStart.setUTCDate(firstDayOfYear.getUTCDate() + daysToMonday);
+  const firstWeekStart = new Date(firstDayOfYear);
+  firstWeekStart.setUTCDate(firstDayOfYear.getUTCDate() - daysToSubtract);
   
   // Calculate the start of the specified week
   const weekStart = new Date(firstWeekStart);
@@ -322,11 +327,14 @@ export async function POST(request: NextRequest) {
             }
 
             // Send completion
+            const hasFailures = createdCount < totalEntries;
             sendProgress(controller, {
-              current: totalEntries,
+              current: createdCount,
               total: totalEntries,
-              status: 'completed',
-              message: `Successfully created ${createdCount} entries for ${year}! (${totalDays} daily${weeklyDatabaseId ? ` + ${totalWeeks} weekly` : ''})`
+              status: hasFailures ? 'partial' : 'completed',
+              message: hasFailures
+                ? `Created ${createdCount} of ${totalEntries} entries for ${year} (some entries failed to create). (${totalDays} daily${weeklyDatabaseId ? ` + ${totalWeeks} weekly` : ''})`
+                : `Successfully created ${createdCount} entries for ${year}! (${totalDays} daily${weeklyDatabaseId ? ` + ${totalWeeks} weekly` : ''})`
             });
 
             controller.close();

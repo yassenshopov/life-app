@@ -17,6 +17,10 @@ interface GenerateProgress {
   error?: string;
 }
 
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
 export function TrackingPrepareView() {
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -26,6 +30,10 @@ export function TrackingPrepareView() {
   // Generate years from current year + 5 to current year + 10
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 11 }, (_, i) => (currentYear + i).toString());
+  
+  // Calculate days in year based on selectedYear or current year
+  const year = selectedYear ? parseInt(selectedYear, 10) : currentYear;
+  const daysInYear = isLeapYear(year) ? 366 : 365;
 
   const handleGenerate = async () => {
     if (!selectedYear) return;
@@ -176,7 +184,7 @@ export function TrackingPrepareView() {
           <Alert>
             <Calendar className="h-4 w-4" />
             <AlertDescription>
-              This will create {new Date(parseInt(selectedYear || '2025'), 1, 29).getDate() === 29 ? '366' : '365'} daily entries
+              This will create {daysInYear} daily entries
               and 52 weekly entries (if Weekly Tracking database is connected)
               for {selectedYear || 'the selected year'} in your Notion databases.
               Make sure your Daily Tracking database is connected before proceeding.

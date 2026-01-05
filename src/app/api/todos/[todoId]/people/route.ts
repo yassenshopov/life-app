@@ -45,14 +45,17 @@ export async function GET(
     }
 
     // Transform the data to flatten the people object
-    const people = (todoPeople || []).map((tp: any) => ({
-      id: tp.people.id,
-      name: tp.people.name,
-      image: tp.people.image,
-      image_url: tp.people.image_url,
-      nicknames: tp.people.nicknames,
-      linkId: tp.id, // The junction table ID for deletion
-    }));
+    // Filter out entries where tp.people is null to prevent null reference errors
+    const people = (todoPeople || [])
+      .filter((tp: any) => tp.people != null)
+      .map((tp: any) => ({
+        id: tp.people.id,
+        name: tp.people.name,
+        image: tp.people.image,
+        image_url: tp.people.image_url,
+        nicknames: tp.people.nicknames,
+        linkId: tp.id, // The junction table ID for deletion
+      }));
 
     return NextResponse.json({ people });
   } catch (error) {
