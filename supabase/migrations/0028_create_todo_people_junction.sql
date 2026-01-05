@@ -34,3 +34,5 @@ COMMENT ON COLUMN todo_people.todo_id IS 'Reference to todos table';
 COMMENT ON COLUMN todo_people.person_id IS 'Reference to people table';
 COMMENT ON COLUMN todo_people.user_id IS 'User who owns this relationship';
 
+
+

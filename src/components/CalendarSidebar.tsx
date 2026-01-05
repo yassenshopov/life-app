@@ -219,20 +219,32 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
     setIsRefreshingAll(true);
     try {
       // Refresh all calendars in parallel
-      const refreshPromises = calendars.map((calendar) =>
-        fetch(`/api/google-calendar/events/refresh?calendarId=${calendar.id}`, {
-          method: 'POST',
-        })
-      );
+      const refreshPromises = calendars.map(async (calendar) => {
+        try {
+          const response = await fetch(`/api/google-calendar/events/refresh?calendarId=${calendar.id}`, {
+            method: 'POST',
+          });
+          const data = await response.json();
+          return { calendar, response, data, success: response.ok };
+        } catch (error) {
+          return { calendar, error, success: false };
+        }
+      });
       
-      const responses = await Promise.all(refreshPromises);
-      const allSuccessful = responses.every((response) => response.ok);
+      const results = await Promise.all(refreshPromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
       
-      if (allSuccessful) {
-        // Trigger a refresh of the calendar view
-        window.dispatchEvent(new CustomEvent('calendar-refresh'));
+      if (failed.length > 0) {
+        const failedNames = failed.map(r => r.calendar.summary).join(', ');
+        console.warn(`Some calendars failed to refresh: ${failedNames}`);
+        // Still trigger refresh for successful ones
+        if (successful.length > 0) {
+          window.dispatchEvent(new CustomEvent('calendar-refresh'));
+        }
       } else {
-        console.error('Some calendars failed to refresh');
+        // All successful
+        window.dispatchEvent(new CustomEvent('calendar-refresh'));
       }
     } catch (error) {
       console.error('Error refreshing calendars:', error);

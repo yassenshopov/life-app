@@ -122,7 +122,7 @@ export async function POST(req: Request) {
 
     // Fetch events from Google Calendar API
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-    
+
     // Fetch calendar list for color info
     const calendarList = await calendar.calendarList.list();
     const calInfo = calendarList.data.items?.find((cal: any) => cal.id === calendarId);
@@ -143,23 +143,42 @@ export async function POST(req: Request) {
     let allEvents: any[] = [];
     let pageToken: string | undefined = undefined;
 
-    do {
-      const response = await calendar.events.list({
-        calendarId,
-        timeMin: timeMin.toISOString(),
-        timeMax: timeMax.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-        maxResults: 2500, // Maximum allowed by Google Calendar API
-        pageToken: pageToken,
-      });
+    try {
+      do {
+        const response = await calendar.events.list({
+          calendarId,
+          timeMin: timeMin.toISOString(),
+          timeMax: timeMax.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime',
+          maxResults: 2500, // Maximum allowed by Google Calendar API
+          pageToken: pageToken,
+        });
 
-      if (response.data.items) {
-        allEvents = [...allEvents, ...response.data.items];
+        if (response.data.items) {
+          allEvents = [...allEvents, ...response.data.items];
+        }
+
+        pageToken = response.data.nextPageToken || undefined;
+      } while (pageToken);
+    } catch (listError: any) {
+      // Handle 404 errors for calendars that don't support event fetching
+      // (e.g., locale/holiday calendars like "en-gb.bulgarian")
+      if (listError.code === 404 || listError.response?.status === 404) {
+        console.warn(
+          `Calendar ${calendarId} not found or doesn't support event fetching. Skipping.`
+        );
+        return NextResponse.json({
+          success: true,
+          eventsCount: 0,
+          calendarId,
+          warning: 'Calendar not found or does not support event fetching',
+          skipped: true,
+        });
       }
-
-      pageToken = response.data.nextPageToken || undefined;
-    } while (pageToken);
+      // Re-throw other errors
+      throw listError;
+    }
 
     // Delete existing events for this calendar (all events, not just a time range)
     await supabase
@@ -173,7 +192,7 @@ export async function POST(req: Request) {
       const eventsToInsert = allEvents.map((event: any) => {
         // Check if it's an all-day event (has date but no dateTime)
         const isAllDay = !event.start?.dateTime && !!event.start?.date;
-        
+
         let start: Date;
         let end: Date;
         let startDate: string | null = null;
@@ -236,9 +255,7 @@ export async function POST(req: Request) {
       const batchSize = 100;
       for (let i = 0; i < eventsToInsert.length; i += batchSize) {
         const batch = eventsToInsert.slice(i, i + batchSize);
-        const { error: insertError } = await supabase
-          .from('google_calendar_events')
-          .insert(batch);
+        const { error: insertError } = await supabase.from('google_calendar_events').insert(batch);
 
         if (insertError) {
           console.error('Error inserting events batch:', insertError);
@@ -246,14 +263,14 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       eventsCount: allEvents.length,
       calendarId,
       timeRange: {
         from: timeMin.toISOString(),
         to: timeMax.toISOString(),
-      }
+      },
     });
   } catch (error) {
     console.error('Error refreshing calendar events:', error);
@@ -263,4 +280,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

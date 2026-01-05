@@ -20,3 +20,5 @@ COMMENT ON COLUMN media.monthly_tracking_id IS 'Reference to the monthly trackin
 
 
 
+
+
