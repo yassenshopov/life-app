@@ -40,25 +40,10 @@ function SpotifyWaveform({
   isPlaying: boolean;
   compact?: boolean;
 }) {
-  // Generate a simple sine wave path that repeats seamlessly
-  const generateWavePath = (width: number, height: number) => {
-    const centerY = height / 2;
-    const amplitude = height * 0.35;
-    // Use frequency that ensures seamless repetition: 2π / width gives one full period
-    const frequency = (2 * Math.PI) / width;
-    const points: string[] = [];
-    
-    for (let x = 0; x <= width; x += 2) {
-      const y = centerY + Math.sin(x * frequency) * amplitude;
-      points.push(`${x},${y}`);
-    }
-    
-    return `M ${points.join(' L ')}`;
-  };
-
-  const segmentWidth = 1000; // Width of one wave segment
-  const waveHeight = compact ? 24 : 48;
-  const wavePath = generateWavePath(segmentWidth, waveHeight);
+  const barCount = compact ? 60 : 120;
+  const containerHeight = compact ? 24 : 48;
+  const minHeightPercent = 15;
+  const maxHeightPercent = 85;
 
   if (!isPlaying) {
     return (
@@ -71,47 +56,36 @@ function SpotifyWaveform({
   return (
     <>
       <style>{`
-        @keyframes wave-scroll {
-          0% {
-            transform: translateX(0);
+        @keyframes bar-animate {
+          0%, 100% {
+            height: ${minHeightPercent}%;
           }
-          100% {
-            transform: translateX(-50%);
+          50% {
+            height: ${maxHeightPercent}%;
           }
         }
       `}</style>
-      <div className={`w-full ${compact ? 'h-6' : 'h-12'} relative overflow-hidden`}>
-        <div className="absolute inset-0 flex items-center">
-          <svg
-            className="h-full"
-            style={{
-              width: '200%',
-              animation: isPlaying ? 'wave-scroll 4s linear infinite' : 'none',
-            }}
-            viewBox={`0 0 ${segmentWidth * 2} ${waveHeight}`}
-            preserveAspectRatio="none"
-          >
-            {/* First wave segment */}
-            <path
-              d={wavePath}
-              fill="none"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              opacity={0.8}
+      <div className={`w-full ${compact ? 'h-6' : 'h-12'} flex items-end justify-between gap-0.5 px-1`}>
+        {Array.from({ length: barCount }).map((_, i) => {
+          // Calculate delay based on position to create wave effect
+          const delay = (i / barCount) * 1.2;
+          
+          return (
+            <div
+              key={i}
+              className="bg-white/80 rounded-full"
+              style={{
+                width: compact ? '3px' : '4px',
+                flex: '1 1 0',
+                height: `${minHeightPercent}%`,
+                animation: isPlaying
+                  ? `bar-animate 1.2s ease-in-out infinite`
+                  : 'none',
+                animationDelay: `${delay}s`,
+              } as React.CSSProperties}
             />
-            {/* Duplicate wave segment for seamless looping */}
-            <path
-              d={wavePath}
-              fill="none"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              opacity={0.8}
-              transform={`translate(${segmentWidth}, 0)`}
-            />
-          </svg>
-        </div>
+          );
+        })}
       </div>
     </>
   );
