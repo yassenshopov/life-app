@@ -38,6 +38,7 @@ interface WeeklyCalendarViewProps {
   previewEvent?: CalendarEvent | null;
   people?: Array<{ id: string; name: string; nicknames?: string[] | null; image?: any; image_url?: string | null }>;
   onPersonClick?: (person: { id: string; name: string; nicknames?: string[] | null; image?: any; image_url?: string | null }) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 export function WeeklyCalendarView({
@@ -52,6 +53,7 @@ export function WeeklyCalendarView({
   previewEvent,
   people = [],
   onPersonClick,
+  colorPalette,
 }: WeeklyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
@@ -173,10 +175,24 @@ export function WeeklyCalendarView({
         <div className="min-w-[800px]">
           {/* Day headers - Fixed */}
           <div
-            className="grid border-b sticky top-0 z-10 bg-background"
-            style={{ gridTemplateColumns: '60px repeat(7, 1fr)' }}
+            className="grid sticky top-0 z-10 transition-all duration-1000"
+            style={{
+              gridTemplateColumns: '60px repeat(7, 1fr)',
+              borderBottom: colorPalette 
+                ? `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`
+                : undefined,
+              ...(colorPalette ? {
+                backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+              } : { backgroundColor: 'hsl(var(--background))' })
+            }}
           >
-            <div className="border-r p-2 bg-background text-foreground">
+            <div 
+              className="p-2 text-foreground transition-all duration-1000"
+              style={colorPalette ? {
+                backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.12)'),
+                borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+              } : undefined}
+            >
               <div className="text-xs text-muted-foreground font-medium mb-1">All Day</div>
             </div>
             {weekDays.map((day, index) => {
@@ -185,9 +201,15 @@ export function WeeklyCalendarView({
                 <div
                   key={index}
                   className={cn(
-                    'border-r flex flex-col',
+                    'flex flex-col transition-all duration-1000',
                     isToday(day) && 'bg-blue-50 dark:bg-blue-950/20'
                   )}
+                  style={colorPalette ? {
+                    ...(colorPalette && !isToday(day) ? {
+                      backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.08)'),
+                    } : {}),
+                    borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                  } : undefined}
                 >
                   <div className="p-2 text-center">
                     <div className="text-xs text-muted-foreground font-medium">
@@ -225,14 +247,30 @@ export function WeeklyCalendarView({
               style={{ gridTemplateColumns: '60px repeat(7, 1fr)' }}
             >
               {/* Time column */}
-              <div className="border-r bg-background text-primary">
+              <div 
+                className="text-primary transition-all duration-1000"
+                style={colorPalette ? {
+                  backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.12)'),
+                  borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                } : { backgroundColor: 'hsl(var(--background))' }}
+              >
                 {timeSlots.map((hour) => (
                   <div
                     key={hour}
-                    className="border-b border-foreground/20 h-[45px] relative px-2"
-                    style={{ minHeight: '45px' }}
+                    className="h-[45px] relative px-2 transition-all duration-1000"
+                    style={{ 
+                      minHeight: '45px',
+                      borderBottom: colorPalette 
+                        ? `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`
+                        : '1px solid hsl(var(--foreground) / 0.2)'
+                    }}
                   >
-                    <div className="absolute -top-2 right-2 text-xs text-foreground font-medium bg-background px-2">
+                    <div 
+                      className="absolute -top-2 right-2 text-xs text-foreground font-medium px-2 transition-all duration-1000"
+                      style={colorPalette ? {
+                        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.12)'),
+                      } : { backgroundColor: 'hsl(var(--background))' }}
+                    >
                       {formatTime(hour, timeFormat)}
                     </div>
                   </div>
@@ -249,16 +287,24 @@ export function WeeklyCalendarView({
                   <div
                     key={dayIndex}
                     className={cn(
-                      'border-r relative',
+                      'relative transition-all duration-1000',
                       isToday(day) && 'bg-blue-50/30 dark:bg-blue-950/10'
                     )}
+                    style={colorPalette ? {
+                      borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                    } : undefined}
                   >
                     {/* Time slot grid - clickable for new events */}
                     {timeSlots.map((hour) => (
                       <div
                         key={hour}
-                        className="border-b h-[45px] relative cursor-pointer hover:bg-accent/30 transition-colors"
-                        style={{ minHeight: '45px' }}
+                        className="h-[45px] relative cursor-pointer hover:bg-accent/30 transition-all duration-1000"
+                        style={{ 
+                          minHeight: '45px',
+                          borderBottom: colorPalette 
+                            ? `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`
+                            : '1px solid hsl(var(--foreground) / 0.2)'
+                        }}
                         onClick={(e) => {
                           if (!onEmptySpaceClick) return;
                           

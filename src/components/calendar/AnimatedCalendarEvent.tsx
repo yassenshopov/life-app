@@ -80,16 +80,16 @@ export function AnimatedCalendarEvent({
   const durationMinutes = (displayEnd.getTime() - displayStart.getTime()) / (1000 * 60);
   const showExtraInfo = durationMinutes > 60; // Only show if > 1 hour (not exactly 1 hour)
 
-  // Use linked people from database (if available), otherwise fall back to title matching
+  // Only use linked people from database (explicitly tagged people)
+  // Do not fall back to title matching - avatars should only show for explicitly tagged people
   const matchedPeople = React.useMemo(() => {
-    // Prefer linked people from database
+    // Only use linked people from database
     if (event.linkedPeople && event.linkedPeople.length > 0) {
       return event.linkedPeople;
     }
-    // Fallback to title matching
-    if (!people || people.length === 0) return [];
-    return getMatchedPeopleFromEvent(event.title, people);
-  }, [event.linkedPeople, event.title, people]);
+    // Return empty array if no linked people (no fallback to title matching)
+    return [];
+  }, [event.linkedPeople]);
 
   return (
     <motion.div

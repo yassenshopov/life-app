@@ -54,6 +54,7 @@ interface EventDetailModalProps {
   people?: Person[];
   onPersonClick?: (person: Person) => void;
   onPeopleChange?: (eventId: string, people: Person[]) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 /**
@@ -68,6 +69,7 @@ export function EventDetailModal({
   people = [],
   onPersonClick,
   onPeopleChange,
+  colorPalette,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
   // Local optimistic event state for UI updates without triggering parent rerenders
@@ -159,17 +161,18 @@ export function EventDetailModal({
   const [locationValue, setLocationValue] = React.useState('');
   const [isUpdatingLocation, setIsUpdatingLocation] = React.useState(false);
 
-  // Use linked people from database (if available), otherwise fall back to title matching
+  // Only show linked people from database in the title (no title matching for display)
+  // Use linkedPeople state which is fetched from the database, not the event prop
   const matchedPeople = React.useMemo(() => {
-    if (!displayEvent) return [];
-    // Prefer linked people from database
-    if (displayEvent.linkedPeople && displayEvent.linkedPeople.length > 0) {
-      return displayEvent.linkedPeople;
-    }
-    // Fallback to title matching
-    if (!people || people.length === 0) return [];
+    // Only use linked people from database (fetched via fetchLinkedPeople)
+    return linkedPeople;
+  }, [linkedPeople]);
+
+  // Get suggested people from title matching (for dropdown suggestions only)
+  const suggestedPeopleFromTitle = React.useMemo(() => {
+    if (!displayEvent || !people || people.length === 0) return [];
     return getMatchedPeopleFromEvent(displayEvent.title, people);
-  }, [displayEvent?.linkedPeople, displayEvent?.title, people]);
+  }, [displayEvent?.title, people]);
 
   // Fetch linked people when event changes
   React.useEffect(() => {
@@ -414,8 +417,10 @@ export function EventDetailModal({
   }, [showPersonSelector, people]);
 
   // Get available people (not already linked), filtered and sorted
+  // Prioritize people suggested from title matching
   const availablePeople = React.useMemo(() => {
     const linkedIds = new Set(linkedPeople.map((p) => p.id));
+    const suggestedIds = new Set(suggestedPeopleFromTitle.map((p) => p.id));
     let filtered = people.filter((p) => !linkedIds.has(p.id));
 
     // Filter by search query
@@ -428,8 +433,16 @@ export function EventDetailModal({
       );
     }
 
-    // Sort by most recently attached to an event
+    // Sort: suggested people from title first, then by most recently attached
     filtered.sort((a, b) => {
+      const aIsSuggested = suggestedIds.has(a.id);
+      const bIsSuggested = suggestedIds.has(b.id);
+
+      // Suggested people come first
+      if (aIsSuggested && !bIsSuggested) return -1;
+      if (!aIsSuggested && bIsSuggested) return 1;
+
+      // Within each group, sort by most recently attached to an event
       const dateA = peopleWithRecentDates.get(a.id);
       const dateB = peopleWithRecentDates.get(b.id);
 
@@ -443,7 +456,37 @@ export function EventDetailModal({
     });
 
     return filtered;
-  }, [people, linkedPeople, personSearchQuery, peopleWithRecentDates]);
+  }, [people, linkedPeople, personSearchQuery, peopleWithRecentDates, suggestedPeopleFromTitle]);
+
+  // Helper to mix colors - blend default background with Spotify color for solid background
+  const getMixedBackground = React.useCallback(() => {
+    if (!colorPalette || typeof window === 'undefined') return undefined;
+    
+    // Get computed background color (resolved from CSS variables)
+    const root = document.documentElement;
+    const computedBg = getComputedStyle(root).getPropertyValue('background-color');
+    
+    // Extract RGB from computed background
+    const bgMatch = computedBg.match(/\d+/g);
+    if (!bgMatch || bgMatch.length < 3) return undefined;
+    
+    const [bgR, bgG, bgB] = bgMatch.map(Number);
+    
+    // Extract RGB from Spotify color
+    const spotifyMatch = colorPalette.primary.match(/\d+/g);
+    if (!spotifyMatch || spotifyMatch.length < 3) return undefined;
+    
+    const [spotifyR, spotifyG, spotifyB] = spotifyMatch.map(Number);
+    
+    // Mix colors: 75% default background, 25% Spotify color
+    const mixRatio = 0.25; // 25% Spotify, 75% default
+    const mixedR = Math.round(bgR * (1 - mixRatio) + spotifyR * mixRatio);
+    const mixedG = Math.round(bgG * (1 - mixRatio) + spotifyG * mixRatio);
+    const mixedB = Math.round(bgB * (1 - mixRatio) + spotifyB * mixRatio);
+    
+    // Return solid RGB color
+    return `rgb(${mixedR}, ${mixedG}, ${mixedB})`;
+  }, [colorPalette]);
 
   // Handle all-day toggle
   const handleAllDayToggle = (checked: boolean) => {
@@ -728,11 +771,24 @@ export function EventDetailModal({
     return `${hours}h ${minutes}m`;
   };
 
+  // Apply color palette to dialog if available (solid background with color mixing)
+  const dialogStyle = colorPalette
+    ? {
+        background: getMixedBackground(),
+      }
+    : undefined;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl">
+      <DialogContent 
+        className={cn(
+          "max-w-2xl max-h-[90vh] overflow-y-auto p-0 shadow-2xl transition-all duration-1000 border-0",
+          !colorPalette && "bg-background"
+        )}
+        style={dialogStyle}
+      >
         {/* Notion-style header with color accent */}
-        <div className="h-1 w-full" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
+        <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
 
         <div className="px-6 py-8 pb-16 relative">
           <DialogHeader className="mb-6">

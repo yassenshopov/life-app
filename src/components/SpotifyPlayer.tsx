@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { Outfit } from 'next/font/google';
-import { motion, useMotionValue, useAnimationFrame, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -33,41 +32,7 @@ interface CurrentlyPlaying {
   is_playing?: boolean;
 }
 
-// Individual bar component - allows hooks to be called at top level
-function WaveformBar({
-  time,
-  position,
-  isPlaying,
-}: {
-  time: ReturnType<typeof useMotionValue<number>>;
-  position: number;
-  isPlaying: boolean;
-}) {
-  const baseSpeed = 1;
-  
-  // Define transform function separately to avoid linter issues
-  const transformHeight = React.useCallback(
-    (t: number) => {
-      if (!isPlaying) return '10%';
-      const wave = Math.cos(t * baseSpeed + position * Math.PI * 5);
-      const normalized = (wave + 1) / 2;
-      const h = 20 + normalized * 60;
-      return `${Math.max(20, Math.min(80, h))}%`;
-    },
-    [isPlaying, position, baseSpeed]
-  );
-  
-  const height = useTransform(time, transformHeight);
-
-  return (
-    <motion.div
-      className="w-1 bg-white/80 rounded-full flex-shrink-0"
-      style={{ height }}
-    />
-  );
-}
-
-// Spotify waveform animation component
+// Simple ECG-like waveform animation
 function SpotifyWaveform({
   isPlaying,
   compact = false,
@@ -75,39 +40,80 @@ function SpotifyWaveform({
   isPlaying: boolean;
   compact?: boolean;
 }) {
-  const barCount = compact ? 16 : 32;
-  const bars = Array.from({ length: barCount }, (_, i) => i);
-  const time = useMotionValue(Math.random());
-  const prevIsPlayingRef = React.useRef(isPlaying);
-
-  // Reset time only when transitioning from playing to paused
-  React.useEffect(() => {
-    if (prevIsPlayingRef.current === true && isPlaying === false) {
-      time.set(0);
+  // Generate a simple sine wave path that repeats seamlessly
+  const generateWavePath = (width: number, height: number) => {
+    const centerY = height / 2;
+    const amplitude = height * 0.35;
+    // Use frequency that ensures seamless repetition: 2π / width gives one full period
+    const frequency = (2 * Math.PI) / width;
+    const points: string[] = [];
+    
+    for (let x = 0; x <= width; x += 2) {
+      const y = centerY + Math.sin(x * frequency) * amplitude;
+      points.push(`${x},${y}`);
     }
-    prevIsPlayingRef.current = isPlaying;
-  }, [isPlaying, time]);
+    
+    return `M ${points.join(' L ')}`;
+  };
 
-  useAnimationFrame((delta) => {
-    if (isPlaying) {
-      time.set(time.get() + delta / 1000);
-    }
-  });
+  const segmentWidth = 1000; // Width of one wave segment
+  const waveHeight = compact ? 24 : 48;
+  const wavePath = generateWavePath(segmentWidth, waveHeight);
+
+  if (!isPlaying) {
+    return (
+      <div className={`w-full ${compact ? 'h-6' : 'h-12'} flex items-center`}>
+        <div className="w-full h-0.5 bg-white/40" />
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex items-end justify-evenly w-full ${compact ? 'h-6' : 'h-12'}`}>
-      {bars.map((_, i) => {
-        const position = i / barCount;
-        return (
-          <WaveformBar
-            key={i}
-            time={time}
-            position={position}
-            isPlaying={isPlaying}
-          />
-        );
-      })}
-    </div>
+    <>
+      <style>{`
+        @keyframes wave-scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+      `}</style>
+      <div className={`w-full ${compact ? 'h-6' : 'h-12'} relative overflow-hidden`}>
+        <div className="absolute inset-0 flex items-center">
+          <svg
+            className="h-full"
+            style={{
+              width: '200%',
+              animation: isPlaying ? 'wave-scroll 4s linear infinite' : 'none',
+            }}
+            viewBox={`0 0 ${segmentWidth * 2} ${waveHeight}`}
+            preserveAspectRatio="none"
+          >
+            {/* First wave segment */}
+            <path
+              d={wavePath}
+              fill="none"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              opacity={0.8}
+            />
+            {/* Duplicate wave segment for seamless looping */}
+            <path
+              d={wavePath}
+              fill="none"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              opacity={0.8}
+              transform={`translate(${segmentWidth}, 0)`}
+            />
+          </svg>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -345,7 +351,7 @@ export function SpotifyPlayer() {
       {/* Mini Widget - Fixed Width */}
       <div className="fixed bottom-4 right-4 z-50">
         <div
-          className={`relative w-80 rounded-lg shadow-2xl border border-white/10 transition-all duration-500 cursor-pointer overflow-hidden ${outfit.className}`}
+          className={`relative w-80 rounded-lg shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden ${outfit.className}`}
           style={
             {
               backgroundColor: bgColor || getDefaultBgColor(),

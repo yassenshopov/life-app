@@ -1,7 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, MoreVertical, Maximize2, Minimize2, HelpCircle, RefreshCw } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Maximize2,
+  Minimize2,
+  HelpCircle,
+  RefreshCw,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +25,10 @@ import { DailyCalendarView } from '@/components/calendar-views/DailyCalendarView
 import { WeeklyCalendarView } from '@/components/calendar-views/WeeklyCalendarView';
 import { MonthlyCalendarView } from '@/components/calendar-views/MonthlyCalendarView';
 import { AnnualCalendarView } from '@/components/calendar-views/AnnualCalendarView';
-import { ScheduleCalendarView, ScheduleCalendarViewRef } from '@/components/calendar-views/ScheduleCalendarView';
+import {
+  ScheduleCalendarView,
+  ScheduleCalendarViewRef,
+} from '@/components/calendar-views/ScheduleCalendarView';
 import { AnimatedCalendarView } from '@/components/calendar/AnimatedCalendarView';
 import { EventDetailModal } from '@/components/calendar/EventDetailModal';
 import { NewEventModal } from '@/components/calendar/NewEventModal';
@@ -81,9 +92,14 @@ export type CalendarViewMode = 'daily' | 'weekly' | 'monthly' | 'year' | 'schedu
 interface HQCalendarProps {
   events?: CalendarEvent[];
   navigateToDate?: Date;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
-export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCalendarProps) {
+export function HQCalendar({
+  events: initialEvents = [],
+  navigateToDate,
+  colorPalette,
+}: HQCalendarProps) {
   const [events, setEvents] = React.useState<CalendarEvent[]>(initialEvents);
   const [loadingEvents, setLoadingEvents] = React.useState(false);
   const [selectedEvent, setSelectedEvent] = React.useState<CalendarEvent | null>(null);
@@ -100,7 +116,12 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   const [people, setPeople] = React.useState<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = React.useState<Person | null>(null);
   const [isPersonModalOpen, setIsPersonModalOpen] = React.useState(false);
-  const [contextMenuEvent, setContextMenuEvent] = React.useState<{ event: CalendarEvent; x: number; y: number; calendarColor?: string } | null>(null);
+  const [contextMenuEvent, setContextMenuEvent] = React.useState<{
+    event: CalendarEvent;
+    x: number;
+    y: number;
+    calendarColor?: string;
+  } | null>(null);
   const scheduleViewRef = React.useRef<ScheduleCalendarViewRef>(null);
 
   const handlePersonClick = (person: Person) => {
@@ -124,15 +145,15 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
   const handleEventRightClick = async (event: CalendarEvent, e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // Fetch calendar color
     let calendarColor: string | undefined;
     try {
       const response = await fetch(`/api/google-calendar/calendars`);
       if (response.ok) {
         const data = await response.json();
-        const calendar = data.calendars?.find((cal: any) => 
-          cal.id === event.calendarId || cal.id === event.calendar
+        const calendar = data.calendars?.find(
+          (cal: any) => cal.id === event.calendarId || cal.id === event.calendar
         );
         if (calendar?.color) {
           calendarColor = calendar.color.startsWith('#') ? calendar.color : `#${calendar.color}`;
@@ -141,7 +162,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     } catch (error) {
       console.warn('Could not fetch calendar color:', error);
     }
-    
+
     setContextMenuEvent({
       event,
       x: e.clientX,
@@ -155,16 +176,14 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
     const event = contextMenuEvent.event;
     const calendarColor = contextMenuEvent.calendarColor || '#4285f4';
-    
+
     // If color is null, use calendar default
     const colorToUse = color || calendarColor;
-    
+
     // Optimistically update the UI
     const updatedEvent: CalendarEvent = { ...event, color: colorToUse };
-    setEvents((prevEvents) =>
-      prevEvents.map((e) => (e.id === event.id ? updatedEvent : e))
-    );
-    
+    setEvents((prevEvents) => prevEvents.map((e) => (e.id === event.id ? updatedEvent : e)));
+
     // Update cache
     allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
       e.id === event.id ? updatedEvent : e
@@ -192,17 +211,17 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       }
 
       const data = await response.json();
-      
+
       // Update with server response
       const serverUpdatedEvent: CalendarEvent = {
         ...event,
         color: data.event.color,
       };
-      
+
       setEvents((prevEvents) =>
         prevEvents.map((e) => (e.id === event.id ? serverUpdatedEvent : e))
       );
-      
+
       // Update cache
       allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
         e.id === event.id ? serverUpdatedEvent : e
@@ -211,12 +230,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       // No need to trigger refresh - we've already updated the UI optimistically and with server response
     } catch (error) {
       console.error('Error updating event color:', error);
-      
+
       // Revert optimistic update on error
-      setEvents((prevEvents) =>
-        prevEvents.map((e) => (e.id === event.id ? event : e))
-      );
-      
+      setEvents((prevEvents) => prevEvents.map((e) => (e.id === event.id ? event : e)));
+
       allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
         e.id === event.id ? event : e
       );
@@ -295,7 +312,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
       // Update cache
       allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
-      
+
       // Update displayed events
       setEvents((prevEvents) =>
         [...prevEvents, newEvent].sort((a, b) => a.start.getTime() - b.start.getTime())
@@ -399,7 +416,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         created: data.event.created ? new Date(data.event.created) : undefined,
         updated: data.event.updated ? new Date(data.event.updated) : undefined,
       };
-      
+
       // Update cache
       allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
         e.id === eventId ? updatedEvent : e
@@ -440,11 +457,13 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       setViewMode('year');
       return;
     }
-    if (saved === 'daily' ||
+    if (
+      saved === 'daily' ||
       saved === 'weekly' ||
       saved === 'monthly' ||
       saved === 'year' ||
-      saved === 'schedule') {
+      saved === 'schedule'
+    ) {
       setViewMode(saved);
     }
   }, []);
@@ -495,29 +514,34 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   }, [viewMode]);
 
   // Load time format from localStorage
-  const [timeFormat, setTimeFormat] = React.useState<TimeFormat>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hq-calendar-time-format');
-      return saved === '12h' || saved === '24h' ? saved : '12h';
+  // Use default '12h' for SSR, then sync with localStorage after mount to avoid hydration mismatch
+  const [timeFormat, setTimeFormat] = React.useState<TimeFormat>('12h');
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  // Sync timeFormat with localStorage after mount
+  React.useEffect(() => {
+    setIsMounted(true);
+    const saved = localStorage.getItem('hq-calendar-time-format');
+    if (saved === '12h' || saved === '24h') {
+      setTimeFormat(saved);
     }
-    return '12h';
-  });
+  }, []);
 
   const [settingsOpen, setSettingsOpen] = React.useState(false);
 
-  // Save time format to localStorage when it changes
+  // Save time format to localStorage when it changes (only after mount)
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isMounted) {
       localStorage.setItem('hq-calendar-time-format', timeFormat);
     }
-  }, [timeFormat]);
+  }, [timeFormat, isMounted]);
 
   // Track if we should stop retrying (for auth errors)
   const [shouldStopRetrying, setShouldStopRetrying] = React.useState(false);
   const [forceRefresh, setForceRefresh] = React.useState(false);
   const fetchingRef = React.useRef(false);
   const abortControllerRef = React.useRef<AbortController | null>(null);
-  
+
   // Client-side cache: track what date ranges we've already fetched
   const cachedRangeRef = React.useRef<{ min: Date; max: Date } | null>(null);
   const allCachedEventsRef = React.useRef<CalendarEvent[]>([]);
@@ -551,7 +575,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   };
 
   // Helper function to determine what ranges need to be fetched
-  const getMissingRanges = (requestedMin: Date, requestedMax: Date): Array<{ min: Date; max: Date }> => {
+  const getMissingRanges = (
+    requestedMin: Date,
+    requestedMax: Date
+  ): Array<{ min: Date; max: Date }> => {
     if (!cachedRangeRef.current || forceRefresh) {
       // No cache or force refresh - fetch everything
       return [{ min: requestedMin, max: requestedMax }];
@@ -582,17 +609,17 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
   // Helper function to merge events and remove duplicates
   const mergeEvents = (existing: CalendarEvent[], newEvents: CalendarEvent[]): CalendarEvent[] => {
     const eventMap = new Map<string, CalendarEvent>();
-    
+
     // Add existing events
-    existing.forEach(event => {
+    existing.forEach((event) => {
       eventMap.set(event.id, event);
     });
-    
+
     // Add/update with new events (new events take precedence)
-    newEvents.forEach(event => {
+    newEvents.forEach((event) => {
       eventMap.set(event.id, event);
     });
-    
+
     // Convert back to array and sort by start time
     return Array.from(eventMap.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
   };
@@ -644,7 +671,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     const { timeMin, timeMax } = viewRange;
 
     // Remove events from cache that overlap with current view range
-    allCachedEventsRef.current = allCachedEventsRef.current.filter(event => {
+    allCachedEventsRef.current = allCachedEventsRef.current.filter((event) => {
       // Keep events that don't overlap with the current view range
       return !(event.start <= timeMax && event.end >= timeMin);
     });
@@ -652,9 +679,12 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     // Update cached range to exclude the current view range
     if (cachedRangeRef.current) {
       const cached = cachedRangeRef.current;
-      
+
       // If the cached range is exactly the view range, clear it
-      if (cached.min.getTime() === timeMin.getTime() && cached.max.getTime() === timeMax.getTime()) {
+      if (
+        cached.min.getTime() === timeMin.getTime() &&
+        cached.max.getTime() === timeMax.getTime()
+      ) {
         cachedRangeRef.current = null;
       } else {
         // Otherwise, shrink the cached range to exclude the view range
@@ -673,12 +703,12 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
     // Clear displayed events for current view
     setEvents([]);
-    
+
     // Force refresh and trigger refetch
     setShouldStopRetrying(false);
     fetchingRef.current = false;
     setForceRefresh(true);
-    
+
     // Trigger refetch by updating currentDate slightly to force useEffect to run
     setCurrentDate((prev) => new Date(prev.getTime()));
   }, [viewMode, currentDate]);
@@ -737,11 +767,11 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     // Check if we already have all events for this range cached
     if (!forceRefresh && isRangeCached(timeMin, timeMax)) {
       // Filter cached events to show only what's in the current view range
-      const filteredEvents = allCachedEventsRef.current.filter(event => {
+      const filteredEvents = allCachedEventsRef.current.filter((event) => {
         // Event overlaps with requested range if: start <= timeMax AND end >= timeMin
         return event.start <= timeMax && event.end >= timeMin;
       });
-      
+
       setEvents(filteredEvents);
       setLoadingEvents(false);
       console.log('Using cached events:', filteredEvents.length, 'events in range');
@@ -760,7 +790,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
         // Determine what ranges we need to fetch
         const missingRanges = getMissingRanges(timeMin, timeMax);
-        
+
         if (missingRanges.length === 0) {
           // Shouldn't happen, but handle gracefully
           setLoadingEvents(false);
@@ -781,7 +811,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           }
 
           const data = await response.json();
-          
+
           if (!response.ok) {
             console.error('Error fetching range:', range, data.error);
             return null;
@@ -830,7 +860,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
         // Wait for all fetches to complete
         const allFetchedEvents = await Promise.all(fetchPromises);
-        
+
         if (abortController.signal.aborted) {
           return;
         }
@@ -838,14 +868,20 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         // Flatten and combine all fetched events
         const newEvents = allFetchedEvents.flat().filter(Boolean) as CalendarEvent[];
 
-        console.log('Fetched new events:', newEvents.length, 'from', missingRanges.length, 'ranges');
+        console.log(
+          'Fetched new events:',
+          newEvents.length,
+          'from',
+          missingRanges.length,
+          'ranges'
+        );
 
         // Merge with existing cached events
         const mergedEvents = mergeEvents(allCachedEventsRef.current, newEvents);
-        
+
         // Update cache
         allCachedEventsRef.current = mergedEvents;
-        
+
         // Update cached range to include the new range
         if (cachedRangeRef.current) {
           cachedRangeRef.current = {
@@ -858,28 +894,28 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
 
         // Fetch linked people for new events only (if not aborted)
         if (!abortController.signal.aborted && newEvents.length > 0) {
-          const eventIds = newEvents.map(e => e.id);
+          const eventIds = newEvents.map((e) => e.id);
           const eventPeopleMap = await fetchEventPeople(eventIds);
-          
+
           if (abortController.signal.aborted) {
             return;
           }
-          
+
           // Update people data in merged events
-          mergedEvents.forEach(event => {
+          mergedEvents.forEach((event) => {
             if (eventPeopleMap[event.id]) {
               event.linkedPeople = eventPeopleMap[event.id];
             }
           });
         }
-        
+
         // Filter to show only events in the current view range
-        const filteredEvents = mergedEvents.filter(event => {
+        const filteredEvents = mergedEvents.filter((event) => {
           return event.start <= timeMax && event.end >= timeMin;
         });
-        
+
         setEvents(filteredEvents);
-        
+
         // Reset stop retrying flag on success
         setShouldStopRetrying(false);
         // Reset force refresh flag after successful fetch
@@ -894,7 +930,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         console.error('Error fetching events:', error);
         // On error, try to use cached events if available
         if (allCachedEventsRef.current.length > 0) {
-          const filteredEvents = allCachedEventsRef.current.filter(event => {
+          const filteredEvents = allCachedEventsRef.current.filter((event) => {
             return event.start <= timeMax && event.end >= timeMin;
           });
           setEvents(filteredEvents);
@@ -932,7 +968,14 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
       }
 
       // Handle Escape key to exit fullscreen (only if fullscreen is active and no modals are open)
-      if (event.key === 'Escape' && isFullscreen && !isEventModalOpen && !isNewEventModalOpen && !settingsOpen && !isShortcutsDialogOpen) {
+      if (
+        event.key === 'Escape' &&
+        isFullscreen &&
+        !isEventModalOpen &&
+        !isNewEventModalOpen &&
+        !settingsOpen &&
+        !isShortcutsDialogOpen
+      ) {
         setIsFullscreen(false);
         return;
       }
@@ -1001,7 +1044,15 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [viewMode, isFullscreen, isEventModalOpen, isNewEventModalOpen, settingsOpen, isShortcutsDialogOpen, toggleFullscreen]);
+  }, [
+    viewMode,
+    isFullscreen,
+    isEventModalOpen,
+    isNewEventModalOpen,
+    settingsOpen,
+    isShortcutsDialogOpen,
+    toggleFullscreen,
+  ]);
 
   const goToToday = () => {
     const today = new Date();
@@ -1150,13 +1201,20 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
     }
   };
 
+  // Apply color palette to card if available
+  const cardStyle = colorPalette
+    ? {
+        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+      }
+    : undefined;
+
   return (
     <Card
       className={cn(
-        'w-full h-screen transition-all duration-300 flex flex-col',
-        isFullscreen &&
-          'fixed inset-0 z-[9999] m-0 rounded-none w-screen max-w-none'
+        'w-full h-screen transition-all duration-1000 flex flex-col border-0',
+        isFullscreen && 'fixed inset-0 z-[9999] m-0 rounded-none w-screen max-w-none'
       )}
+      style={cardStyle}
     >
       <CardHeader className="pb-4">
         <div className="flex items-center justify-end">
@@ -1165,7 +1223,21 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               value={viewMode}
               onValueChange={(value) => setViewMode(value as CalendarViewMode)}
             >
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger
+                className="w-[120px] transition-all duration-1000"
+                style={
+                  colorPalette
+                    ? {
+                        borderColor: colorPalette.accent
+                          .replace('rgb', 'rgba')
+                          .replace(')', ', 0.4)'),
+                        backgroundColor: colorPalette.primary
+                          .replace('rgb', 'rgba')
+                          .replace(')', ', 0.1)'),
+                      }
+                    : undefined
+                }
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1176,7 +1248,24 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
                 <SelectItem value="schedule">Schedule</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={goToToday}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToToday}
+              className="transition-all duration-1000"
+              style={
+                colorPalette
+                  ? {
+                      borderColor: colorPalette.accent
+                        .replace('rgb', 'rgba')
+                        .replace(')', ', 0.4)'),
+                      backgroundColor: colorPalette.primary
+                        .replace('rgb', 'rgba')
+                        .replace(')', ', 0.1)'),
+                    }
+                  : undefined
+              }
+            >
               Today
             </Button>
             <Button
@@ -1186,7 +1275,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               title="Refresh current view"
               disabled={loadingEvents}
             >
-              <RefreshCw className={cn("h-4 w-4", loadingEvents && "animate-spin")} />
+              <RefreshCw className={cn('h-4 w-4', loadingEvents && 'animate-spin')} />
             </Button>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" onClick={goToPrevious}>
@@ -1196,7 +1285,10 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <div className="text-sm font-medium text-muted-foreground min-w-[200px] text-right" suppressHydrationWarning>
+            <div
+              className="text-sm font-medium text-muted-foreground min-w-[200px] text-right"
+              suppressHydrationWarning
+            >
               {dateRangeString}
             </div>
             <Button
@@ -1206,11 +1298,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               className="ml-2"
               title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
             >
-              {isFullscreen ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
             <Button
               variant="ghost"
@@ -1232,19 +1320,41 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           </div>
         </div>
       </CardHeader>
-      <CardContent className={cn('p-0 overflow-hidden relative flex-1 min-h-0')}>
+      <CardContent className={cn('p-0 overflow-hidden relative flex-1 min-h-0 pb-0')}>
         {/* Loading overlay */}
         {loadingEvents && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
+            className="absolute inset-0 backdrop-blur-sm z-50 flex items-center justify-center transition-all duration-1000"
+            style={
+              colorPalette
+                ? {
+                    backgroundColor: colorPalette.primary
+                      .replace('rgb', 'rgba')
+                      .replace(')', ', 0.2)'),
+                  }
+                : {
+                    backgroundColor: 'hsl(var(--background) / 0.2)',
+                  }
+            }
           >
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+              className="w-8 h-8 border-2 rounded-full transition-all duration-1000"
+              style={
+                colorPalette
+                  ? {
+                      borderColor: colorPalette.accent,
+                      borderTopColor: 'transparent',
+                    }
+                  : {
+                      borderColor: 'hsl(var(--primary))',
+                      borderTopColor: 'transparent',
+                    }
+              }
             />
           </motion.div>
         )}
@@ -1263,6 +1373,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               onEmptySpaceClick={handleEmptySpaceClick}
               previewEvent={previewEvent}
               people={people}
+              colorPalette={colorPalette}
             />
           )}
           {viewMode === 'weekly' && (
@@ -1278,6 +1389,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               onEmptySpaceClick={handleEmptySpaceClick}
               previewEvent={previewEvent}
               people={people}
+              colorPalette={colorPalette}
             />
           )}
           {viewMode === 'monthly' && (
@@ -1311,6 +1423,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
               onEventRightClick={handleEventRightClick}
               onPersonClick={handlePersonClick}
               people={people}
+              colorPalette={colorPalette}
             />
           )}
         </AnimatedCalendarView>
@@ -1337,6 +1450,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         onEventUpdate={handleEventUpdate}
         people={people}
         onPersonClick={handlePersonClick}
+        colorPalette={colorPalette}
         onPeopleChange={(eventId, updatedPeople) => {
           // Update cache
           allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
@@ -1344,11 +1458,7 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
           );
           // Optimistically update the event in the events array
           setEvents((prevEvents) =>
-            prevEvents.map((e) =>
-              e.id === eventId
-                ? { ...e, linkedPeople: updatedPeople }
-                : e
-            )
+            prevEvents.map((e) => (e.id === eventId ? { ...e, linkedPeople: updatedPeople } : e))
           );
         }}
       />
@@ -1369,14 +1479,11 @@ export function HQCalendar({ events: initialEvents = [], navigateToDate }: HQCal
         availableCalendars={availableCalendars}
         people={people}
         onPersonClick={handlePersonClick}
+        colorPalette={colorPalette}
         onPeopleChange={(eventId, updatedPeople) => {
           // Optimistically update the event in the events array
           setEvents((prevEvents) =>
-            prevEvents.map((e) =>
-              e.id === eventId
-                ? { ...e, linkedPeople: updatedPeople }
-                : e
-            )
+            prevEvents.map((e) => (e.id === eventId ? { ...e, linkedPeople: updatedPeople } : e))
           );
         }}
         onPreviewChange={(preview) => {

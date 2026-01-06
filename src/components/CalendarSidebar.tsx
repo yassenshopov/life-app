@@ -23,6 +23,7 @@ interface CalendarItemProps {
 interface CalendarSidebarProps {
   currentDate?: Date;
   onDateSelect?: (date: Date) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 function CalendarItemComponent({ calendar, onToggle }: CalendarItemProps) {
@@ -80,7 +81,7 @@ function CalendarItemComponent({ calendar, onToggle }: CalendarItemProps) {
   );
 }
 
-export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarProps) {
+export function CalendarSidebar({ currentDate, onDateSelect, colorPalette }: CalendarSidebarProps) {
   const [calendars, setCalendars] = React.useState<CalendarItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isConnecting, setIsConnecting] = React.useState(false);
@@ -253,8 +254,21 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
     }
   };
 
+  // Apply color palette to sidebar if available (very light opacity, no border)
+  const sidebarStyle = colorPalette
+    ? {
+        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.35)'),
+      }
+    : undefined;
+
   return (
-    <div className="w-64 border-r bg-background p-4 space-y-4 overflow-y-auto">
+    <div 
+      className={cn(
+        'w-64 p-4 space-y-4 overflow-y-auto transition-all duration-1000',
+        !colorPalette && 'bg-background'
+      )}
+      style={sidebarStyle}
+    >
       {/* Monthly Calendar Preview */}
       <MiniCalendar selectedDate={selectedDate} onDateSelect={handleDateSelect} />
 
