@@ -282,9 +282,10 @@ function SequentialTypedList({
   );
 }
 
-// Helper function to get matched people from event (prioritizes linkedPeople)
-const getEventPeople = (event: CalendarEvent, people: Person[]): Person[] => {
-  // Prefer linked people from database
+// Helper function to get linked people from event (only explicitly tagged people)
+// Do not fall back to title matching - avatars should only show for explicitly tagged people
+const getEventPeople = (event: CalendarEvent): Person[] => {
+  // Only use linked people from database
   if (event.linkedPeople && event.linkedPeople.length > 0) {
     // Convert linkedPeople format to Person format for PersonAvatar
     return event.linkedPeople.map(lp => ({
@@ -294,9 +295,8 @@ const getEventPeople = (event: CalendarEvent, people: Person[]): Person[] => {
       image: lp.image,
     })) as Person[];
   }
-  // Fallback to title matching
-  if (!people || people.length === 0) return [];
-  return getMatchedPeopleFromEvent(event.title, people);
+  // Return empty array if no linked people (no fallback to title matching)
+  return [];
 };
 
 interface ScheduleCalendarViewProps {
@@ -308,6 +308,7 @@ interface ScheduleCalendarViewProps {
   onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
   people?: Person[];
   onPersonClick?: (person: Person) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 export interface ScheduleCalendarViewRef {
@@ -323,6 +324,7 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
   onEventRightClick,
   people = [],
   onPersonClick,
+  colorPalette,
 }, ref) => {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const todayElementRef = React.useRef<HTMLDivElement>(null);
@@ -901,9 +903,12 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
               >
                 <div
                   className={cn(
-                    'text-sm font-semibold mb-4 pb-2 border-b',
+                    'text-sm font-semibold mb-4 pb-2 transition-all duration-1000',
                     isTodayDate && 'text-blue-600 dark:text-blue-400'
                   )}
+                  style={colorPalette ? {
+                    borderBottom: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                  } : undefined}
                 >
                   {formatDateHeader(date)}
                 </div>
@@ -913,7 +918,7 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                   <div className="flex flex-wrap gap-2 mb-4">
                     {allDayEvents.map((event) => {
                       const eventColor = event.color || '#4285f4';
-                      const matchedPeople = getEventPeople(event, people);
+                      const matchedPeople = getEventPeople(event);
                       // Get high-contrast text color that ensures WCAG AA compliance
                       const textColor = getContrastTextColorHex(eventColor);
                       
@@ -997,12 +1002,15 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                         {/* Vertical timeline line connecting all events - centered with circles */}
                         {showTimeline && (
                           <div 
-                            className="absolute w-0.5 bg-border/50"
+                            className="absolute w-0.5 transition-all duration-1000"
                             style={{ 
-                              left: '88px', // Center of circle: 64px (w-16 time) + 8px (gap-2) + 16px (half of w-8 circle) = 88px
+                              left: '84px', // Center of circle: 64px (w-16 time) + 8px (gap-2) + 12px (half of w-6 circle) = 84px
                               top: '20px',
-                              // Extend to near bottom, stopping 16px from bottom to center on last circle
-                              bottom: '16px', // Half of circle radius (32px / 2) to center on last circle
+                              // Extend to near bottom, stopping 12px from bottom to center on last circle
+                              bottom: '12px', // Half of circle radius (24px / 2) to center on last circle
+                              backgroundColor: colorPalette 
+                                ? colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.5)')
+                                : 'hsl(var(--border) / 0.7)',
                             }}
                           />
                         )}
@@ -1023,11 +1031,22 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                     </div>
                                     
                                     {/* Empty circle indicator */}
-                                    <div className="relative z-10 w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 bg-transparent" />
+                                    <div 
+                                      className="relative z-10 w-6 h-6 rounded-full border-2 border-dashed bg-transparent transition-all duration-1000"
+                                      style={colorPalette ? {
+                                        borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+                                      } : undefined}
+                                    />
                                   </div>
                                   
                                   {/* Right side: Unscheduled time block */}
-                                  <div className="flex-1 min-w-0 bg-muted/30 border border-dashed border-muted-foreground/30 rounded-lg p-3">
+                                  <div 
+                                    className="flex-1 min-w-0 border border-dashed rounded-lg p-3 transition-all duration-1000"
+                                    style={colorPalette ? {
+                                      backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.05)'),
+                                      borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                                    } : undefined}
+                                  >
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                       <div className="text-xs text-muted-foreground italic">
                                         Unscheduled time
@@ -1058,7 +1077,12 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                     
                                     {/* Suggestions list */}
                                     {suggestions.length > 0 && (
-                                      <div className="mt-3 pt-3 border-t border-muted-foreground/20">
+                                      <div 
+                                        className="mt-3 pt-3 transition-all duration-1000"
+                                        style={colorPalette ? {
+                                          borderTop: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`,
+                                        } : undefined}
+                                      >
                                         <div className="text-xs font-medium text-muted-foreground mb-2">
                                           Suggestions:
                                         </div>
@@ -1076,8 +1100,8 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                             
                             const eventColor = event.color || '#4285f4';
                             const isAllDay = event.isAllDay || false;
-                            // Use linked people from database (if available), otherwise fall back to title matching
-                            const matchedPeople = getEventPeople(event, people);
+                            // Only use linked people from database (explicitly tagged people)
+                            const matchedPeople = getEventPeople(event);
                             const hasChildren = event.children && event.children.length > 0;
                             const isActive = isEventActive(event, date);
                             
@@ -1113,17 +1137,30 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                   
                                   {/* Colored circle */}
                                   <div
-                                    className="relative z-10 w-8 h-8 rounded-full border-2 border-background shadow-sm"
-                                    style={{ backgroundColor: eventColor }}
+                                    className="relative z-10 w-6 h-6 rounded-full shadow-sm transition-all duration-1000"
+                                    style={{ 
+                                      backgroundColor: eventColor,
+                                    }}
                                   />
                                 </div>
                                 
                                 {/* Right side: Event card */}
                                 <div
-                                  className="flex-1 min-w-0 bg-card border rounded-lg p-3 cursor-pointer transition-all hover:border-primary/50"
+                                  className="flex-1 min-w-0 border rounded-lg p-3 cursor-pointer transition-all duration-1000 hover:border-primary/50"
                                   style={{
-                                    borderWidth: isActive ? '2px' : '1px',
-                                    borderColor: isActive ? eventColor : undefined,
+                                    borderWidth: isActive ? '0px' : '1px',
+                                    borderColor: isActive 
+                                      ? 'transparent'
+                                      : colorPalette 
+                                        ? colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')
+                                        : undefined,
+                                    backgroundColor: isActive
+                                      ? colorPalette
+                                        ? colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.18)')
+                                        : undefined
+                                      : colorPalette
+                                        ? colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.08)')
+                                        : undefined,
                                   }}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1178,7 +1215,12 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                       
                                       {/* Health Metrics for Sleep Events */}
                                       {isSleepEvent && healthMetrics && (
-                                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                                        <div 
+                                          className="mt-2 pt-2 transition-all duration-1000"
+                                          style={colorPalette ? {
+                                            borderTop: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`,
+                                          } : undefined}
+                                        >
                                           <div className="grid grid-cols-2 gap-2 text-xs">
                                             {/* Sleep Quality Metrics */}
                                             {healthMetrics.sleepHours !== null && (
@@ -1266,11 +1308,16 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
                                       
                                       {/* Nested events as sub-items */}
                                       {hasChildren && (
-                                        <div className="mt-3 pt-3 border-t space-y-2">
+                                        <div 
+                                          className="mt-3 pt-3 space-y-2 transition-all duration-1000"
+                                          style={colorPalette ? {
+                                            borderTop: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`,
+                                          } : undefined}
+                                        >
                                           {event.children!.map((childEvent) => {
                                             const childColor = childEvent.color || '#4285f4';
-                                            // Use linked people from database (if available), otherwise fall back to title matching
-                                            const childMatchedPeople = getEventPeople(childEvent, people);
+                                            // Only use linked people from database (explicitly tagged people)
+                                            const childMatchedPeople = getEventPeople(childEvent);
                                             const childDurationMs = childEvent.end.getTime() - childEvent.start.getTime();
                                             const childDurationHours = Math.floor(childDurationMs / (1000 * 60 * 60));
                                             const childDurationMinutes = Math.floor((childDurationMs % (1000 * 60 * 60)) / (1000 * 60));

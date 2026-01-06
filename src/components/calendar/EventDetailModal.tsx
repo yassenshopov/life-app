@@ -1,16 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEvent } from '@/components/HQCalendar';
 import { formatEventTime, isAllDayEvent } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
-import { MapPin, Users, Repeat, Video, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Edit2, Save, X, Plus } from 'lucide-react';
+import {
+  MapPin,
+  Users,
+  Repeat,
+  Video,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Edit2,
+  Save,
+  X,
+  Plus,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -20,23 +29,32 @@ import { Switch } from '@/components/ui/switch';
 import { formatTimeForInput } from '@/lib/time-format-utils';
 import { TimePicker } from '@/components/ui/time-picker';
 import { PersonAvatar } from './PersonAvatar';
+import { PersonSelectorPopover } from './PersonSelectorPopover';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDown } from 'lucide-react';
+import { getDominantColor } from '@/lib/spotify-color';
+import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
+
+// Cache for dominant colors keyed by imageUrl to avoid repeated network requests
+const colorCache = new Map<string, string>();
 
 interface EventDetailModalProps {
   event: CalendarEvent | null;
   isOpen: boolean;
   onClose: () => void;
   timeFormat: TimeFormat;
-  onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date, isAllDay?: boolean) => Promise<void>;
+  onEventUpdate?: (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date,
+    isAllDay?: boolean
+  ) => Promise<void>;
   people?: Person[];
   onPersonClick?: (person: Person) => void;
   onPeopleChange?: (eventId: string, people: Person[]) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 /**
@@ -51,24 +69,25 @@ export function EventDetailModal({
   people = [],
   onPersonClick,
   onPeopleChange,
+  colorPalette,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
   // Local optimistic event state for UI updates without triggering parent rerenders
   const [optimisticEvent, setOptimisticEvent] = React.useState<CalendarEvent | null>(event);
-  
+
   // Update optimistic event when prop event changes
   React.useEffect(() => {
     setOptimisticEvent(event);
   }, [event]);
-  
+
   // Use optimistic event for rendering
   const displayEvent = optimisticEvent || event;
-  
+
   const [isEditing, setIsEditing] = React.useState(false);
-  const [editedStart, setEditedStart] = React.useState<Date>(() => 
+  const [editedStart, setEditedStart] = React.useState<Date>(() =>
     event ? new Date(event.start) : new Date()
   );
-  const [editedEnd, setEditedEnd] = React.useState<Date>(() => 
+  const [editedEnd, setEditedEnd] = React.useState<Date>(() =>
     event ? new Date(event.end) : new Date()
   );
   const [isSaving, setIsSaving] = React.useState(false);
@@ -86,15 +105,37 @@ export function EventDetailModal({
       setEditedStart(start);
       setEditedEnd(end);
       setIsAllDayEdit(displayEvent.isAllDay || false);
-      
+
       // Format for date input (YYYY-MM-DD)
       setStartDate(start.toISOString().split('T')[0]);
       setEndDate(end.toISOString().split('T')[0]);
-      
+
       setStartTime(formatTimeForInput(start));
       setEndTime(formatTimeForInput(end));
     }
   }, [displayEvent, isEditing]);
+
+  // Helper to get image URL from person
+  const getImageUrl = React.useCallback((person: Person): string | null => {
+    if (person.image_url) {
+      return person.image_url;
+    }
+
+    const imageData = person.image;
+    if (!imageData || !Array.isArray(imageData) || imageData.length === 0) {
+      return null;
+    }
+
+    const firstFile = imageData[0];
+    if (firstFile.type === 'external' && firstFile.external?.url) {
+      return firstFile.external.url;
+    }
+    if (firstFile.type === 'file' && firstFile.file?.url) {
+      return firstFile.file.url;
+    }
+
+    return null;
+  }, []);
 
   // State for linked people (from database)
   const [linkedPeople, setLinkedPeople] = React.useState<Array<Person & { linkId?: string }>>([]);
@@ -102,10 +143,17 @@ export function EventDetailModal({
   const [isAddingPerson, setIsAddingPerson] = React.useState(false);
   const [showPersonSelector, setShowPersonSelector] = React.useState(false);
   const [personSearchQuery, setPersonSearchQuery] = React.useState('');
-  const [peopleWithRecentDates, setPeopleWithRecentDates] = React.useState<Map<string, Date>>(new Map());
-  
+  const [peopleWithRecentDates, setPeopleWithRecentDates] = React.useState<Map<string, Date>>(
+    new Map()
+  );
+  const [badgeColors, setBadgeColors] = React.useState<Map<string, string>>(new Map());
+  const personSelectorTriggerRef = React.useRef<HTMLDivElement>(null);
+  const [showCreatePersonDialog, setShowCreatePersonDialog] = React.useState(false);
+
   // State for calendar and location editing
-  const [calendars, setCalendars] = React.useState<Array<{ id: string; summary: string; color?: string }>>([]);
+  const [calendars, setCalendars] = React.useState<
+    Array<{ id: string; summary: string; color?: string }>
+  >([]);
   const [isLoadingCalendars, setIsLoadingCalendars] = React.useState(false);
   const [showCalendarSelector, setShowCalendarSelector] = React.useState(false);
   const [isUpdatingCalendar, setIsUpdatingCalendar] = React.useState(false);
@@ -113,17 +161,18 @@ export function EventDetailModal({
   const [locationValue, setLocationValue] = React.useState('');
   const [isUpdatingLocation, setIsUpdatingLocation] = React.useState(false);
 
-  // Use linked people from database (if available), otherwise fall back to title matching
+  // Only show linked people from database in the title (no title matching for display)
+  // Use linkedPeople state which is fetched from the database, not the event prop
   const matchedPeople = React.useMemo(() => {
-    if (!displayEvent) return [];
-    // Prefer linked people from database
-    if (displayEvent.linkedPeople && displayEvent.linkedPeople.length > 0) {
-      return displayEvent.linkedPeople;
-    }
-    // Fallback to title matching
-    if (!people || people.length === 0) return [];
+    // Only use linked people from database (fetched via fetchLinkedPeople)
+    return linkedPeople;
+  }, [linkedPeople]);
+
+  // Get suggested people from title matching (for dropdown suggestions only)
+  const suggestedPeopleFromTitle = React.useMemo(() => {
+    if (!displayEvent || !people || people.length === 0) return [];
     return getMatchedPeopleFromEvent(displayEvent.title, people);
-  }, [displayEvent?.linkedPeople, displayEvent?.title, people]);
+  }, [displayEvent?.title, people]);
 
   // Fetch linked people when event changes
   React.useEffect(() => {
@@ -133,6 +182,69 @@ export function EventDetailModal({
       setLinkedPeople([]);
     }
   }, [displayEvent?.id]);
+
+  // Extract badge colors from linked people's images
+  React.useEffect(() => {
+    let isCancelled = false;
+
+    const extractColors = async () => {
+      const colorMap = new Map<string, string>();
+
+      // Create promises for all color extractions to run in parallel
+      const colorPromises = linkedPeople.map(async (person) => {
+        const imageUrl = getImageUrl(person);
+        
+        // Check cache first
+        if (imageUrl && colorCache.has(imageUrl)) {
+          return { personId: person.id, color: colorCache.get(imageUrl)! };
+        }
+
+        if (imageUrl) {
+          try {
+            const color = await getDominantColor(imageUrl);
+            // Store in cache for future use
+            colorCache.set(imageUrl, color);
+            return { personId: person.id, color };
+          } catch (error) {
+            // Use default muted color if extraction fails
+            const defaultColor = 'hsl(var(--muted))';
+            // Cache the default to avoid retrying failed extractions
+            colorCache.set(imageUrl, defaultColor);
+            return { personId: person.id, color: defaultColor };
+          }
+        } else {
+          // Use default muted color if no image
+          return { personId: person.id, color: 'hsl(var(--muted))' };
+        }
+      });
+
+      // Wait for all color extractions to complete in parallel
+      const results = await Promise.all(colorPromises);
+
+      // Check if effect was cancelled before updating state
+      if (isCancelled) {
+        return;
+      }
+
+      // Build color map from results
+      results.forEach(({ personId, color }) => {
+        colorMap.set(personId, color);
+      });
+
+      setBadgeColors(colorMap);
+    };
+
+    if (linkedPeople.length > 0) {
+      extractColors();
+    } else {
+      setBadgeColors(new Map());
+    }
+
+    // Cleanup: mark as cancelled if effect is cleaned up or linkedPeople changes
+    return () => {
+      isCancelled = true;
+    };
+  }, [linkedPeople, getImageUrl]);
 
   // Fetch calendars when modal opens
   React.useEffect(() => {
@@ -168,7 +280,7 @@ export function EventDetailModal({
 
   const fetchLinkedPeople = async () => {
     if (!displayEvent?.id) return;
-    
+
     setIsLoadingLinkedPeople(true);
     try {
       const response = await fetch(`/api/events/${encodeURIComponent(displayEvent.id)}/people`);
@@ -185,20 +297,20 @@ export function EventDetailModal({
 
   const handleAddPerson = async (personId: string) => {
     if (!displayEvent?.id) return;
-    
+
     // Optimistically update
-    const person = people.find(p => p.id === personId);
+    const person = people.find((p) => p.id === personId);
     if (person) {
       const optimisticPerson = { ...person, linkId: `temp-${Date.now()}` };
       setLinkedPeople((prev) => [...prev, optimisticPerson]);
       setShowPersonSelector(false);
       setPersonSearchQuery('');
-      
+
       // Optimistically update parent component
       const updatedPeople = [...linkedPeople, optimisticPerson];
       onPeopleChange?.(displayEvent.id, updatedPeople);
     }
-    
+
     setIsAddingPerson(true);
     try {
       const response = await fetch(`/api/events/${encodeURIComponent(displayEvent.id)}/people`, {
@@ -206,30 +318,34 @@ export function EventDetailModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personId }),
       });
-      
+
       const data = await response.json();
       if (response.ok) {
         // Replace optimistic update with real data
-        setLinkedPeople((prev) => 
-          prev.map(p => p.id === personId && p.linkId?.startsWith('temp-') ? data.person : p)
+        setLinkedPeople((prev) =>
+          prev.map((p) => (p.id === personId && p.linkId?.startsWith('temp-') ? data.person : p))
         );
         // Update parent with real data
         const updatedPeople = linkedPeople
-          .filter(p => !p.linkId?.startsWith('temp-'))
+          .filter((p) => !p.linkId?.startsWith('temp-'))
           .concat(data.person);
         onPeopleChange?.(displayEvent.id, updatedPeople);
       } else {
         // Revert optimistic update on error
-        setLinkedPeople((prev) => prev.filter(p => p.id !== personId || !p.linkId?.startsWith('temp-')));
-        const revertedPeople = linkedPeople.filter(p => p.id !== personId);
+        setLinkedPeople((prev) =>
+          prev.filter((p) => p.id !== personId || !p.linkId?.startsWith('temp-'))
+        );
+        const revertedPeople = linkedPeople.filter((p) => p.id !== personId);
         onPeopleChange?.(displayEvent.id, revertedPeople);
         alert(data.error || 'Failed to add person');
       }
     } catch (error) {
       console.error('Error adding person:', error);
       // Revert optimistic update on error
-      setLinkedPeople((prev) => prev.filter(p => p.id !== personId || !p.linkId?.startsWith('temp-')));
-      const revertedPeople = linkedPeople.filter(p => p.id !== personId);
+      setLinkedPeople((prev) =>
+        prev.filter((p) => p.id !== personId || !p.linkId?.startsWith('temp-'))
+      );
+      const revertedPeople = linkedPeople.filter((p) => p.id !== personId);
       onPeopleChange?.(displayEvent.id, revertedPeople);
       alert('Failed to add person');
     } finally {
@@ -239,21 +355,21 @@ export function EventDetailModal({
 
   const handleRemovePerson = async (personId: string) => {
     if (!displayEvent?.id) return;
-    
+
     // Optimistically update
-    const personToRemove = linkedPeople.find(p => p.id === personId);
+    const personToRemove = linkedPeople.find((p) => p.id === personId);
     setLinkedPeople((prev) => prev.filter((p) => p.id !== personId));
-    
+
     // Optimistically update parent component
-    const updatedPeople = linkedPeople.filter(p => p.id !== personId);
+    const updatedPeople = linkedPeople.filter((p) => p.id !== personId);
     onPeopleChange?.(displayEvent.id, updatedPeople);
-    
+
     try {
       const response = await fetch(
         `/api/events/${encodeURIComponent(displayEvent.id)}/people?personId=${personId}`,
         { method: 'DELETE' }
       );
-      
+
       if (!response.ok) {
         // Revert optimistic update on error
         if (personToRemove) {
@@ -278,7 +394,7 @@ export function EventDetailModal({
   React.useEffect(() => {
     const fetchRecentDates = async () => {
       if (!showPersonSelector || people.length === 0) return;
-      
+
       try {
         const response = await fetch('/api/people/recent-attachments');
         if (response.ok) {
@@ -300,37 +416,77 @@ export function EventDetailModal({
     }
   }, [showPersonSelector, people]);
 
-
   // Get available people (not already linked), filtered and sorted
+  // Prioritize people suggested from title matching
   const availablePeople = React.useMemo(() => {
     const linkedIds = new Set(linkedPeople.map((p) => p.id));
+    const suggestedIds = new Set(suggestedPeopleFromTitle.map((p) => p.id));
     let filtered = people.filter((p) => !linkedIds.has(p.id));
-    
+
     // Filter by search query
     if (personSearchQuery.trim()) {
       const query = personSearchQuery.toLowerCase();
-      filtered = filtered.filter((p) => 
-        p.name.toLowerCase().includes(query) ||
-        (p.nicknames && p.nicknames.some(n => n.toLowerCase().includes(query)))
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query) ||
+          (p.nicknames && p.nicknames.some((n) => n.toLowerCase().includes(query)))
       );
     }
-    
-    // Sort by most recently attached to an event
+
+    // Sort: suggested people from title first, then by most recently attached
     filtered.sort((a, b) => {
+      const aIsSuggested = suggestedIds.has(a.id);
+      const bIsSuggested = suggestedIds.has(b.id);
+
+      // Suggested people come first
+      if (aIsSuggested && !bIsSuggested) return -1;
+      if (!aIsSuggested && bIsSuggested) return 1;
+
+      // Within each group, sort by most recently attached to an event
       const dateA = peopleWithRecentDates.get(a.id);
       const dateB = peopleWithRecentDates.get(b.id);
-      
+
       // People with recent attachments come first
       if (dateA && !dateB) return -1;
       if (!dateA && dateB) return 1;
       if (!dateA && !dateB) return 0; // Both have no attachments, keep original order
-      
+
       // Sort by most recent attachment first
       return dateB!.getTime() - dateA!.getTime();
     });
-    
+
     return filtered;
-  }, [people, linkedPeople, personSearchQuery, peopleWithRecentDates]);
+  }, [people, linkedPeople, personSearchQuery, peopleWithRecentDates, suggestedPeopleFromTitle]);
+
+  // Helper to mix colors - blend default background with Spotify color for solid background
+  const getMixedBackground = React.useCallback(() => {
+    if (!colorPalette || typeof window === 'undefined') return undefined;
+    
+    // Get computed background color (resolved from CSS variables)
+    const root = document.documentElement;
+    const computedBg = getComputedStyle(root).getPropertyValue('background-color');
+    
+    // Extract RGB from computed background
+    const bgMatch = computedBg.match(/\d+/g);
+    if (!bgMatch || bgMatch.length < 3) return undefined;
+    
+    const [bgR, bgG, bgB] = bgMatch.map(Number);
+    
+    // Extract RGB from Spotify color
+    const spotifyMatch = colorPalette.primary.match(/\d+/g);
+    if (!spotifyMatch || spotifyMatch.length < 3) return undefined;
+    
+    const [spotifyR, spotifyG, spotifyB] = spotifyMatch.map(Number);
+    
+    // Mix colors: 75% default background, 25% Spotify color
+    const mixRatio = 0.25; // 25% Spotify, 75% default
+    const mixedR = Math.round(bgR * (1 - mixRatio) + spotifyR * mixRatio);
+    const mixedG = Math.round(bgG * (1 - mixRatio) + spotifyG * mixRatio);
+    const mixedB = Math.round(bgB * (1 - mixRatio) + spotifyB * mixRatio);
+    
+    // Return solid RGB color
+    return `rgb(${mixedR}, ${mixedG}, ${mixedB})`;
+  }, [colorPalette]);
 
   // Handle all-day toggle
   const handleAllDayToggle = (checked: boolean) => {
@@ -344,7 +500,7 @@ export function EventDetailModal({
 
   const handleSave = async () => {
     if (!onEventUpdate || !displayEvent) return;
-    
+
     const calendarId = displayEvent.calendarId || displayEvent.calendar;
     if (!calendarId) {
       console.error('No calendar ID available');
@@ -433,15 +589,19 @@ export function EventDetailModal({
   };
 
   const handleCalendarChange = async (newCalendarId: string) => {
-    if (!displayEvent || newCalendarId === displayEvent.calendarId || newCalendarId === displayEvent.calendar) {
+    if (
+      !displayEvent ||
+      newCalendarId === displayEvent.calendarId ||
+      newCalendarId === displayEvent.calendar
+    ) {
       setShowCalendarSelector(false);
       return;
     }
 
     setIsUpdatingCalendar(true);
     const oldCalendarId = displayEvent.calendarId || displayEvent.calendar;
-    const newCalendar = calendars.find(c => c.id === newCalendarId);
-    
+    const newCalendar = calendars.find((c) => c.id === newCalendarId);
+
     // Optimistic update - update local state immediately
     const updatedEvent = {
       ...displayEvent,
@@ -451,7 +611,7 @@ export function EventDetailModal({
     };
     setOptimisticEvent(updatedEvent);
     setShowCalendarSelector(false);
-    
+
     try {
       const response = await fetch(`/api/google-calendar/events/${displayEvent.id}`, {
         method: 'PATCH',
@@ -468,20 +628,21 @@ export function EventDetailModal({
       }
 
       const data = await response.json();
-      
+
       // Update optimistic event with server response
       // Ensure calendar name is used (not ID) - prefer API response, then newCalendar summary, then keep current
-      const calendarName = data.event.calendar && data.event.calendar !== data.event.calendarId
-        ? data.event.calendar
-        : (newCalendar?.summary || displayEvent.calendar);
-      
+      const calendarName =
+        data.event.calendar && data.event.calendar !== data.event.calendarId
+          ? data.event.calendar
+          : newCalendar?.summary || displayEvent.calendar;
+
       setOptimisticEvent({
         ...updatedEvent,
         calendarId: data.event.calendarId || newCalendarId,
         calendar: calendarName,
         color: data.event.color || newCalendar?.color || displayEvent.color,
       });
-      
+
       // Silently update parent without triggering full refresh
       // Only update the specific event in parent's cache, not trigger a full calendar refresh
       if (onEventUpdate) {
@@ -508,7 +669,7 @@ export function EventDetailModal({
 
     setIsUpdatingLocation(true);
     const newLocation = locationValue.trim();
-    
+
     // Optimistic update
     const updatedEvent = {
       ...displayEvent,
@@ -516,7 +677,7 @@ export function EventDetailModal({
     };
     setOptimisticEvent(updatedEvent);
     setIsEditingLocation(false);
-    
+
     try {
       const response = await fetch(`/api/google-calendar/events/${displayEvent.id}`, {
         method: 'PATCH',
@@ -533,13 +694,13 @@ export function EventDetailModal({
       }
 
       const data = await response.json();
-      
+
       // Update optimistic event with server response
       setOptimisticEvent({
         ...updatedEvent,
         location: data.event.location || newLocation,
       });
-      
+
       // Silently update parent without triggering full refresh
       if (onEventUpdate) {
         await onEventUpdate(
@@ -579,7 +740,7 @@ export function EventDetailModal({
     if (isAllDay) {
       const startStr = format(eventStartDate, 'EEEE, MMMM d, yyyy');
       const endStr = format(eventEndDate, 'EEEE, MMMM d, yyyy');
-      
+
       if (startStr === endStr) {
         return startStr;
       }
@@ -588,7 +749,7 @@ export function EventDetailModal({
       const startStr = format(eventStartDate, 'EEEE, MMMM d, yyyy');
       const startTime = formatEventTime(eventStartDate, timeFormat);
       const endTime = formatEventTime(eventEndDate, timeFormat);
-      
+
       if (format(eventStartDate, 'yyyy-MM-dd') === format(eventEndDate, 'yyyy-MM-dd')) {
         return `${startStr} at ${startTime} - ${endTime}`;
       } else {
@@ -600,25 +761,35 @@ export function EventDetailModal({
 
   const formatDuration = () => {
     if (isAllDay) return 'All day';
-    
+
     const durationMs = eventEndDate.getTime() - eventStartDate.getTime();
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours === 0) return `${minutes} minutes`;
     if (minutes === 0) return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
     return `${hours}h ${minutes}m`;
   };
 
+  // Apply color palette to dialog if available (solid background with color mixing)
+  const dialogStyle = colorPalette
+    ? {
+        background: getMixedBackground(),
+      }
+    : undefined;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl">
+      <DialogContent 
+        className={cn(
+          "max-w-2xl max-h-[90vh] overflow-y-auto p-0 shadow-2xl transition-all duration-1000 border-0",
+          !colorPalette && "bg-background"
+        )}
+        style={dialogStyle}
+      >
         {/* Notion-style header with color accent */}
-        <div
-          className="h-1 w-full"
-          style={{ backgroundColor: displayEvent.color || '#4285f4' }}
-        />
-        
+        <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
+
         <div className="px-6 py-8 pb-16 relative">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
@@ -653,9 +824,7 @@ export function EventDetailModal({
             <div className="flex items-start gap-4">
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Date & Time
-                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">Date & Time</div>
                   {!isAllDay && onEventUpdate && (
                     <Button
                       variant="ghost"
@@ -663,11 +832,7 @@ export function EventDetailModal({
                       onClick={() => setIsEditing(!isEditing)}
                       className="h-7 px-2"
                     >
-                      {isEditing ? (
-                        <X className="h-4 w-4" />
-                      ) : (
-                        <Edit2 className="h-4 w-4" />
-                      )}
+                      {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
                     </Button>
                   )}
                 </div>
@@ -676,7 +841,10 @@ export function EventDetailModal({
                     {/* All-day toggle */}
                     <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="all-day-toggle" className="text-sm font-medium cursor-pointer">
+                        <Label
+                          htmlFor="all-day-toggle"
+                          className="text-sm font-medium cursor-pointer"
+                        >
                           All day
                         </Label>
                       </div>
@@ -764,12 +932,7 @@ export function EventDetailModal({
 
                     {/* Action buttons */}
                     <div className="flex gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="flex-1"
-                      >
+                      <Button size="sm" onClick={handleSave} disabled={isSaving} className="flex-1">
                         {isSaving ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
@@ -809,8 +972,8 @@ export function EventDetailModal({
             {displayEvent.calendar && (
               <div className="flex items-start gap-4">
                 <div className="flex-1">
-                  <Popover 
-                    open={showCalendarSelector} 
+                  <Popover
+                    open={showCalendarSelector}
                     onOpenChange={(open) => {
                       if (!isUpdatingCalendar) {
                         setShowCalendarSelector(open);
@@ -823,7 +986,9 @@ export function EventDetailModal({
                         style={{ backgroundColor: displayEvent.color || '#4285f4' }}
                         disabled={isUpdatingCalendar || isLoadingCalendars}
                       >
-                        <span className="text-xs font-medium text-white">{displayEvent.calendar}</span>
+                        <span className="text-xs font-medium text-white">
+                          {displayEvent.calendar}
+                        </span>
                         {!isUpdatingCalendar && (
                           <ChevronDown className="h-3 w-3 text-white ml-1.5" />
                         )}
@@ -832,10 +997,9 @@ export function EventDetailModal({
                         )}
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent 
-                      className="w-56 p-1" 
-                      align="start" 
-                      style={{ zIndex: 10002 }}
+                    <PopoverContent
+                      className="w-56 p-1 z-[10006]"
+                      align="start"
                       onInteractOutside={(e) => {
                         // Allow clicks inside the dialog but prevent closing when clicking outside
                         const target = e.target as HTMLElement;
@@ -867,7 +1031,8 @@ export function EventDetailModal({
                               style={{ backgroundColor: cal.color || '#4285f4' }}
                             />
                             <span className="text-sm flex-1 truncate">{cal.summary}</span>
-                            {(displayEvent.calendarId === cal.id || displayEvent.calendar === cal.id) && (
+                            {(displayEvent.calendarId === cal.id ||
+                              displayEvent.calendar === cal.id) && (
                               <CheckCircle className="h-4 w-4 text-primary" />
                             )}
                           </button>
@@ -882,22 +1047,20 @@ export function EventDetailModal({
             {/* Description */}
             {displayEvent.description && displayEvent.description.trim() && (
               <div className="flex items-start gap-4">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-2">
-                    Description
-                  </div>
+                <div className="w-full">
+                  <div className="text-sm font-medium text-muted-foreground mb-2">Description</div>
                   <div
-                    className="text-base leading-relaxed [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2
+                    className="text-sm leading-relaxed [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2
                       [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2
                       [&_li]:my-1 [&_li]:leading-relaxed
                       [&_strong]:font-semibold [&_b]:font-semibold
                       [&_em]:italic [&_i]:italic
                       [&_p]:my-2 [&_p]:leading-relaxed
-                      [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
-                      [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2
-                      [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2
+                      [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
+                      [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2
+                      [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2
                       [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:hover:text-blue-800 [&_a]:dark:hover:text-blue-300
-                      [&_code]:text-sm [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono
+                      [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono
                       [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2
                       [&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2
                       [&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border"
@@ -912,112 +1075,98 @@ export function EventDetailModal({
               <div className="flex-1">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* People Section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm font-medium text-muted-foreground">
-                        People
-                      </div>
+                  <div ref={personSelectorTriggerRef}>
+                    <div className="relative flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-muted-foreground">People</div>
                       {availablePeople.length > 0 && linkedPeople.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowPersonSelector(!showPersonSelector)}
-                          className="h-7 px-2"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
+                        <PersonSelectorPopover
+                          open={showPersonSelector}
+                          onOpenChange={setShowPersonSelector}
+                          availablePeople={availablePeople}
+                          personSearchQuery={personSearchQuery}
+                          onSearchChange={setPersonSearchQuery}
+                          onAddPerson={handleAddPerson}
+                          onCreateNew={() => {
+                            setShowPersonSelector(false);
+                            setShowCreatePersonDialog(true);
+                          }}
+                          isAdding={isAddingPerson}
+                          peopleWithRecentDates={peopleWithRecentDates}
+                          triggerButton={
+                            <Button variant="ghost" size="sm" className="h-7 px-2">
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add
+                            </Button>
+                          }
+                        />
                       )}
                     </div>
-                    
+
                     {isLoadingLinkedPeople ? (
                       <div className="text-sm text-muted-foreground">Loading...</div>
                     ) : linkedPeople.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        {linkedPeople.map((person) => (
-                          <div
-                            key={person.id}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 transition-colors group"
-                          >
-                            <PersonAvatar
-                              person={person}
-                              size="sm"
+                        {linkedPeople.map((person) => {
+                          const firstName = person.name.split(' ')[0];
+                          const badgeColor = badgeColors.get(person.id) || 'hsl(var(--muted))';
+                          return (
+                            <div
+                              key={person.id}
+                              className="relative inline-flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full transition-colors group cursor-pointer"
+                              style={{
+                                backgroundColor: badgeColor,
+                              }}
                               onClick={() => onPersonClick?.(person)}
-                            />
-                            <span className="text-sm">{person.name}</span>
-                            <button
-                              onClick={() => handleRemovePerson(person.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/20 rounded"
-                              title="Remove person"
                             >
-                              <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      availablePeople.length > 0 ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowPersonSelector(!showPersonSelector)}
-                          className="h-7 px-2"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add people
-                        </Button>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">No people available</div>
-                      )
-                    )}
-
-                    {/* Person selector dropdown */}
-                    {showPersonSelector && (
-                      <div className="mt-2 border rounded-md bg-background shadow-lg z-[100] relative">
-                        {/* Search bar */}
-                        <div className="p-2 border-b">
-                          <Input
-                            placeholder="Search people..."
-                            value={personSearchQuery}
-                            onChange={(e) => setPersonSearchQuery(e.target.value)}
-                            className="h-8 text-sm"
-                            autoFocus
-                          />
-                        </div>
-                        {/* People list */}
-                        <div className="max-h-48 overflow-y-auto">
-                          {availablePeople.length > 0 ? (
-                            availablePeople.map((person) => (
+                              <PersonAvatar
+                                person={person}
+                                size="sm"
+                                onClick={() => onPersonClick?.(person)}
+                              />
+                              <span className="text-xs font-medium text-white">{firstName}</span>
                               <button
-                                key={person.id}
-                                onClick={() => handleAddPerson(person.id)}
-                                disabled={isAddingPerson}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent transition-colors text-left"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemovePerson(person.id);
+                                }}
+                                className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-all duration-200 w-4 h-4 flex items-center justify-center bg-destructive hover:bg-destructive/90 rounded-full"
+                                title="Remove person"
                               >
-                                <PersonAvatar person={person} size="sm" onClick={undefined} />
-                                <span className="text-sm">{person.name}</span>
-                                {peopleWithRecentDates.has(person.id) && (
-                                  <span className="text-xs text-muted-foreground ml-auto">
-                                    {format(new Date(peopleWithRecentDates.get(person.id)!), 'MMM d, yyyy')}
-                                  </span>
-                                )}
+                                <X className="h-2.5 w-2.5 text-white" />
                               </button>
-                            ))
-                          ) : (
-                            <div className="p-4 text-sm text-muted-foreground text-center">
-                              {personSearchQuery.trim() ? 'No people found' : 'No people available'}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })}
                       </div>
+                    ) : availablePeople.length > 0 ? (
+                      <PersonSelectorPopover
+                        open={showPersonSelector}
+                        onOpenChange={setShowPersonSelector}
+                        availablePeople={availablePeople}
+                        personSearchQuery={personSearchQuery}
+                        onSearchChange={setPersonSearchQuery}
+                        onAddPerson={handleAddPerson}
+                        onCreateNew={() => {
+                          setShowPersonSelector(false);
+                          setShowCreatePersonDialog(true);
+                        }}
+                        isAdding={isAddingPerson}
+                        peopleWithRecentDates={peopleWithRecentDates}
+                        triggerButton={
+                          <Button variant="ghost" size="sm" className="h-7 px-2">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add people
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No people available</div>
                     )}
                   </div>
 
                   {/* Location Section */}
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-2">
-                      Location
-                    </div>
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Location</div>
                     {isEditingLocation ? (
                       <div className="space-y-2">
                         <Input
@@ -1068,7 +1217,9 @@ export function EventDetailModal({
                       </div>
                     ) : displayEvent.location && String(displayEvent.location).trim() !== '' ? (
                       <a
-                        href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(displayEvent.location)}`}
+                        href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(
+                          displayEvent.location
+                        )}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
@@ -1123,13 +1274,19 @@ export function EventDetailModal({
                           <span className="text-xs text-muted-foreground">(Organizer)</span>
                         )}
                         {attendee.responseStatus && (
-                          <span className={cn(
-                            'text-xs px-2 py-0.5 rounded',
-                            attendee.responseStatus === 'accepted' && 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-                            attendee.responseStatus === 'declined' && 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-                            attendee.responseStatus === 'tentative' && 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
-                            attendee.responseStatus === 'needsAction' && 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400'
-                          )}>
+                          <span
+                            className={cn(
+                              'text-xs px-2 py-0.5 rounded',
+                              attendee.responseStatus === 'accepted' &&
+                                'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+                              attendee.responseStatus === 'declined' &&
+                                'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+                              attendee.responseStatus === 'tentative' &&
+                                'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
+                              attendee.responseStatus === 'needsAction' &&
+                                'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400'
+                            )}
+                          >
                             {attendee.responseStatus === 'accepted' && 'Accepted'}
                             {attendee.responseStatus === 'declined' && 'Declined'}
                             {attendee.responseStatus === 'tentative' && 'Tentative'}
@@ -1150,9 +1307,7 @@ export function EventDetailModal({
                   <Repeat className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Recurrence
-                  </div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Recurrence</div>
                   <div className="text-base">
                     Recurring event
                     {displayEvent.recurrence[0] && (
@@ -1166,7 +1321,9 @@ export function EventDetailModal({
             )}
 
             {/* Video Conference */}
-            {(displayEvent.hangoutLink || (displayEvent.conferenceData?.entryPoints && displayEvent.conferenceData.entryPoints.length > 0)) && (
+            {(displayEvent.hangoutLink ||
+              (displayEvent.conferenceData?.entryPoints &&
+                displayEvent.conferenceData.entryPoints.length > 0)) && (
               <div className="flex items-start gap-4">
                 <div className="mt-1">
                   <Video className="h-5 w-5 text-muted-foreground" />
@@ -1214,9 +1371,7 @@ export function EventDetailModal({
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Status
-                  </div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Status</div>
                   <div className="text-base capitalize">{displayEvent.status}</div>
                 </div>
               </div>
@@ -1233,54 +1388,41 @@ export function EventDetailModal({
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Visibility
-                  </div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Visibility</div>
                   <div className="text-base capitalize">{displayEvent.visibility}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Transparency */}
-            {displayEvent.transparency && displayEvent.transparency !== 'opaque' && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <div className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Transparency
-                  </div>
-                  <div className="text-base capitalize">
-                    {displayEvent.transparency === 'transparent' ? 'Shows as available' : displayEvent.transparency}
-                  </div>
                 </div>
               </div>
             )}
 
           </div>
         </div>
-        
+
         {/* Open event button in bottom left */}
         {displayEvent.htmlLink && (
           <div className="absolute bottom-4 left-4">
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-            >
-              <a
-                href={displayEvent.htmlLink}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+            <Button variant="outline" size="sm" asChild>
+              <a href={displayEvent.htmlLink} target="_blank" rel="noopener noreferrer">
                 Open event
               </a>
             </Button>
           </div>
         )}
       </DialogContent>
+
+      {/* Create Person Dialog */}
+      <CreatePersonDialog
+        isOpen={showCreatePersonDialog}
+        onClose={() => setShowCreatePersonDialog(false)}
+        onSuccess={async (person) => {
+          // Automatically link the new person to the event
+          if (displayEvent?.id) {
+            // Use handleAddPerson which will make the API call
+            await handleAddPerson(person.id);
+          }
+          
+          setShowCreatePersonDialog(false);
+        }}
+      />
     </Dialog>
   );
 }
-

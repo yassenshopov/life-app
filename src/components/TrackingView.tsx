@@ -13,9 +13,12 @@ import { TrackingQuarterlyView } from '@/components/TrackingQuarterlyView';
 import { TrackingYearlyView } from '@/components/TrackingYearlyView';
 import { TrackingEntryDetailModal } from '@/components/TrackingEntryDetailModal';
 import { HealthMetricsTrends } from '@/components/HealthMetricsTrends';
+import { TrackingPrepareView } from '@/components/TrackingPrepareView';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 type TrackingPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+type ViewMode = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'prepare';
 
 export interface TrackingEntry {
   id: string;
@@ -43,6 +46,15 @@ const PERIOD_LABELS: Record<TrackingPeriod, string> = {
   yearly: 'Yearly',
 };
 
+const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  daily: 'Daily View',
+  weekly: 'Weekly View',
+  monthly: 'Monthly View',
+  quarterly: 'Quarterly View',
+  yearly: 'Yearly View',
+  prepare: 'Prepare Year',
+};
+
 const PERIOD_ICONS: Record<TrackingPeriod, string> = {
   daily: '📅',
   weekly: '📆',
@@ -54,15 +66,15 @@ const PERIOD_ICONS: Record<TrackingPeriod, string> = {
 // Helper to format property value from stored JSONB format
 export function formatStoredPropertyValue(prop: { type: string; value: any } | undefined): string {
   if (!prop || prop.value === null || prop.value === undefined) return '';
-  
+
   const { type, value } = prop;
-  
+
   // Helper to safely extract value from nested objects
   const extractValue = (val: any): any => {
     if (val === null || val === undefined) return null;
     if (typeof val !== 'object') return val;
     if (Array.isArray(val)) return val;
-    
+
     // Try common Notion property structures
     if (val.title?.[0]?.plain_text) return val.title[0].plain_text;
     if (val.rich_text?.[0]?.plain_text) return val.rich_text[0].plain_text;
@@ -77,12 +89,12 @@ export function formatStoredPropertyValue(prop: { type: string; value: any } | u
     if (val.relation) return val.relation;
     if (val.formula) return val.formula;
     if (val.rollup) return val.rollup;
-    
+
     return val;
   };
-  
+
   const extractedValue = extractValue(value);
-  
+
   switch (type) {
     case 'title':
       return typeof extractedValue === 'string' ? extractedValue : '';
@@ -94,11 +106,13 @@ export function formatStoredPropertyValue(prop: { type: string; value: any } | u
       return '';
     case 'multi_select':
       if (Array.isArray(extractedValue)) {
-        return extractedValue.map((item: any) => {
-          if (typeof item === 'string') return item;
-          if (item?.name) return item.name;
-          return String(item);
-        }).join(', ');
+        return extractedValue
+          .map((item: any) => {
+            if (typeof item === 'string') return item;
+            if (item?.name) return item.name;
+            return String(item);
+          })
+          .join(', ');
       }
       return '';
     case 'date':
@@ -146,13 +160,16 @@ export function formatStoredPropertyValue(prop: { type: string; value: any } | u
     case 'email':
       return typeof extractedValue === 'string' ? extractedValue : extractedValue?.email || '';
     case 'phone_number':
-      return typeof extractedValue === 'string' ? extractedValue : extractedValue?.phone_number || '';
+      return typeof extractedValue === 'string'
+        ? extractedValue
+        : extractedValue?.phone_number || '';
     case 'relation':
       if (Array.isArray(extractedValue)) {
         // Relations are stored as IDs, show count or IDs
         if (extractedValue.length === 0) return '';
         if (extractedValue.length === 1) {
-          const id = typeof extractedValue[0] === 'string' ? extractedValue[0] : extractedValue[0]?.id;
+          const id =
+            typeof extractedValue[0] === 'string' ? extractedValue[0] : extractedValue[0]?.id;
           return id ? `${id.slice(0, 8)}...` : '';
         }
         return `${extractedValue.length} relations`;
@@ -161,12 +178,18 @@ export function formatStoredPropertyValue(prop: { type: string; value: any } | u
     case 'formula':
       // Formula can return various types
       if (extractedValue === null || extractedValue === undefined) return '';
-      if (typeof extractedValue === 'string' || typeof extractedValue === 'number' || typeof extractedValue === 'boolean') {
+      if (
+        typeof extractedValue === 'string' ||
+        typeof extractedValue === 'number' ||
+        typeof extractedValue === 'boolean'
+      ) {
         return String(extractedValue);
       }
       if (extractedValue.type === 'string' && extractedValue.string) return extractedValue.string;
-      if (extractedValue.type === 'number' && extractedValue.number !== undefined) return String(extractedValue.number);
-      if (extractedValue.type === 'boolean' && extractedValue.boolean !== undefined) return extractedValue.boolean ? 'Yes' : 'No';
+      if (extractedValue.type === 'number' && extractedValue.number !== undefined)
+        return String(extractedValue.number);
+      if (extractedValue.type === 'boolean' && extractedValue.boolean !== undefined)
+        return extractedValue.boolean ? 'Yes' : 'No';
       if (extractedValue.type === 'date' && extractedValue.date) {
         const dateVal = extractedValue.date.start || extractedValue.date;
         return new Date(dateVal).toLocaleDateString('en-US', {
@@ -212,7 +235,11 @@ export function formatStoredPropertyValue(prop: { type: string; value: any } | u
       return '';
     default:
       // For unknown types, try to extract a meaningful string
-      if (typeof extractedValue === 'string' || typeof extractedValue === 'number' || typeof extractedValue === 'boolean') {
+      if (
+        typeof extractedValue === 'string' ||
+        typeof extractedValue === 'number' ||
+        typeof extractedValue === 'boolean'
+      ) {
         return String(extractedValue);
       }
       if (Array.isArray(extractedValue)) {
@@ -243,11 +270,14 @@ export function TrackingView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentYear, setCurrentYear] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'>(() => {
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== 'undefined') {
       const saved = getCookie('tracking-view-mode');
-      if (saved && ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(saved)) {
-        return saved as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+      if (
+        saved &&
+        ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'prepare'].includes(saved)
+      ) {
+        return saved as ViewMode;
       }
     }
     return 'daily';
@@ -281,7 +311,7 @@ export function TrackingView() {
     try {
       const response = await fetch('/api/tracking/connections');
       const data = await response.json();
-      
+
       if (data.connections) {
         // Use functional updater to avoid stale closure
         setConnections((prev) => {
@@ -321,7 +351,7 @@ export function TrackingView() {
         method: 'POST',
       });
       const data = await response.json();
-      
+
       if (data.success) {
         await fetchEntries('daily');
         await checkConnections();
@@ -356,7 +386,6 @@ export function TrackingView() {
     setSelectedEntry(entry);
   };
 
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -376,11 +405,15 @@ export function TrackingView() {
             <Database className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-2xl font-semibold mb-2">Connect Your Tracking Databases</h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Connect your Notion Daily, Weekly, Monthly, Quarterly, and Yearly tracking databases to sync and view your entries.
+              Connect your Notion Daily, Weekly, Monthly, Quarterly, and Yearly tracking databases
+              to sync and view your entries.
             </p>
-            <Button onClick={() => {
-              setShowConnectDialog(true);
-            }} size="lg">
+            <Button
+              onClick={() => {
+                setShowConnectDialog(true);
+              }}
+              size="lg"
+            >
               <Database className="w-4 h-4 mr-2" />
               Connect Daily Database
             </Button>
@@ -424,22 +457,31 @@ export function TrackingView() {
         </div>
 
         {/* Health Metrics Trends */}
-        <HealthMetricsTrends entries={entries} viewMode={viewMode} />
+        {viewMode !== 'prepare' && (
+          <HealthMetricsTrends
+            entries={entries}
+            viewMode={viewMode as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'}
+          />
+        )}
 
         {/* View Tabs */}
-        <Tabs value={viewMode} onValueChange={(value) => {
-          const newMode = value as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-          setViewMode(newMode);
-          setCookie('tracking-view-mode', newMode);
-        }}>
+        <Tabs
+          value={viewMode as any}
+          onValueChange={(value: string) => {
+            const newMode = value as ViewMode;
+            setViewMode(newMode);
+            setCookie('tracking-view-mode', newMode);
+          }}
+        >
           <TabsList className="mb-4">
             <TabsTrigger value="daily">Daily View</TabsTrigger>
             <TabsTrigger value="weekly">Weekly View</TabsTrigger>
             <TabsTrigger value="monthly">Monthly View</TabsTrigger>
             <TabsTrigger value="quarterly">Quarterly View</TabsTrigger>
             <TabsTrigger value="yearly">Yearly View</TabsTrigger>
+            <TabsTrigger value="prepare">Prepare Year</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="daily" className="mt-0">
             <TrackingCalendarView
               entries={entries}
@@ -448,7 +490,7 @@ export function TrackingView() {
               onEntryClick={handleEntryClick}
             />
           </TabsContent>
-          
+
           <TabsContent value="weekly" className="mt-0">
             <TrackingWeeklyView
               entries={entries}
@@ -456,7 +498,7 @@ export function TrackingView() {
               onNavigate={handleNavigateWeek}
             />
           </TabsContent>
-          
+
           <TabsContent value="monthly" className="mt-0">
             <TrackingMonthlyView
               entries={entries}
@@ -464,7 +506,7 @@ export function TrackingView() {
               onNavigate={handleNavigateYear}
             />
           </TabsContent>
-          
+
           <TabsContent value="quarterly" className="mt-0">
             <TrackingQuarterlyView
               entries={entries}
@@ -472,13 +514,17 @@ export function TrackingView() {
               onNavigate={handleNavigateYear}
             />
           </TabsContent>
-          
+
           <TabsContent value="yearly" className="mt-0">
             <TrackingYearlyView
               entries={entries}
               currentYear={currentYear}
               onNavigate={handleNavigateYear}
             />
+          </TabsContent>
+
+          <TabsContent value="prepare" className="mt-0">
+            <TrackingPrepareView />
           </TabsContent>
         </Tabs>
       </div>
@@ -504,4 +550,3 @@ export function TrackingView() {
     </div>
   );
 }
-

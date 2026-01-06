@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { ConnectedCalendarEvents } from './ConnectedCalendarEvents';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Cake, Briefcase, Users, Star } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
 // Helper functions (duplicated from PeopleView for modularity)
 function extractZodiacSign(starSign: string | null): string {
@@ -27,16 +27,7 @@ function extractFlag(location: string | null): { flag: string; text: string } {
 }
 
 import { getTierColor, getTierName } from '@/lib/tier-colors';
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+import { FlagImage } from '@/lib/flag-utils';
 
 function calculateAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -203,100 +194,78 @@ export function PersonDetailsModal({
                 </div>
               </div>
 
-              {/* Name and Tier */}
+              {/* Name and Badges */}
               <div className="flex-1 min-w-0">
-                <DialogTitle className="text-3xl font-bold mb-2">
+                <DialogTitle className="text-3xl font-bold mb-3">
                   {person.name}
                 </DialogTitle>
-                {tier && (
-                  <Badge className={tierColorClass}>
-                    {String(tier)}
-                  </Badge>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {tier && (
+                    <Badge className={tierColorClass}>
+                      {String(tier)}
+                    </Badge>
+                  )}
+                  {age !== null && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
+                      {age} years old
+                    </Badge>
+                  )}
+                  {zodiacSign && (
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+                      {zodiacSign}
+                    </Badge>
+                  )}
+                  {currentlyAt.text && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100">
+                      {currentlyAt.flag && (
+                        <FlagImage
+                          flagEmoji={currentlyAt.flag}
+                          width={14}
+                          height={10}
+                          className="mr-1"
+                          alt="Country flag"
+                        />
+                      )}
+                      {currentlyAt.text}
+                    </Badge>
+                  )}
+                  {fromLocation.text && (
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-100">
+                      {fromLocation.flag && (
+                        <FlagImage
+                          flagEmoji={fromLocation.flag}
+                          width={14}
+                          height={10}
+                          className="mr-1"
+                          alt="Country flag"
+                        />
+                      )}
+                      {fromLocation.text}
+                    </Badge>
+                  )}
+                  {person.occupation && (
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-900 dark:bg-orange-900/30 dark:text-orange-100">
+                      {person.occupation}
+                    </Badge>
+                  )}
+                  {person.contact_freq && (
+                    <Badge variant="secondary" className="bg-pink-100 text-pink-900 dark:bg-pink-900/30 dark:text-pink-100">
+                      {person.contact_freq}
+                    </Badge>
+                  )}
+                  {person.origin_of_connection && person.origin_of_connection.length > 0 ? (
+                    person.origin_of_connection.map((origin, idx) => (
+                      <Badge key={idx} variant="secondary" className="bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
+                        {origin}
+                      </Badge>
+                    ))
+                  ) : null}
+                </div>
               </div>
             </div>
           </DialogHeader>
 
-          {/* Details Section */}
-          <div className="space-y-6">
-            {/* Basic Info */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {age !== null && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Cake className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Age:</span>
-                    <span className="font-medium">{age}</span>
-                  </div>
-                )}
-                {person.birth_date && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Birthday:</span>
-                    <span className="font-medium">{formatDate(person.birth_date)}</span>
-                  </div>
-                )}
-                {zodiacSign && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Star className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Star Sign:</span>
-                    <span className="font-medium">{zodiacSign}</span>
-                  </div>
-                )}
-                {person.occupation && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Briefcase className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Occupation:</span>
-                    <span className="font-medium">{person.occupation}</span>
-                  </div>
-                )}
-                {currentlyAt.text && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Currently at:</span>
-                    <span className="font-medium flex items-center gap-1">
-                      {currentlyAt.flag && <span>{currentlyAt.flag}</span>}
-                      {currentlyAt.text}
-                    </span>
-                  </div>
-                )}
-                {fromLocation.text && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">From:</span>
-                    <span className="font-medium flex items-center gap-1">
-                      {fromLocation.flag && <span>{fromLocation.flag}</span>}
-                      {fromLocation.text}
-                    </span>
-                  </div>
-                )}
-                {person.origin_of_connection && person.origin_of_connection.length > 0 && (
-                  <div className="flex items-start gap-2 text-sm">
-                    <Users className="w-4 h-4 text-muted-foreground mt-0.5" />
-                    <span className="text-muted-foreground">Origin:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {person.origin_of_connection.map((origin, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs">
-                          {origin}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {person.contact_freq && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Contact Frequency:</span>
-                    <span className="font-medium">{person.contact_freq}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Calendar Events Section */}
+          {/* Calendar Events Section */}
             <div className="space-y-3 pt-4 border-t border-border">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Calendar Events
@@ -307,7 +276,6 @@ export function PersonDetailsModal({
               />
             </div>
           </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

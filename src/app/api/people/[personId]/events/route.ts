@@ -127,39 +127,166 @@ export async function GET(
       calendarsToFetch = calendarList.map((cal: any) => cal.id);
     }
 
-    // Fetch events from all calendars
-    const timeMin = new Date();
-    timeMin.setFullYear(timeMin.getFullYear() - 1);
-    const timeMax = new Date();
-    timeMax.setFullYear(timeMax.getFullYear() + 1);
+    // OPTIMIZATION: Instead of fetching ALL events and filtering,
+    // try to fetch each event directly by ID from each calendar in parallel
+    // This is much faster when a person has only a few linked events
+    
+    // If we have too many events, use a more efficient strategy
+    const MAX_DIRECT_FETCH_EVENTS = 50; // Threshold for direct fetch vs list approach
+    const eventIdSet = new Set(eventIds);
+    const linkedEvents: any[] = [];
+    const foundEventIds = new Set<string>();
+    const eventCalendarMap = new Map<string, string>();
 
-    const allEvents: any[] = [];
-    for (const calendarId of calendarsToFetch) {
-      try {
-        let pageToken: string | undefined = undefined;
-        do {
-          const response = await calendarApi.events.list({
-            calendarId,
-            timeMin: timeMin.toISOString(),
-            timeMax: timeMax.toISOString(),
-            maxResults: 2500,
-            singleEvents: true,
-            orderBy: 'startTime',
-            pageToken,
-          });
-          const items = response.data.items || [];
-          allEvents.push(...items);
-          pageToken = response.data.nextPageToken;
-        } while (pageToken);
-      } catch (error: any) {
-        console.error(`Error fetching events from calendar ${calendarId}:`, error);
+    // Strategy: If few events, fetch directly by ID. If many events, use optimized list approach.
+    if (eventIds.length <= MAX_DIRECT_FETCH_EVENTS && calendarsToFetch.length <= 10) {
+      // Direct fetch approach: Try each event ID in each calendar
+      // Batch requests to avoid overwhelming the API (max 20 concurrent)
+      const BATCH_SIZE = 20;
+      const fetchPromises: Promise<void>[] = [];
+      const eventById = new Map<string, any>();
+      
+      for (const calendarId of calendarsToFetch) {
+        for (const eventId of eventIds) {
+          fetchPromises.push(
+            calendarApi.events
+              .get({
+                calendarId,
+                eventId,
+              })
+              .then((response) => {
+                const event = response.data;
+                if (event && event.id && eventIdSet.has(event.id)) {
+                  // Atomically check and add - only process if this is the first time we see this event.id
+                  if (!eventById.has(event.id)) {
+                    eventById.set(event.id, event);
+                    linkedEvents.push(event);
+                    foundEventIds.add(event.id);
+                    eventCalendarMap.set(event.id, calendarId);
+                  }
+                }
+              })
+              .catch((error: any) => {
+                // Event not found in this calendar - this is expected and fine
+                // Only log if it's not a 404
+                if (error.code !== 404) {
+                  console.error(`Error fetching event ${eventId} from calendar ${calendarId}:`, error.message);
+                }
+              })
+          );
+
+          // Process in batches to avoid overwhelming the API
+          if (fetchPromises.length >= BATCH_SIZE) {
+            await Promise.allSettled(fetchPromises);
+            fetchPromises.length = 0; // Clear array
+          }
+        }
+      }
+
+      // Wait for remaining fetch attempts
+      if (fetchPromises.length > 0) {
+        await Promise.allSettled(fetchPromises);
+      }
+    } else {
+      // For many events, use optimized list approach with early exit
+      const timeMin = new Date();
+      timeMin.setFullYear(timeMin.getFullYear() - 2);
+      const timeMax = new Date();
+      timeMax.setFullYear(timeMax.getFullYear() + 1);
+
+      for (const calendarId of calendarsToFetch) {
+        // Early exit if we've found all events
+        if (foundEventIds.size === eventIds.length) break;
+
+        try {
+          let pageToken: string | undefined = undefined;
+          do {
+            const response = await calendarApi.events.list({
+              calendarId,
+              timeMin: timeMin.toISOString(),
+              timeMax: timeMax.toISOString(),
+              maxResults: 2500,
+              singleEvents: true,
+              orderBy: 'startTime',
+              pageToken,
+            });
+            
+            const items = response.data.items || [];
+            for (const event of items) {
+              if (eventIdSet.has(event.id)) {
+                linkedEvents.push(event);
+                foundEventIds.add(event.id);
+                eventCalendarMap.set(event.id, calendarId);
+                
+                // Early exit if we found all events
+                if (foundEventIds.size === eventIds.length) {
+                  pageToken = undefined;
+                  break;
+                }
+              }
+            }
+            
+            pageToken = response.data.nextPageToken;
+          } while (pageToken && foundEventIds.size < eventIds.length);
+        } catch (error: any) {
+          console.error(`Error fetching events from calendar ${calendarId}:`, error);
+        }
       }
     }
 
-    // Filter to only events linked to this person
-    const linkedEvents = allEvents.filter((event: any) =>
-      eventIds.includes(event.id)
-    );
+    // If we used direct fetch and didn't find all events, try a fallback search
+    // (This handles cases where events might be in calendars not in our selected list)
+    const missingEventIds = eventIds.filter((id) => !foundEventIds.has(id));
+    
+    if (missingEventIds.length > 0 && eventIds.length <= MAX_DIRECT_FETCH_EVENTS) {
+      // Only a few events missing from direct fetch - try a targeted search as fallback
+      const timeMin = new Date();
+      timeMin.setFullYear(timeMin.getFullYear() - 2);
+      const timeMax = new Date();
+      timeMax.setFullYear(timeMax.getFullYear() + 1);
+
+      const missingEventIdSet = new Set(missingEventIds);
+      
+      for (const calendarId of calendarsToFetch) {
+        // Skip if we've found all events
+        if (missingEventIdSet.size === 0) break;
+
+        try {
+          let pageToken: string | undefined = undefined;
+          do {
+            const response = await calendarApi.events.list({
+              calendarId,
+              timeMin: timeMin.toISOString(),
+              timeMax: timeMax.toISOString(),
+              maxResults: 2500,
+              singleEvents: true,
+              orderBy: 'startTime',
+              pageToken,
+            });
+            
+            const items = response.data.items || [];
+            for (const event of items) {
+              if (missingEventIdSet.has(event.id)) {
+                linkedEvents.push(event);
+                foundEventIds.add(event.id);
+                eventCalendarMap.set(event.id, calendarId);
+                missingEventIdSet.delete(event.id);
+                
+                // Early exit if we found all missing events
+                if (missingEventIdSet.size === 0) {
+                  pageToken = undefined;
+                  break;
+                }
+              }
+            }
+            
+            pageToken = response.data.nextPageToken;
+          } while (pageToken && missingEventIdSet.size > 0);
+        } catch (error: any) {
+          console.error(`Error fetching events from calendar ${calendarId}:`, error);
+        }
+      }
+    }
 
     // Enhance events with calendar colors (reuse calendarList already fetched)
     const calendarMap = new Map(
@@ -168,8 +295,9 @@ export async function GET(
 
     // Map colorId to hex and add calendar color
     const enhancedEvents = linkedEvents.map((event: any) => {
-      const calendarId = event.organizer?.email || event.calendarId;
-      const calendarColor = calendarId ? (calendarMap.get(calendarId) || '#4285f4') : '#4285f4';
+      // Use the calendar we found the event in, or fallback to organizer email
+      const eventCalendarId = eventCalendarMap.get(event.id) || event.organizer?.email || event.calendarId;
+      const calendarColor = eventCalendarId ? (calendarMap.get(eventCalendarId) || '#4285f4') : '#4285f4';
       
       // Map colorId to hex color, using calendar color as fallback
       let color = calendarColor;
@@ -185,7 +313,7 @@ export async function GET(
       return {
         ...event,
         color: color.startsWith('#') ? color : `#${color}`,
-        calendarId: calendarId,
+        calendarId: eventCalendarId,
       };
     });
 

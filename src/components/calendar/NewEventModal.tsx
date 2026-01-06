@@ -61,6 +61,7 @@ interface NewEventModalProps {
   people?: Person[];
   onPersonClick?: (person: Person) => void;
   onPeopleChange?: (eventId: string, people: Person[]) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 /**
@@ -78,6 +79,7 @@ export function NewEventModal({
   people = [],
   onPersonClick,
   onPeopleChange,
+  colorPalette,
 }: NewEventModalProps) {
   const [title, setTitle] = React.useState('');
   const [isAllDay, setIsAllDay] = React.useState(false);
@@ -403,9 +405,52 @@ export function NewEventModal({
   const selectedCalendar = availableCalendars.find(cal => cal.id === selectedCalendarId);
   const borderColor = selectedCalendar?.color || '#4285f4';
 
+  // Helper to mix colors - blend default background with Spotify color for solid background
+  const getMixedBackground = React.useCallback(() => {
+    if (!colorPalette || typeof window === 'undefined') return undefined;
+    
+    // Get computed background color (resolved from CSS variables)
+    const root = document.documentElement;
+    const computedBg = getComputedStyle(root).getPropertyValue('background-color');
+    
+    // Extract RGB from computed background
+    const bgMatch = computedBg.match(/\d+/g);
+    if (!bgMatch || bgMatch.length < 3) return undefined;
+    
+    const [bgR, bgG, bgB] = bgMatch.map(Number);
+    
+    // Extract RGB from Spotify color
+    const spotifyMatch = colorPalette.primary.match(/\d+/g);
+    if (!spotifyMatch || spotifyMatch.length < 3) return undefined;
+    
+    const [spotifyR, spotifyG, spotifyB] = spotifyMatch.map(Number);
+    
+    // Mix colors: 75% default background, 25% Spotify color
+    const mixRatio = 0.25; // 25% Spotify, 75% default
+    const mixedR = Math.round(bgR * (1 - mixRatio) + spotifyR * mixRatio);
+    const mixedG = Math.round(bgG * (1 - mixRatio) + spotifyG * mixRatio);
+    const mixedB = Math.round(bgB * (1 - mixRatio) + spotifyB * mixRatio);
+    
+    // Return solid RGB color
+    return `rgb(${mixedR}, ${mixedG}, ${mixedB})`;
+  }, [colorPalette]);
+
+  // Apply color palette to dialog if available (solid background with color mixing)
+  const dialogStyle = colorPalette
+    ? {
+        background: getMixedBackground(),
+      }
+    : undefined;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl">
+      <DialogContent 
+        className={cn(
+          "max-w-2xl max-h-[90vh] overflow-y-auto p-0 shadow-2xl transition-all duration-1000 border-0",
+          !colorPalette && "bg-background"
+        )}
+        style={dialogStyle}
+      >
         {/* Notion-style header with calendar color accent */}
         <div 
           className="h-1 w-full transition-colors"

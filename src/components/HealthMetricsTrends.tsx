@@ -280,12 +280,15 @@ export function HealthMetricsTrends({
   const chartData = useMemo(() => {
     if (entries.length === 0) return [];
 
-    // Early filter: pre-extract dates and filter invalid entries to reduce processing
+    // Early filter: pre-extract dates and filter invalid entries and future dates to reduce processing
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
+
     const validEntries = entries.filter((entry) => {
       const dateStr = extractEntryDate(entry);
       if (!dateStr) return false;
       const d = new Date(dateStr);
-      return !isNaN(d.getTime());
+      return !isNaN(d.getTime()) && d <= today;
     });
 
     if (validEntries.length === 0) return [];

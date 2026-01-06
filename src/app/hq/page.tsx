@@ -309,7 +309,7 @@ export default function HQPage() {
 
   return (
     <div className={`flex h-screen bg-background ${outfit.className}`}>
-      <HQSidebar />
+      <HQSidebar colorPalette={isConnected && gradientColors ? colorPalette : null} />
       <main className="flex-1 overflow-y-auto">
         <div
           className={`min-h-screen p-6 md:p-8 transition-all duration-1000 ease-in-out ${

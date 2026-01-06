@@ -23,6 +23,7 @@ interface CalendarItemProps {
 interface CalendarSidebarProps {
   currentDate?: Date;
   onDateSelect?: (date: Date) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 function CalendarItemComponent({ calendar, onToggle }: CalendarItemProps) {
@@ -80,7 +81,7 @@ function CalendarItemComponent({ calendar, onToggle }: CalendarItemProps) {
   );
 }
 
-export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarProps) {
+export function CalendarSidebar({ currentDate, onDateSelect, colorPalette }: CalendarSidebarProps) {
   const [calendars, setCalendars] = React.useState<CalendarItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isConnecting, setIsConnecting] = React.useState(false);
@@ -219,20 +220,32 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
     setIsRefreshingAll(true);
     try {
       // Refresh all calendars in parallel
-      const refreshPromises = calendars.map((calendar) =>
-        fetch(`/api/google-calendar/events/refresh?calendarId=${calendar.id}`, {
-          method: 'POST',
-        })
-      );
+      const refreshPromises = calendars.map(async (calendar) => {
+        try {
+          const response = await fetch(`/api/google-calendar/events/refresh?calendarId=${calendar.id}`, {
+            method: 'POST',
+          });
+          const data = await response.json();
+          return { calendar, response, data, success: response.ok };
+        } catch (error) {
+          return { calendar, error, success: false };
+        }
+      });
       
-      const responses = await Promise.all(refreshPromises);
-      const allSuccessful = responses.every((response) => response.ok);
+      const results = await Promise.all(refreshPromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
       
-      if (allSuccessful) {
-        // Trigger a refresh of the calendar view
-        window.dispatchEvent(new CustomEvent('calendar-refresh'));
+      if (failed.length > 0) {
+        const failedNames = failed.map(r => r.calendar.summary).join(', ');
+        console.warn(`Some calendars failed to refresh: ${failedNames}`);
+        // Still trigger refresh for successful ones
+        if (successful.length > 0) {
+          window.dispatchEvent(new CustomEvent('calendar-refresh'));
+        }
       } else {
-        console.error('Some calendars failed to refresh');
+        // All successful
+        window.dispatchEvent(new CustomEvent('calendar-refresh'));
       }
     } catch (error) {
       console.error('Error refreshing calendars:', error);
@@ -241,8 +254,21 @@ export function CalendarSidebar({ currentDate, onDateSelect }: CalendarSidebarPr
     }
   };
 
+  // Apply color palette to sidebar if available (very light opacity, no border)
+  const sidebarStyle = colorPalette
+    ? {
+        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.35)'),
+      }
+    : undefined;
+
   return (
-    <div className="w-64 border-r bg-background p-4 space-y-4 overflow-y-auto">
+    <div 
+      className={cn(
+        'w-64 p-4 space-y-4 overflow-y-auto transition-all duration-1000',
+        !colorPalette && 'bg-background'
+      )}
+      style={sidebarStyle}
+    >
       {/* Monthly Calendar Preview */}
       <MiniCalendar selectedDate={selectedDate} onDateSelect={handleDateSelect} />
 

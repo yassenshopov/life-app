@@ -22,6 +22,10 @@ model User {
 
   // Relationships
   dailyTracking             daily_tracking[]
+  trackingDaily             tracking_daily[]
+  trackingWeekly            tracking_weekly[]
+  trackingQuarterly         tracking_quarterly[]
+  trackingYearly            tracking_yearly[]
   stravaCredentials         strava_credentials?
   userPreferences           user_preferences?
   googleCalendarEvents      google_calendar_events[]
@@ -31,6 +35,7 @@ model User {
   financesAssets            finances_assets[]
   financesIndividualInvestments finances_individual_investments[]
   financesPlaces            finances_places[]
+  todos                     todos[]
 
   @@map("users")
 }
@@ -54,6 +59,98 @@ model daily_tracking {
   @@index([date], map: "idx_daily_tracking_date")
   @@index([user_id], map: "idx_daily_tracking_user_id")
   @@map("daily_tracking")
+}
+
+/// This table contains tracking entries for daily tracking from Notion
+model tracking_daily {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  period            String   @default("daily")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  title             String   @default("Untitled")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_tracking_daily_user_id")
+  @@index([notion_page_id], map: "idx_tracking_daily_notion_page_id")
+  @@index([notion_database_id], map: "idx_tracking_daily_notion_database_id")
+  @@map("tracking_daily")
+}
+
+/// This table contains tracking entries for weekly tracking from Notion
+model tracking_weekly {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  period            String   @default("weekly")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  title             String   @default("Untitled")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_tracking_weekly_user_id")
+  @@index([notion_page_id], map: "idx_tracking_weekly_notion_page_id")
+  @@index([notion_database_id], map: "idx_tracking_weekly_notion_database_id")
+  @@map("tracking_weekly")
+}
+
+/// This table contains tracking entries for quarterly tracking from Notion
+model tracking_quarterly {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  period            String   @default("quarterly")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  title             String   @default("Untitled")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_tracking_quarterly_user_id")
+  @@index([notion_page_id], map: "idx_tracking_quarterly_notion_page_id")
+  @@index([notion_database_id], map: "idx_tracking_quarterly_notion_database_id")
+  @@map("tracking_quarterly")
+}
+
+/// This table contains tracking entries for yearly tracking from Notion
+model tracking_yearly {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  period            String   @default("yearly")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  title             String   @default("Untitled")
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_tracking_yearly_user_id")
+  @@index([notion_page_id], map: "idx_tracking_yearly_notion_page_id")
+  @@index([notion_database_id], map: "idx_tracking_yearly_notion_database_id")
+  @@map("tracking_yearly")
 }
 
 model strava_credentials {
@@ -290,4 +387,40 @@ model finances_places {
   @@index([notion_database_id], map: "idx_finances_places_notion_database_id")
   @@index([place_type], map: "idx_finances_places_place_type")
   @@map("finances_places")
+}
+
+model todos {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String
+  notion_page_id    String
+  notion_database_id String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  last_synced_at    DateTime @default(now()) @db.Timestamptz(6)
+  title             String   @default("Untitled")
+  status            String?  // To-Do, In progress, Done
+  priority          String?  // Immediate, Quick, Scheduled, 1st Priority, etc.
+  do_date           DateTime? @db.Timestamptz(6)
+  due_date          DateTime? @db.Date
+  mega_tags         String[] @default([])
+  assignee          Json?    // People property
+  gcal_id           String?
+  duration_hours    Decimal? @db.Decimal(10, 2)
+  start_date        DateTime? @db.Timestamptz(6)
+  end_date          DateTime? @db.Timestamptz(6)
+  projects          Json?    // Relation property
+  properties        Json     @default("{}")
+
+  // Relationships
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, notion_page_id])
+  @@index([user_id], map: "idx_todos_user_id")
+  @@index([notion_page_id], map: "idx_todos_notion_page_id")
+  @@index([notion_database_id], map: "idx_todos_notion_database_id")
+  @@index([status], map: "idx_todos_status")
+  @@index([priority], map: "idx_todos_priority")
+  @@index([do_date], map: "idx_todos_do_date")
+  @@index([due_date], map: "idx_todos_due_date")
+  @@map("todos")
 }
