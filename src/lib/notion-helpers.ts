@@ -47,3 +47,4 @@ export function getPropertyValue(property: any, propertyType: string): any {
   }
 }
 
+
