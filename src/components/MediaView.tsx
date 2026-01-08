@@ -227,11 +227,17 @@ function MediaDetailModal({
     return null;
   })();
 
+  // Normalize colorPalette to ensure consistent dependency array size
+  // Always use null instead of undefined to maintain consistent array structure
+  const normalizedColorPalette = colorPalette ?? null;
+  // Extract primary color as a stable string reference for dependency tracking
+  const colorPalettePrimary = normalizedColorPalette?.primary ?? null;
+
   React.useEffect(() => {
     // Prioritize Spotify color palette if available
-    if (colorPalette?.primary) {
+    if (normalizedColorPalette?.primary) {
       // Convert RGB to hex for consistency
-      const rgbMatch = colorPalette.primary.match(/\d+/g);
+      const rgbMatch = normalizedColorPalette.primary.match(/\d+/g);
       if (rgbMatch && rgbMatch.length >= 3) {
         const r = parseInt(rgbMatch[0]);
         const g = parseInt(rgbMatch[1]);
@@ -262,7 +268,8 @@ function MediaDetailModal({
     } else {
       setBgColor('#8b5cf6');
     }
-  }, [thumbnailUrl, item, colorPalette]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thumbnailUrl, item?.id, colorPalettePrimary]);
 
   // Reset animation state when item changes
   React.useEffect(() => {
