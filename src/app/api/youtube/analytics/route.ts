@@ -458,6 +458,150 @@ export async function GET(request: Request) {
       .map(([channel, firstWatched]) => ({ channel, firstWatched }))
       .sort((a, b) => new Date(a.firstWatched).getTime() - new Date(b.firstWatched).getTime());
 
+    // Get enriched data insights
+    const enrichedInsights: any = {};
+    
+    // Get ALL unique video IDs from watch history (not just top videos)
+    const allUniqueVideoIds = Array.from(videoIdSet);
+    
+    if (allUniqueVideoIds.length > 0) {
+      // Fetch enriched data for all unique videos in chunks
+      const chunkSize = 1000;
+      const enrichedVideoData = new Map<string, any>();
+      
+      for (let i = 0; i < allUniqueVideoIds.length; i += chunkSize) {
+        const chunk = allUniqueVideoIds.slice(i, i + chunkSize);
+        const { data: enrichedVideos } = await supabase
+          .from('youtube_videos')
+          .select('video_id, view_count, like_count, comment_count, duration_seconds, category_id, tags, published_at')
+          .in('video_id', chunk);
+        
+        if (enrichedVideos) {
+          enrichedVideos.forEach((video) => {
+            enrichedVideoData.set(video.video_id, video);
+          });
+        }
+      }
+
+      // Calculate watch time (sum of duration * watch count)
+      let totalWatchTimeSeconds = 0;
+      let videosWithDuration = 0;
+      const categoryCounts = new Map<string, number>();
+      const tagCounts = new Map<string, number>();
+      const popularVideos: Array<{
+        video_id: string;
+        title: string;
+        channel_name: string | null;
+        thumbnail_url: string | null;
+        video_url: string;
+        view_count: number;
+        like_count: number | null;
+        comment_count: number | null;
+      }> = [];
+
+      // Process all unique videos to calculate insights
+      allUniqueVideoIds.forEach((videoId) => {
+        const enriched = enrichedVideoData.get(videoId);
+        const watchCount = videoCounts.get(videoId)?.count || 1;
+        const videoInfo = videoCounts.get(videoId);
+        
+        if (enriched?.duration_seconds) {
+          totalWatchTimeSeconds += enriched.duration_seconds * watchCount;
+          videosWithDuration++;
+        }
+
+        if (enriched?.category_id) {
+          categoryCounts.set(enriched.category_id, (categoryCounts.get(enriched.category_id) || 0) + watchCount);
+        }
+
+        if (enriched?.tags && Array.isArray(enriched.tags)) {
+          enriched.tags.forEach((tag: string) => {
+            tagCounts.set(tag, (tagCounts.get(tag) || 0) + watchCount);
+          });
+        }
+
+        // Collect popular videos (by view count)
+        if (enriched?.view_count && videoInfo) {
+          popularVideos.push({
+            video_id: videoId,
+            title: videoInfo.video.title,
+            channel_name: videoInfo.video.channel_name,
+            thumbnail_url: videoInfo.video.thumbnail_url,
+            video_url: videoInfo.video.video_url,
+            view_count: enriched.view_count,
+            like_count: enriched.like_count,
+            comment_count: enriched.comment_count,
+          });
+        }
+      });
+
+      // Format watch time helper
+      const formatWatchTime = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+          return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+      };
+
+      // Calculate average watch time
+      const averageWatchTimeSeconds = videosWithDuration > 0 
+        ? Math.round(totalWatchTimeSeconds / videosWithDuration) 
+        : 0;
+
+      // Top categories
+      const topCategories = Array.from(categoryCounts.entries())
+        .map(([category, count]) => ({ category, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+      // Top tags
+      const topTags = Array.from(tagCounts.entries())
+        .map(([tag, count]) => ({ tag, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+
+      // Most popular videos (by view count)
+      const mostPopularVideos = popularVideos
+        .sort((a, b) => b.view_count - a.view_count)
+        .slice(0, 10);
+
+      // Calculate engagement metrics
+      let totalLikes = 0;
+      let totalComments = 0;
+      let videosWithEngagement = 0;
+      
+      popularVideos.forEach((video) => {
+        if (video.like_count !== null) {
+          totalLikes += video.like_count;
+          videosWithEngagement++;
+        }
+        if (video.comment_count !== null) {
+          totalComments += video.comment_count;
+        }
+      });
+
+      enrichedInsights.watchTime = {
+        totalSeconds: totalWatchTimeSeconds,
+        totalFormatted: formatWatchTime(totalWatchTimeSeconds),
+        averageSeconds: averageWatchTimeSeconds,
+        averageFormatted: formatWatchTime(averageWatchTimeSeconds),
+        videosWithDuration,
+      };
+
+      enrichedInsights.mostPopularVideos = mostPopularVideos;
+      enrichedInsights.topCategories = topCategories;
+      enrichedInsights.topTags = topTags;
+      enrichedInsights.engagement = {
+        totalLikes,
+        totalComments,
+        averageLikes: videosWithEngagement > 0 ? Math.round(totalLikes / videosWithEngagement) : 0,
+        averageComments: videosWithEngagement > 0 ? Math.round(totalComments / videosWithEngagement) : 0,
+        videosWithEngagement,
+      };
+    }
+
     return NextResponse.json({
       totalVideos: totalVideos || 0,
       uniqueVideos,
@@ -480,6 +624,8 @@ export async function GET(request: Request) {
       channelDiscovery: channelDiscoveryArray.slice(0, 50), // Last 50 discovered channels
       bingeSessions: bingeSessions.slice(0, 10), // Top 10 binge sessions
       memoryLane: memoryLane.sort((a, b) => b.year - a.year), // Most recent years first
+      // Enriched data insights
+      enrichedInsights: Object.keys(enrichedInsights).length > 0 ? enrichedInsights : undefined,
     });
   } catch (error: any) {
     console.error('Error fetching YouTube analytics:', error);

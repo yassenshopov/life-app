@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { TrendingUp, Clock, Video, Users, Calendar, Zap, RefreshCw, ExternalLink, History, Sparkles, BarChart3 } from 'lucide-react';
+import { TrendingUp, Clock, Video, Users, Calendar, Zap, RefreshCw, ExternalLink, History, Sparkles, BarChart3, Heart, MessageSquare, Folder, Tag } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getDefaultBgColor, getDominantColor } from '@/lib/youtube-color';
 import {
@@ -22,6 +22,48 @@ import {
   Tooltip,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
+
+// YouTube Category ID to Name Mapping
+const YOUTUBE_CATEGORIES: Record<string, string> = {
+  '1': 'Film & Animation',
+  '2': 'Autos & Vehicles',
+  '10': 'Music',
+  '15': 'Pets & Animals',
+  '17': 'Sports',
+  '18': 'Short Movies',
+  '19': 'Travel & Events',
+  '20': 'Gaming',
+  '21': 'Videoblogging',
+  '22': 'People & Blogs',
+  '23': 'Comedy',
+  '24': 'Entertainment',
+  '25': 'News & Politics',
+  '26': 'Howto & Style',
+  '27': 'Education',
+  '28': 'Science & Technology',
+  '29': 'Nonprofits & Activism',
+  '30': 'Movies',
+  '31': 'Anime/Animation',
+  '32': 'Action/Adventure',
+  '33': 'Classics',
+  '34': 'Comedy',
+  '35': 'Documentary',
+  '36': 'Drama',
+  '37': 'Family',
+  '38': 'Foreign',
+  '39': 'Horror',
+  '40': 'Sci-Fi/Fantasy',
+  '41': 'Thriller',
+  '42': 'Shorts',
+  '43': 'Shows',
+  '44': 'Trailers',
+};
+
+// Helper function to get category name from ID
+function getCategoryName(categoryId: string | null | undefined): string {
+  if (!categoryId) return 'Unknown';
+  return YOUTUBE_CATEGORIES[categoryId] || `Category ${categoryId}`;
+}
 
 // Top Video Card Component
 function TopVideoCard({ video, index }: {
@@ -194,9 +236,41 @@ interface AnalyticsData {
   channelDiscovery?: Array<{ channel: string; firstWatched: string }>;
   bingeSessions?: Array<{ date: string; count: number; videos: string[] }>;
   memoryLane?: Array<{ year: number; videos: Array<{ title: string; channel: string; url: string; date: string }> }>;
+  enrichedInsights?: {
+    watchTime?: {
+      totalSeconds: number;
+      totalFormatted: string;
+      averageSeconds: number;
+      averageFormatted: string;
+      videosWithDuration: number;
+    };
+    mostPopularVideos?: Array<{
+      video_id: string;
+      title: string;
+      channel_name: string | null;
+      thumbnail_url: string | null;
+      video_url: string;
+      view_count: number;
+      like_count: number | null;
+      comment_count: number | null;
+    }>;
+    topCategories?: Array<{ category: string; count: number }>;
+    topTags?: Array<{ tag: string; count: number }>;
+    engagement?: {
+      totalLikes: number;
+      totalComments: number;
+      averageLikes: number;
+      averageComments: number;
+      videosWithEngagement: number;
+    };
+  };
 }
 
-export function YouTubeAnalytics() {
+interface YouTubeAnalyticsProps {
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
+}
+
+export function YouTubeAnalytics({ colorPalette }: YouTubeAnalyticsProps) {
   const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [timeRange, setTimeRange] = React.useState<number | 'all'>(30);
@@ -244,6 +318,15 @@ export function YouTubeAnalytics() {
   const maxDay = Math.max(...analytics.watchingByDay, 1);
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // Helper function to get card style based on color palette
+  const getCardStyle = (): React.CSSProperties | undefined => {
+    if (!colorPalette) return undefined;
+    return {
+      backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
+      borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+    };
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Time Range Selector */}
@@ -269,7 +352,7 @@ export function YouTubeAnalytics() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Videos</CardTitle>
             <Video className="h-4 w-4 text-muted-foreground" />
@@ -282,7 +365,7 @@ export function YouTubeAnalytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Channels Watched</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -293,7 +376,7 @@ export function YouTubeAnalytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground" />
@@ -304,7 +387,7 @@ export function YouTubeAnalytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg per Day</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -324,9 +407,186 @@ export function YouTubeAnalytics() {
         </Card>
       </div>
 
+      {/* Enriched Data Insights */}
+      {analytics.enrichedInsights && (
+        <>
+          {/* Watch Time & Engagement Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {analytics.enrichedInsights.watchTime && (
+              <Card style={getCardStyle()}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Watch Time</CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{analytics.enrichedInsights.watchTime.totalFormatted}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {analytics.enrichedInsights.watchTime.videosWithDuration} videos with duration
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {analytics.enrichedInsights.watchTime && (
+              <Card style={getCardStyle()}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Video Length</CardTitle>
+                  <Video className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{analytics.enrichedInsights.watchTime.averageFormatted}</div>
+                  <p className="text-xs text-muted-foreground">per video</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {analytics.enrichedInsights.engagement && (
+              <Card style={getCardStyle()}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Likes</CardTitle>
+                  <Heart className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics.enrichedInsights.engagement.totalLikes.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Avg: {analytics.enrichedInsights.engagement.averageLikes.toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {analytics.enrichedInsights.engagement && (
+              <Card style={getCardStyle()}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Comments</CardTitle>
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics.enrichedInsights.engagement.totalComments.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Avg: {analytics.enrichedInsights.engagement.averageComments.toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Most Popular Videos (by view count) */}
+          {analytics.enrichedInsights.mostPopularVideos && analytics.enrichedInsights.mostPopularVideos.length > 0 && (
+            <Card style={getCardStyle()}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Most Popular Videos (by View Count)
+                </CardTitle>
+                <CardDescription>Videos you watched that have the most views on YouTube</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {analytics.enrichedInsights.mostPopularVideos.slice(0, 10).map((video, index) => (
+                    <div
+                      key={video.video_id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="text-muted-foreground text-sm font-bold w-6">#{index + 1}</span>
+                      {video.thumbnail_url && (
+                        <img
+                          src={video.thumbnail_url}
+                          alt={video.title}
+                          className="w-20 h-12 object-cover rounded"
+                          style={{ aspectRatio: '16/9' }}
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={video.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium hover:underline line-clamp-1"
+                        >
+                          {video.title}
+                        </a>
+                        <div className="text-sm text-muted-foreground line-clamp-1">
+                          {video.channel_name}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span>{video.view_count.toLocaleString()} views</span>
+                          {video.like_count !== null && (
+                            <span>{video.like_count.toLocaleString()} likes</span>
+                          )}
+                          {video.comment_count !== null && (
+                            <span>{video.comment_count.toLocaleString()} comments</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Categories */}
+          {analytics.enrichedInsights.topCategories && analytics.enrichedInsights.topCategories.length > 0 && (
+            <Card style={getCardStyle()}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Folder className="w-5 h-5" />
+                  Top Categories
+                </CardTitle>
+                <CardDescription>Video categories you watch most</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {analytics.enrichedInsights.topCategories.map((item, index) => (
+                    <div key={item.category} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm font-bold w-6">#{index + 1}</span>
+                        <span className="text-sm">{getCategoryName(item.category)}</span>
+                      </div>
+                      <span className="text-sm font-semibold">{item.count} videos</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Tags */}
+          {analytics.enrichedInsights.topTags && analytics.enrichedInsights.topTags.length > 0 && (
+            <Card style={getCardStyle()}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tag className="w-5 h-5" />
+                  Most Common Tags
+                </CardTitle>
+                <CardDescription>Tags from videos you watch most frequently</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {analytics.enrichedInsights.topTags.map((item) => (
+                    <div
+                      key={item.tag}
+                      className="px-3 py-1.5 rounded-full bg-muted text-sm flex items-center gap-2"
+                    >
+                      <span>{item.tag}</span>
+                      <span className="text-muted-foreground text-xs">({item.count})</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
       {/* Watching Patterns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle>Watching by Hour</CardTitle>
             <CardDescription>Your most active watching times</CardDescription>
@@ -355,7 +615,7 @@ export function YouTubeAnalytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle>Watching by Day</CardTitle>
             <CardDescription>Your weekly watching patterns</CardDescription>
@@ -387,7 +647,7 @@ export function YouTubeAnalytics() {
 
       {/* Top Videos and Channels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle>Top Videos</CardTitle>
             <CardDescription>
@@ -411,7 +671,7 @@ export function YouTubeAnalytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle>Top Channels</CardTitle>
             <CardDescription>
@@ -439,7 +699,7 @@ export function YouTubeAnalytics() {
       {/* Monthly & Yearly Trends */}
       {analytics.monthlyTrends && analytics.monthlyTrends.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          <Card style={getCardStyle()}>
             <CardHeader>
               <CardTitle>Monthly Trends</CardTitle>
               <CardDescription>Watch volume over time</CardDescription>
@@ -494,7 +754,7 @@ export function YouTubeAnalytics() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card style={getCardStyle()}>
             <CardHeader>
               <CardTitle>Yearly Trends</CardTitle>
               <CardDescription>Watch volume by year</CardDescription>
@@ -530,7 +790,7 @@ export function YouTubeAnalytics() {
 
       {/* Top Channels by Year */}
       {analytics.topChannelsByYear && Object.keys(analytics.topChannelsByYear).length > 0 && (
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5" />
@@ -581,7 +841,7 @@ export function YouTubeAnalytics() {
 
       {/* Channel Discovery Timeline */}
       {analytics.channelDiscovery && analytics.channelDiscovery.length > 0 && (
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5" />
@@ -616,7 +876,7 @@ export function YouTubeAnalytics() {
 
       {/* Binge Sessions */}
       {analytics.bingeSessions && analytics.bingeSessions.length > 0 && (
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5" />
@@ -656,7 +916,7 @@ export function YouTubeAnalytics() {
 
       {/* Memory Lane */}
       {analytics.memoryLane && analytics.memoryLane.length > 0 && (
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="w-5 h-5" />
@@ -698,7 +958,7 @@ export function YouTubeAnalytics() {
 
       {/* Date Range Info */}
       {analytics.dateRange && (
-        <Card>
+        <Card style={getCardStyle()}>
           <CardHeader>
             <CardTitle>History Range</CardTitle>
             <CardDescription>Your watch history spans this period</CardDescription>
