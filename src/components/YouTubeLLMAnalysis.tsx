@@ -189,7 +189,7 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
   const parseInsights = (text: string): Insight[] => {
     const insights: Insight[] = [];
     // Split by numbered list items (e.g., "1. **Title**: Description")
-    const insightPattern = /(\d+)\.\s+\*\*(.+?)\*\*:\s*(.+?)(?=\d+\.\s+\*\*|$)/gs;
+    const insightPattern = /(\d+)\.\s+\*\*([\s\S]+?)\*\*:\s*([\s\S]+?)(?=\d+\.\s+\*\*|$)/g;
     let match;
     
     while ((match = insightPattern.exec(text)) !== null) {

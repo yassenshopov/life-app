@@ -114,9 +114,14 @@ export interface MediaModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate?: (updatedItem: any) => void;
+  colorPalette?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  } | null;
 }
 
-export function MediaModal({ item, isOpen, onClose, onUpdate }: MediaModalProps) {
+export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: MediaModalProps) {
   const [bgColor, setBgColor] = React.useState('#8b5cf6');
   const [isFillingDescription, setIsFillingDescription] = React.useState(false);
   const [shouldAnimateDescription, setShouldAnimateDescription] = React.useState(false);
@@ -143,6 +148,24 @@ export function MediaModal({ item, isOpen, onClose, onUpdate }: MediaModalProps)
   })();
 
   React.useEffect(() => {
+    // Prioritize Spotify color palette if available
+    if (colorPalette?.primary) {
+      // Convert RGB to hex for consistency
+      const rgbMatch = colorPalette.primary.match(/\d+/g);
+      if (rgbMatch && rgbMatch.length >= 3) {
+        const r = parseInt(rgbMatch[0]);
+        const g = parseInt(rgbMatch[1]);
+        const b = parseInt(rgbMatch[2]);
+        const toHex = (n: number) => {
+          const hex = n.toString(16);
+          return hex.length === 1 ? '0' + hex : hex;
+        };
+        setBgColor(`#${toHex(r)}${toHex(g)}${toHex(b)}`);
+        return;
+      }
+    }
+    
+    // Fallback to thumbnail color extraction
     if (thumbnailUrl && localItem) {
       setBgColor('#8b5cf6');
       getDominantColor(thumbnailUrl)
@@ -151,7 +174,7 @@ export function MediaModal({ item, isOpen, onClose, onUpdate }: MediaModalProps)
     } else {
       setBgColor('#8b5cf6');
     }
-  }, [thumbnailUrl, localItem]);
+  }, [thumbnailUrl, localItem, colorPalette]);
 
   React.useEffect(() => {
     setShouldAnimateDescription(false);

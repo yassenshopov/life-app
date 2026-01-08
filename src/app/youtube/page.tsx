@@ -11,7 +11,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { YouTubeAnalytics } from '@/components/YouTubeAnalytics';
 import { YouTubeLLMAnalysis } from '@/components/YouTubeLLMAnalysis';
 import { YouTubeWatchHistoryCalendar } from '@/components/YouTubeWatchHistoryCalendar';
-import { getColorPalette, getDefaultBgColor } from '@/lib/youtube-color';
+import { getColorPalette as getYouTubeColorPalette, getDefaultBgColor as getYouTubeDefaultBgColor } from '@/lib/youtube-color';
+import { getColorPalette as getSpotifyColorPalette, getDefaultBgColor as getSpotifyDefaultBgColor } from '@/lib/spotify-color';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const outfit = Outfit({ subsets: ['latin'] });
+
+interface CurrentlyPlaying {
+  isPlaying: boolean;
+  item?: {
+    name: string;
+    artists: Array<{ name: string }>;
+    album: {
+      name: string;
+      images: Array<{ url: string }>;
+    };
+    external_urls: { spotify: string };
+  };
+  progress_ms?: number;
+  is_playing?: boolean;
+}
 
 export default function YouTubePage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
@@ -69,44 +85,182 @@ export default function YouTubePage() {
     secondary: string;
     accent: string;
   }>(() => {
-    const defaultColor = getDefaultBgColor();
+    const defaultColor = getSpotifyDefaultBgColor();
     return {
       primary: defaultColor,
       secondary: defaultColor,
       accent: defaultColor,
     };
   });
+  const [isSpotifyConnected, setIsSpotifyConnected] = React.useState(false);
   const currentVideoIdRef = React.useRef<string | null>(null);
+  const currentTrackIdRef = React.useRef<string | null>(null);
+  const lastTrackRef = React.useRef<CurrentlyPlaying['item'] | null>(null);
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isWatchHistoryCalendarOpen, setIsWatchHistoryCalendarOpen] = React.useState(false);
 
-  // Update background color based on recently watched video
-  const updateBackgroundColor = React.useCallback((video: { thumbnail_url: string | null; video_id: string } | null) => {
-    if (!video?.thumbnail_url) {
-      const defaultColor = getDefaultBgColor();
+  // Update background color based on Spotify track (priority)
+  const updateSpotifyBackgroundColor = React.useCallback((track: CurrentlyPlaying['item'] | null) => {
+    if (!track?.album?.images || track.album.images.length === 0) {
+      if (!lastTrackRef.current) {
+        // Only reset if no last track and no YouTube video
+        if (!currentVideoIdRef.current) {
+          const defaultColor = getSpotifyDefaultBgColor();
+          setColorPalette({
+            primary: defaultColor,
+            secondary: defaultColor,
+            accent: defaultColor,
+          });
+        }
+      }
+      return;
+    }
+
+    // Use the largest available image for better color extraction
+    const imageUrl =
+      track.album.images[0]?.url || track.album.images[1]?.url || track.album.images[2]?.url;
+    if (imageUrl) {
+      getSpotifyColorPalette(imageUrl)
+        .then((palette) => {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Spotify color palette extracted:', palette);
+          }
+          setColorPalette(palette);
+        })
+        .catch((error) => {
+          console.error('Error extracting Spotify color palette:', error);
+          // Fall back to YouTube colors if available
+          if (!currentVideoIdRef.current) {
+            const defaultColor = getSpotifyDefaultBgColor();
+            setColorPalette({
+              primary: defaultColor,
+              secondary: defaultColor,
+              accent: defaultColor,
+            });
+          }
+        });
+    } else {
+      const defaultColor = getSpotifyDefaultBgColor();
       setColorPalette({
         primary: defaultColor,
         secondary: defaultColor,
         accent: defaultColor,
       });
-      return;
     }
+  }, []);
 
-    getColorPalette(video.thumbnail_url)
-      .then((palette) => {
-        setColorPalette(palette);
-      })
-      .catch((error) => {
-        console.error('Error extracting color palette:', error);
-        const defaultColor = getDefaultBgColor();
+  // Update background color based on recently watched video (fallback)
+  const updateYouTubeBackgroundColor = React.useCallback((video: { thumbnail_url: string | null; video_id: string } | null) => {
+    // Only update with YouTube colors if Spotify is not connected or not playing
+    if (!isSpotifyConnected || !lastTrackRef.current) {
+      if (!video?.thumbnail_url) {
+        const defaultColor = getSpotifyDefaultBgColor();
         setColorPalette({
           primary: defaultColor,
           secondary: defaultColor,
           accent: defaultColor,
         });
-      });
-  }, []);
+        return;
+      }
+
+      getYouTubeColorPalette(video.thumbnail_url)
+        .then((palette) => {
+          setColorPalette(palette);
+        })
+        .catch((error) => {
+          console.error('Error extracting YouTube color palette:', error);
+          const defaultColor = getSpotifyDefaultBgColor();
+          setColorPalette({
+            primary: defaultColor,
+            secondary: defaultColor,
+            accent: defaultColor,
+          });
+        });
+    }
+  }, [isSpotifyConnected]);
+
+  // Check Spotify connection and fetch currently playing
+  React.useEffect(() => {
+    const checkSpotifyConnection = async () => {
+      try {
+        const response = await fetch('/api/spotify/profile');
+        const connected = response.ok;
+        setIsSpotifyConnected(connected);
+        if (connected) {
+          // Fetch immediately to get current track
+          const playingResponse = await fetch('/api/spotify/currently-playing');
+          if (playingResponse.ok) {
+            const data: CurrentlyPlaying = await playingResponse.json();
+            if (data.item) {
+              lastTrackRef.current = data.item;
+              const trackId = data.item.album?.images?.[0]?.url || data.item.name || null;
+              currentTrackIdRef.current = trackId;
+              updateSpotifyBackgroundColor(data.item);
+            }
+          }
+        }
+      } catch (error) {
+        setIsSpotifyConnected(false);
+      }
+    };
+
+    checkSpotifyConnection();
+  }, [updateSpotifyBackgroundColor]);
+
+  const fetchCurrentlyPlaying = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/spotify/currently-playing');
+      if (response.ok) {
+        const data: CurrentlyPlaying = await response.json();
+        
+        // Only update color if track changed
+        const trackId = data.item?.album?.images?.[0]?.url || null;
+        if (trackId !== currentTrackIdRef.current) {
+          currentTrackIdRef.current = trackId;
+          
+          // Store last track info if we have a track
+          if (data.item) {
+            lastTrackRef.current = data.item;
+            updateSpotifyBackgroundColor(data.item);
+          } else if (!data.isPlaying && !data.is_playing) {
+            // If paused and no current track, use last track or fall back to YouTube
+            if (lastTrackRef.current) {
+              updateSpotifyBackgroundColor(lastTrackRef.current);
+            } else {
+              // Fall back to YouTube colors if available
+              if (currentVideoIdRef.current) {
+                // Will be handled by checkHistory
+              } else {
+                const defaultColor = getSpotifyDefaultBgColor();
+                setColorPalette({
+                  primary: defaultColor,
+                  secondary: defaultColor,
+                  accent: defaultColor,
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Silently handle errors
+    }
+  }, [updateSpotifyBackgroundColor]);
+
+  // Poll for currently playing track
+  React.useEffect(() => {
+    if (!isSpotifyConnected) return;
+
+    const pollInterval = setInterval(() => {
+      fetchCurrentlyPlaying();
+    }, 5000); // Poll every 5 seconds
+
+    // Initial fetch
+    fetchCurrentlyPlaying();
+
+    return () => clearInterval(pollInterval);
+  }, [isSpotifyConnected, fetchCurrentlyPlaying]);
 
   const checkHistory = React.useCallback(async () => {
     try {
@@ -118,14 +272,14 @@ export default function YouTubePage() {
           // Only update color if video changed
           if (data.video.video_id !== currentVideoIdRef.current) {
             currentVideoIdRef.current = data.video.video_id;
-            updateBackgroundColor(data.video);
+            updateYouTubeBackgroundColor(data.video);
           }
         }
       }
     } catch {
       setHasHistory(false);
     }
-  }, [updateBackgroundColor]);
+  }, [updateYouTubeBackgroundColor]);
 
   const fetchEnrichmentStats = React.useCallback(async () => {
     try {
@@ -304,7 +458,7 @@ export default function YouTubePage() {
     };
   }, [colorPalette]);
 
-  const effectiveColorPalette = hasHistory && gradientColors ? colorPalette : null;
+  const effectiveColorPalette = (isSpotifyConnected || hasHistory) && gradientColors ? colorPalette : null;
 
   return (
     <div className={`flex h-screen bg-background ${outfit.className}`}>
@@ -312,12 +466,12 @@ export default function YouTubePage() {
       <main className="flex-1 overflow-y-auto">
         <div
           className={`min-h-screen p-6 md:p-8 transition-all duration-1000 ease-in-out ${
-            !hasHistory || !gradientColors
+            (!isSpotifyConnected && !hasHistory) || !gradientColors
               ? 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950'
               : ''
           }`}
           style={{
-            background: hasHistory && gradientColors
+            background: (isSpotifyConnected || hasHistory) && gradientColors
               ? `linear-gradient(135deg, ${gradientColors.primary}, ${gradientColors.secondary}, ${gradientColors.accent})`
               : undefined,
           }}

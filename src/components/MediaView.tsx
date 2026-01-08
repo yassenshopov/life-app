@@ -192,7 +192,8 @@ function MediaDetailModal({
   mediaList,
   currentIndex,
   onNavigate,
-  onUpdate
+  onUpdate,
+  colorPalette
 }: { 
   item: MediaItem | null; 
   isOpen: boolean; 
@@ -201,6 +202,11 @@ function MediaDetailModal({
   currentIndex: number;
   onNavigate: (index: number) => void;
   onUpdate: (updatedItem: MediaItem) => void;
+  colorPalette?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  } | null;
 }) {
   const [bgColor, setBgColor] = React.useState('#8b5cf6');
   const [isFillingDescription, setIsFillingDescription] = React.useState(false);
@@ -222,6 +228,24 @@ function MediaDetailModal({
   })();
 
   React.useEffect(() => {
+    // Prioritize Spotify color palette if available
+    if (colorPalette?.primary) {
+      // Convert RGB to hex for consistency
+      const rgbMatch = colorPalette.primary.match(/\d+/g);
+      if (rgbMatch && rgbMatch.length >= 3) {
+        const r = parseInt(rgbMatch[0]);
+        const g = parseInt(rgbMatch[1]);
+        const b = parseInt(rgbMatch[2]);
+        const toHex = (n: number) => {
+          const hex = n.toString(16);
+          return hex.length === 1 ? '0' + hex : hex;
+        };
+        setBgColor(`#${toHex(r)}${toHex(g)}${toHex(b)}`);
+        return;
+      }
+    }
+    
+    // Fallback to thumbnail color extraction
     if (thumbnailUrl && item) {
       console.log('Extracting color from:', thumbnailUrl);
       // Reset to default while extracting
@@ -238,7 +262,7 @@ function MediaDetailModal({
     } else {
       setBgColor('#8b5cf6');
     }
-  }, [thumbnailUrl, item]);
+  }, [thumbnailUrl, item, colorPalette]);
 
   // Reset animation state when item changes
   React.useEffect(() => {
@@ -793,7 +817,15 @@ function setCookie(name: string, value: string, days: number = 365) {
   document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
 }
 
-export function MediaView() {
+interface MediaViewProps {
+  colorPalette?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  } | null;
+}
+
+export function MediaView({ colorPalette }: MediaViewProps = {}) {
   const [media, setMedia] = React.useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -1193,7 +1225,7 @@ export function MediaView() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 flex items-center justify-center"
+        className="min-h-screen flex items-center justify-center"
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
@@ -1218,7 +1250,7 @@ export function MediaView() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-slate-950 ${outfit.className}`}
+      className={`min-h-screen ${outfit.className}`}
     >
       <div className="p-6 md:p-8">
         <motion.div
@@ -1421,6 +1453,7 @@ export function MediaView() {
           );
           setSelectedMedia(updatedItem);
         }}
+        colorPalette={colorPalette}
       />
 
       {/* New Media Dialog */}
