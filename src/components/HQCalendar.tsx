@@ -1347,11 +1347,15 @@ export function HQCalendar({
               style={
                 colorPalette
                   ? {
-                      borderColor: colorPalette.accent,
+                      borderRightColor: colorPalette.accent,
+                      borderBottomColor: colorPalette.accent,
+                      borderLeftColor: colorPalette.accent,
                       borderTopColor: 'transparent',
                     }
                   : {
-                      borderColor: 'hsl(var(--primary))',
+                      borderRightColor: 'hsl(var(--primary))',
+                      borderBottomColor: 'hsl(var(--primary))',
+                      borderLeftColor: 'hsl(var(--primary))',
                       borderTopColor: 'transparent',
                     }
               }
