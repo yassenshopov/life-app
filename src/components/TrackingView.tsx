@@ -266,7 +266,11 @@ function setCookie(name: string, value: string, days: number = 365) {
   document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
 }
 
-export function TrackingView() {
+interface TrackingViewProps {
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
+}
+
+export function TrackingView({ colorPalette }: TrackingViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentYear, setCurrentYear] = useState(new Date());
@@ -435,8 +439,15 @@ export function TrackingView() {
     );
   }
 
+  // Apply color palette to main container if available
+  const containerStyle = colorPalette
+    ? {
+        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.05)'),
+      }
+    : undefined;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={containerStyle || { backgroundColor: 'var(--background)' }}>
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6">
         {/* Actions Bar */}
@@ -461,6 +472,7 @@ export function TrackingView() {
           <HealthMetricsTrends
             entries={entries}
             viewMode={viewMode as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'}
+            colorPalette={colorPalette}
           />
         )}
 
@@ -488,6 +500,7 @@ export function TrackingView() {
               currentMonth={currentMonth}
               onNavigate={handleNavigateMonth}
               onEntryClick={handleEntryClick}
+              colorPalette={colorPalette}
             />
           </TabsContent>
 
@@ -496,6 +509,7 @@ export function TrackingView() {
               entries={entries}
               currentWeek={currentWeek}
               onNavigate={handleNavigateWeek}
+              colorPalette={colorPalette}
             />
           </TabsContent>
 
@@ -504,6 +518,7 @@ export function TrackingView() {
               entries={entries}
               currentYear={currentYear}
               onNavigate={handleNavigateYear}
+              colorPalette={colorPalette}
             />
           </TabsContent>
 
@@ -512,6 +527,7 @@ export function TrackingView() {
               entries={entries}
               currentYear={currentYear}
               onNavigate={handleNavigateYear}
+              colorPalette={colorPalette}
             />
           </TabsContent>
 
@@ -520,6 +536,7 @@ export function TrackingView() {
               entries={entries}
               currentYear={currentYear}
               onNavigate={handleNavigateYear}
+              colorPalette={colorPalette}
             />
           </TabsContent>
 

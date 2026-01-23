@@ -62,6 +62,9 @@ interface DailyTrackingEntry {
   possibleCauses?: string;
   notDrinkAlcohol?: boolean;
   coffeeIntakeNumber?: number;
+  bfPercent?: number;
+  boneMineralPercent?: number;
+  musclePercent?: number;
 }
 
 interface SummaryStats {

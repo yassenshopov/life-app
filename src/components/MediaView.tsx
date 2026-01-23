@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Film, Book, BookOpen, ChevronDown, ChevronRight, ExternalLink, Plus, MoreVertical, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Sparkles } from 'lucide-react';
+import { RefreshCw, Film, Book, BookOpen, ChevronRight, ExternalLink, Plus, MoreVertical, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Sparkles, Calendar } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
@@ -22,20 +22,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { FilterMenu } from '@/components/FilterMenu';
-import { PropertyVisibilityMenu } from '@/components/PropertyVisibilityMenu';
 import { FilterState, Filter } from '@/types/filters';
 import { Outfit } from 'next/font/google';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { MediaCreationPreview } from '@/components/MediaCreationPreview';
 import { MediaRecommendations } from '@/components/MediaRecommendations';
 
@@ -43,6 +36,7 @@ const outfit = Outfit({ subsets: ['latin'] });
 
 interface MediaItem {
   id: string;
+  notion_page_id: string;
   name: string;
   category: string | null;
   status: string | null;
@@ -54,6 +48,7 @@ interface MediaItem {
   ai_synopsis: string | null;
   created: string | null;
   monthly_tracking_id: string | null;
+  related_notion_page_ids?: string[] | null;
   monthly_tracking?: {
     id: string;
     title: string;
@@ -145,6 +140,14 @@ function getDominantColor(imageUrl: string): Promise<string> {
     
     img.src = imageUrl;
   });
+}
+
+function getProductionYearFromTitle(title: string | null): number | null {
+  if (!title) return null;
+  const match = title.match(/\((\d{4})\)/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  return Number.isFinite(year) ? year : null;
 }
 
 // Typed text animation component
@@ -577,7 +580,7 @@ function MediaDetailModal({
 function MediaCard({ 
   item, 
   onClick, 
-  onDelete 
+  onDelete
 }: { 
   item: MediaItem; 
   onClick: () => void;
@@ -611,6 +614,7 @@ function MediaCard({
   };
 
   const [imageError, setImageError] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
 
   return (
     <motion.div
@@ -618,192 +622,189 @@ function MediaCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      whileHover={{ y: -4 }}
-      className="h-full"
+      className="relative aspect-[2/3] w-full cursor-pointer group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={onClick}
     >
-      <Card 
-        className="p-0 cursor-pointer hover:shadow-lg transition-all group overflow-hidden h-full"
-        onClick={onClick}
-      >
-      {/* Thumbnail */}
-      <div className="aspect-video w-full overflow-hidden relative">
-        {/* Three dots menu - top right, visible on hover */}
-        <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                className="text-red-600 dark:text-red-400"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        
-        {/* Blurred background layer */}
-        {thumbnailUrl && !imageError && (
-          <div
-            className="absolute inset-0 blur-xl opacity-50 scale-110"
-            style={{
-              backgroundImage: `url(${thumbnailUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-        )}
-        {/* Fallback gradient if no image or error */}
-        {(!thumbnailUrl || imageError) && (
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500" />
-        )}
-        {/* Actual image on top */}
+      {/* Thumbnail Image */}
+      <div className="relative w-full h-full rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500">
         {thumbnailUrl && !imageError ? (
           <img
             src={thumbnailUrl}
             alt={item.name}
-            className="relative z-10 w-full h-full object-contain px-2 group-hover:scale-105 transition-transform duration-200"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={() => {
               console.warn('Failed to load image:', thumbnailUrl);
               setImageError(true);
             }}
           />
         ) : (
-          <div className="relative z-10 w-full h-full flex items-center justify-center">
-            <BookOpen className="w-12 h-12 text-white/80" />
-          </div>
-        )}
-      </div>
-
-      <div className="p-4 space-y-3">
-        {/* Status Badge */}
-        {item.status && (
-          <div className="flex justify-start">
-            <Badge
-              variant="secondary"
-              className={`text-xs px-2 py-1 ${getStatusColor(item.status)}`}
-            >
-              {item.status}
-            </Badge>
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="w-16 h-16 text-white/80" />
           </div>
         )}
 
-        {/* Title */}
-        <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-          {item.name}
-        </h3>
-
-        {/* Category */}
-        {item.category && (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              {item.category}
-            </Badge>
+        {/* Hover Overlay with Info */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-4 flex flex-col justify-end"
+        >
+          {/* Three dots menu - top right */}
+          <div className="absolute top-2 right-2 z-20">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="text-red-600 dark:text-red-400"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        )}
 
-        {/* By (Authors/Creators) */}
-        {item.by && item.by.length > 0 && (
-          <div className="text-xs text-muted-foreground">
-            <span className="font-medium">By:</span> {item.by.join(', ')}
-          </div>
-        )}
+          {/* Info Content */}
+          <div className="space-y-2">
+            {/* Title */}
+            <h3 className="font-semibold text-white text-base leading-tight line-clamp-2">
+              {item.name}
+            </h3>
 
-        {/* Created Date */}
-        {item.created && (
-          <div className="text-xs text-muted-foreground">
-            {format(new Date(item.created), 'MMM d, yyyy')}
-          </div>
-        )}
-
-        {/* Monthly Tracking */}
-        {item.monthly_tracking && (
-          <div className="text-xs text-muted-foreground">
-            <span className="font-medium">Month:</span>{' '}
-            {item.monthly_tracking.title || 'Unknown'}
-          </div>
-        )}
-
-        {/* Topics */}
-        {item.topic && item.topic.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {item.topic.slice(0, 3).map((topic, idx) => (
-              <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0.5">
-                {topic}
-              </Badge>
-            ))}
-            {item.topic.length > 3 && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                +{item.topic.length - 3}
-              </Badge>
+            {/* Author/Creator */}
+            {item.by && item.by.length > 0 && (
+              <p className="text-white/90 text-sm">
+                {item.by.join(', ')}
+              </p>
             )}
-          </div>
-        )}
 
-        {/* URL Link */}
-        {item.url && (() => {
-          const url = item.url.toLowerCase();
-          const isIMDB = url.includes('imdb.com');
-          const isGoodreads = url.includes('goodreads.com');
-          
-          return (
-            <div className="pt-2">
-              <Link
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className={`text-xs font-medium hover:underline inline-flex items-center gap-1 ${
-                  isIMDB 
-                    ? 'text-[#F5C518]' 
-                    : isGoodreads 
-                    ? 'text-[#382110] dark:text-[#6B8E5A]' 
-                    : 'text-purple-600 dark:text-purple-400'
-                }`}
-              >
-                {isIMDB ? (
-                  <>
-                    <img 
-                      src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/IMDb_Logo_Square.svg/2048px-IMDb_Logo_Square.svg.png" 
-                      alt="IMDb" 
-                      className="h-3 w-3 object-contain"
-                    />
-                    <span>IMDb</span>
-                  </>
-                ) : isGoodreads ? (
-                  <>
-                    <img 
-                      src="https://static.vecteezy.com/system/resources/previews/055/030/405/non_2x/goodreads-circle-icon-logo-symbol-free-png.png" 
-                      alt="Goodreads" 
-                      className="h-3 w-3 object-contain"
-                    />
-                    <span>Goodreads</span>
-                  </>
-                ) : (
-                  <>
-                    <ExternalLink className="h-3 w-3" />
-                    <span>View</span>
-                  </>
+            {/* Status Badge */}
+            {item.status && (
+              <div className="flex justify-start">
+                <Badge
+                  variant="secondary"
+                  className={`text-xs px-2 py-1 ${getStatusColor(item.status)}`}
+                >
+                  {item.status}
+                </Badge>
+              </div>
+            )}
+
+            {/* Category */}
+            {item.category && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs bg-white/20 text-white border-white/30">
+                  {item.category}
+                </Badge>
+              </div>
+            )}
+
+            {/* Created Date */}
+            {item.created && (
+              <p className="text-white/70 text-xs">
+                {format(new Date(item.created), 'MMM d, yyyy')}
+              </p>
+            )}
+
+            {/* Monthly Tracking */}
+            {item.monthly_tracking && (
+              <p className="text-white/70 text-xs">
+                <span className="font-medium">Month:</span>{' '}
+                {item.monthly_tracking.title || 'Unknown'}
+              </p>
+            )}
+
+            {/* Topics */}
+            {item.topic && item.topic.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {item.topic.slice(0, 3).map((topic, idx) => (
+                  <Badge 
+                    key={idx} 
+                    variant="secondary" 
+                    className="text-xs px-1.5 py-0.5 bg-white/20 text-white border-white/30"
+                  >
+                    {topic}
+                  </Badge>
+                ))}
+                {item.topic.length > 3 && (
+                  <Badge 
+                    variant="secondary" 
+                    className="text-xs px-1.5 py-0.5 bg-white/20 text-white border-white/30"
+                  >
+                    +{item.topic.length - 3}
+                  </Badge>
                 )}
-              </Link>
-            </div>
-          );
-        })()}
+              </div>
+            )}
+
+            {/* URL Link */}
+            {item.url && (() => {
+              const url = item.url.toLowerCase();
+              const isIMDB = url.includes('imdb.com');
+              const isGoodreads = url.includes('goodreads.com');
+              
+              return (
+                <div className="pt-2">
+                  <Link
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className={`text-xs font-medium hover:underline inline-flex items-center gap-1 ${
+                      isIMDB 
+                        ? 'text-[#F5C518]' 
+                        : isGoodreads 
+                        ? 'text-[#6B8E5A]' 
+                        : 'text-white/90'
+                    }`}
+                  >
+                    {isIMDB ? (
+                      <>
+                        <img 
+                          src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/IMDb_Logo_Square.svg/2048px-IMDb_Logo_Square.svg.png" 
+                          alt="IMDb" 
+                          className="h-3 w-3 object-contain"
+                        />
+                        <span>IMDb</span>
+                      </>
+                    ) : isGoodreads ? (
+                      <>
+                        <img 
+                          src="https://static.vecteezy.com/system/resources/previews/055/030/405/non_2x/goodreads-circle-icon-logo-symbol-free-png.png" 
+                          alt="Goodreads" 
+                          className="h-3 w-3 object-contain"
+                        />
+                        <span>Goodreads</span>
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="h-3 w-3" />
+                        <span>View</span>
+                      </>
+                    )}
+                  </Link>
+                </div>
+              );
+            })()}
+          </div>
+        </motion.div>
       </div>
-    </Card>
     </motion.div>
   );
 }
@@ -882,10 +883,27 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
     return new Set();
   });
 
+  // Group Done items by month (from cookies)
+  const [groupDoneByMonth, setGroupDoneByMonth] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = getCookie('media-group-done-by-month');
+      if (saved) {
+        return saved === 'true';
+      }
+      return false;
+    }
+    return false;
+  });
+
   // Save collapsed state to cookies
   React.useEffect(() => {
     setCookie('media-collapsed-groups', JSON.stringify(Array.from(collapsedGroups)));
   }, [collapsedGroups]);
+
+  // Save group by month state to cookies
+  React.useEffect(() => {
+    setCookie('media-group-done-by-month', groupDoneByMonth.toString());
+  }, [groupDoneByMonth]);
 
   const toggleGroup = (status: string) => {
     setCollapsedGroups((prev) => {
@@ -898,6 +916,27 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
       return newSet;
     });
   };
+
+  const openMediaModal = React.useCallback((item: MediaItem) => {
+    const openModal = () => {
+      setSelectedMedia(item);
+      setIsModalOpen(true);
+    };
+
+    if (typeof document !== 'undefined' && typeof (document as any).startViewTransition === 'function') {
+      try {
+        (document as unknown as { startViewTransition: (callback: () => void) => void })
+          .startViewTransition(() => {
+            openModal();
+          });
+      } catch (error) {
+        console.warn('View transition failed, falling back to direct open.', error);
+        openModal();
+      }
+    } else {
+      openModal();
+    }
+  }, []);
 
   // Fetch media from Supabase
   const fetchMedia = async () => {
@@ -927,14 +966,13 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
       if (itemId) {
         const item = media.find(m => m.id === itemId);
         if (item) {
-          setSelectedMedia(item);
-          setIsModalOpen(true);
+          openMediaModal(item);
           // Clean up URL
           window.history.replaceState({}, '', '/media');
         }
       }
     }
-  }, [media]);
+  }, [media, openMediaModal]);
 
   // Sync from Notion
   const handleSync = async () => {
@@ -1106,8 +1144,47 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
     }
   };
 
-  // Filter and group media by category and status
-  const groupedMedia = React.useMemo(() => {
+  // Helper function to parse month title and convert to date
+  const parseMonthTitle = React.useCallback((title: string | null | undefined): number | null => {
+    if (!title) return null;
+    
+    try {
+      // Try to parse common month formats like "January 2024", "Jan 2024", "2024-01", etc.
+      const date = new Date(title);
+      if (!isNaN(date.getTime())) {
+        return date.getTime();
+      }
+      
+      // Try parsing formats like "January 2024" or "Jan 2024"
+      const monthNames = [
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december'
+      ];
+      const shortMonthNames = [
+        'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+      ];
+      
+      const lowerTitle = title.toLowerCase().trim();
+      for (let i = 0; i < monthNames.length; i++) {
+        if (lowerTitle.startsWith(monthNames[i]) || lowerTitle.startsWith(shortMonthNames[i])) {
+          // Extract year (look for 4-digit number)
+          const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+          if (yearMatch) {
+            const year = parseInt(yearMatch[0]);
+            const date = new Date(year, i, 1);
+            return date.getTime();
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse month title:', title, error);
+    }
+    
+    return null;
+  }, []);
+
+  const filteredMedia = React.useMemo(() => {
     let filtered = media;
 
     // Apply category filter
@@ -1134,98 +1211,264 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
       });
     }
 
+    return filtered;
+  }, [media, selectedCategory, filters, matchesMediaFilter]);
+
+  const relatedGroupInfo = React.useMemo(() => {
+    const itemToGroup = new Map<string, string>();
+    const byNotionId = new Map<string, MediaItem>();
+
+    filteredMedia.forEach((item) => {
+      if (item.notion_page_id) {
+        byNotionId.set(item.notion_page_id, item);
+      }
+    });
+
+    const adjacency = new Map<string, Set<string>>();
+    filteredMedia.forEach((item) => {
+      const id = item.notion_page_id;
+      if (!id) return;
+      const related = item.related_notion_page_ids ?? [];
+      related.forEach((relId) => {
+        if (!byNotionId.has(relId)) return;
+        if (!adjacency.has(id)) adjacency.set(id, new Set());
+        adjacency.get(id)!.add(relId);
+        if (!adjacency.has(relId)) adjacency.set(relId, new Set());
+        adjacency.get(relId)!.add(id);
+      });
+    });
+
+    const visited = new Set<string>();
+    for (const id of byNotionId.keys()) {
+      if (visited.has(id)) continue;
+      const stack = [id];
+      const groupIds: string[] = [];
+      visited.add(id);
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        groupIds.push(current);
+        const neighbors = adjacency.get(current);
+        if (!neighbors) continue;
+        neighbors.forEach((neighbor) => {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            stack.push(neighbor);
+          }
+        });
+      }
+
+      if (groupIds.length > 1) {
+        const groupKey = groupIds.slice().sort().join('|');
+        groupIds.forEach((groupId) => itemToGroup.set(groupId, groupKey));
+      }
+    }
+
+    return { itemToGroup };
+  }, [filteredMedia]);
+
+  const clusterItemsByGroup = React.useCallback((items: MediaItem[]) => {
+    const groupMembers = new Map<string, MediaItem[]>();
+    items.forEach((item) => {
+      const groupId = relatedGroupInfo.itemToGroup.get(item.notion_page_id);
+      if (!groupId) return;
+      if (!groupMembers.has(groupId)) {
+        groupMembers.set(groupId, []);
+      }
+      groupMembers.get(groupId)!.push(item);
+    });
+
+    const sortGroupMembers = (members: MediaItem[]) => {
+      return members.slice().sort((a, b) => {
+        const yearA = getProductionYearFromTitle(a.name);
+        const yearB = getProductionYearFromTitle(b.name);
+        if (yearA !== null && yearB !== null) {
+          return yearA - yearB;
+        }
+        if (yearA !== null && yearB === null) {
+          return -1;
+        }
+        if (yearA === null && yearB !== null) {
+          return 1;
+        }
+        return 0;
+      });
+    };
+
+    const ordered: Array<{ groupId?: string; items: MediaItem[] }> = [];
+    const usedGroups = new Set<string>();
+    items.forEach((item) => {
+      const groupId = relatedGroupInfo.itemToGroup.get(item.notion_page_id);
+      if (!groupId) {
+        ordered.push({ items: [item] });
+        return;
+      }
+      if (usedGroups.has(groupId)) return;
+      const members = groupMembers.get(groupId);
+      if (members) {
+        ordered.push({ groupId, items: sortGroupMembers(members) });
+        usedGroups.add(groupId);
+      }
+    });
+
+    return ordered;
+  }, [relatedGroupInfo]);
+
+  // Filter and group media by category and status
+  const groupedMedia = React.useMemo(() => {
+    const groupTodoByType = selectedCategory === 'movies-series';
+    // Collect all unique months from all Done items (before filtering) for empty month groups
+    const allDoneMonths = new Set<string>();
+    if (groupDoneByMonth) {
+      media.forEach((item) => {
+        let status = item.status || 'No Status';
+        if (status === 'Not started') {
+          status = 'To-do';
+        }
+        if (status === 'Done' && item.monthly_tracking?.title) {
+          allDoneMonths.add(item.monthly_tracking.title);
+        }
+      });
+    }
+
     // Group by status (normalize "Not started" to "To-do")
-    const grouped: Record<string, MediaItem[]> = {};
-    filtered.forEach((item) => {
+    const grouped: Record<string, MediaItem[] | Record<string, MediaItem[]>> = {};
+    filteredMedia.forEach((item) => {
       let status = item.status || 'No Status';
       // Normalize "Not started" to "To-do" for display
       if (status === 'Not started') {
         status = 'To-do';
       }
-      if (!grouped[status]) {
-        grouped[status] = [];
+
+      const shouldGroupTodoByType = groupTodoByType && status === 'To-do';
+
+      if (shouldGroupTodoByType) {
+        if (!grouped[status]) {
+          grouped[status] = {} as Record<string, MediaItem[]>;
+        }
+        const todoGroup = grouped[status] as Record<string, MediaItem[]>;
+        const typeKey = item.category === 'Movie'
+          ? 'Movies'
+          : item.category === 'Series'
+            ? 'Series'
+            : 'Other';
+
+        if (!todoGroup[typeKey]) {
+          todoGroup[typeKey] = [];
+        }
+        todoGroup[typeKey].push(item);
+      } else if (groupDoneByMonth && status === 'Done') {
+        // If grouping by month for Done items
+        if (!grouped[status]) {
+          grouped[status] = {} as Record<string, MediaItem[]>;
+        }
+        const doneGroup = grouped[status] as Record<string, MediaItem[]>;
+        
+        if (item.monthly_tracking?.title) {
+          // Item has a month - group by month
+          const monthTitle = item.monthly_tracking.title;
+          if (!doneGroup[monthTitle]) {
+            doneGroup[monthTitle] = [];
+          }
+          doneGroup[monthTitle].push(item);
+        } else {
+          // Item doesn't have a month - put in "No Month" group
+          const noMonthKey = 'No Month';
+          if (!doneGroup[noMonthKey]) {
+            doneGroup[noMonthKey] = [];
+          }
+          doneGroup[noMonthKey].push(item);
+        }
+      } else {
+        // Regular flat grouping
+        if (!grouped[status]) {
+          grouped[status] = [];
+        }
+        const statusGroup = grouped[status] as MediaItem[];
+        statusGroup.push(item);
       }
-      grouped[status].push(item);
     });
 
-    // Helper function to parse month title and convert to date
-    const parseMonthTitle = (title: string | null | undefined): number | null => {
-      if (!title) return null;
-      
-      try {
-        // Try to parse common month formats like "January 2024", "Jan 2024", "2024-01", etc.
-        const date = new Date(title);
-        if (!isNaN(date.getTime())) {
-          return date.getTime();
+    // Ensure all months are present in Done group (even if empty)
+    if (groupDoneByMonth && grouped['Done'] && !Array.isArray(grouped['Done'])) {
+      const doneGroup = grouped['Done'] as Record<string, MediaItem[]>;
+      allDoneMonths.forEach((monthTitle) => {
+        if (!doneGroup[monthTitle]) {
+          doneGroup[monthTitle] = [];
         }
-        
-        // Try parsing formats like "January 2024" or "Jan 2024"
-        const monthNames = [
-          'january', 'february', 'march', 'april', 'may', 'june',
-          'july', 'august', 'september', 'october', 'november', 'december'
-        ];
-        const shortMonthNames = [
-          'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-          'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
-        ];
-        
-        const lowerTitle = title.toLowerCase().trim();
-        for (let i = 0; i < monthNames.length; i++) {
-          if (lowerTitle.startsWith(monthNames[i]) || lowerTitle.startsWith(shortMonthNames[i])) {
-            // Extract year (look for 4-digit number)
-            const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-            if (yearMatch) {
-              const year = parseInt(yearMatch[0]);
-              const date = new Date(year, i, 1);
-              return date.getTime();
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to parse month title:', title, error);
-      }
-      
-      return null;
-    };
+      });
+    }
+
+    if (groupTodoByType && grouped['To-do'] && !Array.isArray(grouped['To-do'])) {
+      const todoGroup = grouped['To-do'] as Record<string, MediaItem[]>;
+      if (!todoGroup['Movies']) todoGroup['Movies'] = [];
+      if (!todoGroup['Series']) todoGroup['Series'] = [];
+    }
 
     // Sort items within each group
-    // Priority: 1) Items with monthly_tracking (chronologically by month), 2) Items without (by created date)
     Object.keys(grouped).forEach((status) => {
-      grouped[status].sort((a, b) => {
-        const monthA = a.monthly_tracking?.title ? parseMonthTitle(a.monthly_tracking.title) : null;
-        const monthB = b.monthly_tracking?.title ? parseMonthTitle(b.monthly_tracking.title) : null;
-        
-        // If both have monthly tracking, sort by month (newest first for reverse chronological order)
-        if (monthA !== null && monthB !== null) {
-          return monthB - monthA;
-        }
-        
-        // If only one has monthly tracking, prioritize it (put it first)
-        if (monthA !== null && monthB === null) {
-          return -1;
-        }
-        if (monthA === null && monthB !== null) {
-          return 1;
-        }
-        
-        // Neither has monthly tracking, sort by created date (newest first)
-        const dateA = a.created ? new Date(a.created).getTime() : 0;
-        const dateB = b.created ? new Date(b.created).getTime() : 0;
-        
-        // If both have no created date, maintain original order (newer items added first)
-        if (dateA === 0 && dateB === 0) {
-          // Find original indices to maintain insertion order
-          const indexA = filtered.findIndex(item => item.id === a.id);
-          const indexB = filtered.findIndex(item => item.id === b.id);
-          return indexA - indexB; // Maintain original order (newer items first)
-        }
-        
-        return dateB - dateA; // Newest first
-      });
+      const statusGroup = grouped[status];
+      
+      if (Array.isArray(statusGroup)) {
+        // Flat structure - sort items
+        statusGroup.sort((a, b) => {
+          const monthA = a.monthly_tracking?.title ? parseMonthTitle(a.monthly_tracking.title) : null;
+          const monthB = b.monthly_tracking?.title ? parseMonthTitle(b.monthly_tracking.title) : null;
+          
+          if (monthA !== null && monthB !== null) {
+            return monthB - monthA;
+          }
+          
+          if (monthA !== null && monthB === null) {
+            return -1;
+          }
+          if (monthA === null && monthB !== null) {
+            return 1;
+          }
+          
+          const dateA = a.created ? new Date(a.created).getTime() : 0;
+          const dateB = b.created ? new Date(b.created).getTime() : 0;
+          
+          if (dateA === 0 && dateB === 0) {
+            const indexA = filteredMedia.findIndex(item => item.id === a.id);
+            const indexB = filteredMedia.findIndex(item => item.id === b.id);
+            return indexA - indexB;
+          }
+          
+          return dateB - dateA;
+        });
+      } else {
+        // Nested structure (Done by month) - sort months and items within each month
+        const monthGroups = statusGroup as Record<string, MediaItem[]>;
+        Object.keys(monthGroups).forEach((monthTitle) => {
+          monthGroups[monthTitle].sort((a, b) => {
+            const dateA = a.created ? new Date(a.created).getTime() : 0;
+            const dateB = b.created ? new Date(b.created).getTime() : 0;
+            return dateB - dateA;
+          });
+        });
+      }
     });
 
     return grouped;
-  }, [media, selectedCategory, filters]);
+  }, [filteredMedia, media, groupDoneByMonth, parseMonthTitle]);
+
+  const flatMediaList = React.useMemo(() => {
+    const list: MediaItem[] = [];
+    Object.values(groupedMedia).forEach((group) => {
+      if (Array.isArray(group)) {
+        clusterItemsByGroup(group).forEach((cluster) => {
+          list.push(...cluster.items);
+        });
+      } else {
+        Object.values(group).forEach((monthItems) => {
+          clusterItemsByGroup(monthItems).forEach((cluster) => {
+            list.push(...cluster.items);
+          });
+        });
+      }
+    });
+    return list;
+  }, [groupedMedia, clusterItemsByGroup]);
 
   if (isLoading) {
     return (
@@ -1257,9 +1500,12 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className={`min-h-screen ${outfit.className}`}
+      className={`min-h-screen ${outfit.className} relative`}
     >
-      <div className="p-6 md:p-8">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-0" />
+      
+      <div className="relative z-10 p-6 md:p-8">
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -1276,7 +1522,19 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
                 Your collection of books, movies, series, and more
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              {/* Group Done by Month Toggle */}
+              <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Label htmlFor="group-done-by-month" className="text-sm cursor-pointer">
+                  Group Done by Month
+                </Label>
+                <Switch
+                  id="group-done-by-month"
+                  checked={groupDoneByMonth}
+                  onCheckedChange={setGroupDoneByMonth}
+                />
+              </div>
               <Button
                 onClick={() => setIsNewDialogOpen(true)}
                 disabled={isCreating}
@@ -1324,7 +1582,19 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
             <>
               {/* Stats */}
               <div className="text-sm text-muted-foreground">
-                Showing {Object.values(groupedMedia).flat().length} of {media.length} items
+                Showing {(() => {
+                  let count = 0;
+                  Object.values(groupedMedia).forEach((group) => {
+                    if (Array.isArray(group)) {
+                      count += group.length;
+                    } else {
+                      Object.values(group as Record<string, MediaItem[]>).forEach((monthItems) => {
+                        count += monthItems.length;
+                      });
+                    }
+                  });
+                  return count;
+                })()} of {media.length} items
               </div>
 
               {/* Grouped Media by Status */}
@@ -1345,8 +1615,19 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
                   const orderB = order[statusB] || 99;
                   return orderA - orderB;
                 })
-                .map(([status, items], groupIndex) => {
+                .map(([status, itemsOrMonths], groupIndex) => {
                   const isCollapsed = collapsedGroups.has(status);
+                  const isNested = !Array.isArray(itemsOrMonths);
+                  const totalCount = isNested 
+                    ? Object.values(itemsOrMonths as Record<string, MediaItem[]>).reduce((sum, monthItems) => sum + monthItems.length, 0)
+                    : (itemsOrMonths as MediaItem[]).length;
+
+                  // Helper to parse month title for sorting
+                  const getMonthSortKey = (monthTitle: string): number => {
+                    const parsed = parseMonthTitle(monthTitle);
+                    return parsed !== null ? parsed : 0;
+                  };
+
                   return (
                     <motion.div
                       key={status}
@@ -1369,7 +1650,7 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
                         </motion.div>
                         <span>
                           {status}{' '}
-                          <span className="text-sm text-muted-foreground font-normal">({items.length})</span>
+                          <span className="text-sm text-muted-foreground font-normal">({totalCount})</span>
                         </span>
                       </motion.button>
                       <AnimatePresence>
@@ -1379,31 +1660,197 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                             transition={{ duration: 0.3, ease: 'easeInOut' }}
-                            className="overflow-hidden"
+                            className="overflow-hidden space-y-4"
                           >
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                              {items.map((item, index) => (
-                                <motion.div
-                                  key={item.id}
-                                  initial={{ opacity: 0, y: 20 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{ 
-                                    duration: 0.3, 
-                                    delay: index * 0.05,
-                                    ease: 'easeOut'
-                                  }}
-                                >
-                                  <MediaCard 
-                                    item={item}
-                                    onClick={() => {
-                                      setSelectedMedia(item);
-                                      setIsModalOpen(true);
-                                    }}
-                                    onDelete={() => handleDeleteClick(item)}
-                                  />
-                                </motion.div>
-                              ))}
-                            </div>
+                            {isNested ? (
+                              // Nested structure: Done by month, or To-do by type
+                              <div className="space-y-6">
+                                {Object.entries(itemsOrMonths as Record<string, MediaItem[]>)
+                                  .sort(([groupA], [groupB]) => {
+                                    const isDoneGroup = status === 'Done';
+                                    const isTodoTypeGroup = status === 'To-do' && selectedCategory === 'movies-series';
+                                    if (isDoneGroup) {
+                                      return getMonthSortKey(groupB) - getMonthSortKey(groupA);
+                                    }
+                                    if (isTodoTypeGroup) {
+                                      const order: Record<string, number> = {
+                                        'Movies': 1,
+                                        'Series': 2,
+                                        'Other': 3,
+                                      };
+                                      const orderA = order[groupA] ?? 99;
+                                      const orderB = order[groupB] ?? 99;
+                                      return orderA - orderB;
+                                    }
+                                    return groupA.localeCompare(groupB);
+                                  })
+                                  .map(([groupTitle, groupItems], groupIndex) => {
+                                    const isEmpty = groupItems.length === 0;
+                                    const isBooks = selectedCategory === 'books';
+                                    const isTodoTypeGroup = status === 'To-do' && selectedCategory === 'movies-series';
+                                    const emptyMessage = isTodoTypeGroup
+                                      ? groupTitle === 'Movies'
+                                        ? 'No movies to watch'
+                                        : groupTitle === 'Series'
+                                          ? 'No series to watch'
+                                          : 'Nothing to watch'
+                                      : isBooks 
+                                        ? `No books read in ${groupTitle}`
+                                        : `Nothing watched in ${groupTitle}`;
+                                    const orderedGroupItems = clusterItemsByGroup(groupItems);
+                                    
+                                    return (
+                                      <motion.div
+                                        key={groupTitle}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.2, delay: groupIndex * 0.05 }}
+                                        className="border-l-2 border-border/40 pl-6"
+                                      >
+                                        {/* Group header */}
+                                        <div className="mb-3">
+                                          <h3 className="text-lg font-semibold text-foreground mb-1">
+                                            {groupTitle}
+                                          </h3>
+                                          {isEmpty ? (
+                                            <p className="text-sm text-muted-foreground italic">
+                                              {emptyMessage}
+                                            </p>
+                                          ) : (
+                                            <p className="text-sm text-muted-foreground">
+                                              {groupItems.length} {groupItems.length === 1 ? 'item' : 'items'}
+                                            </p>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Items grid */}
+                                        {!isEmpty && (
+                                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3 md:gap-4">
+                                            {orderedGroupItems.map((cluster, index) => {
+                                              if (cluster.items.length > 1) {
+                                                const groupSpan = Math.min(cluster.items.length, 6);
+                                                return (
+                                                  <motion.div
+                                                    key={cluster.groupId || `group-${index}`}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ 
+                                                      duration: 0.3, 
+                                                      delay: index * 0.05,
+                                                      ease: 'easeOut'
+                                                    }}
+                                                    className="rounded-lg bg-muted/90 p-2"
+                                                    style={{ gridColumn: `span ${groupSpan}` }}
+                                                  >
+                                                    <div
+                                                      className="grid gap-3 md:gap-4"
+                                                      style={{ gridTemplateColumns: `repeat(${groupSpan}, minmax(0, 1fr))` }}
+                                                    >
+                                                      {cluster.items.map((item) => (
+                                                        <MediaCard 
+                                                          key={item.id}
+                                                          item={item}
+                                                          onClick={() => {
+                                                            openMediaModal(item);
+                                                          }}
+                                                          onDelete={() => handleDeleteClick(item)}
+                                                        />
+                                                      ))}
+                                                    </div>
+                                                  </motion.div>
+                                                );
+                                              }
+
+                                              const singleItem = cluster.items[0];
+                                              return (
+                                                <motion.div
+                                                  key={singleItem.id}
+                                                  initial={{ opacity: 0, y: 20 }}
+                                                  animate={{ opacity: 1, y: 0 }}
+                                                  transition={{ 
+                                                    duration: 0.3, 
+                                                    delay: index * 0.05,
+                                                    ease: 'easeOut'
+                                                  }}
+                                                >
+                                                  <MediaCard 
+                                                    item={singleItem}
+                                                    onClick={() => {
+                                                      openMediaModal(singleItem);
+                                                    }}
+                                                    onDelete={() => handleDeleteClick(singleItem)}
+                                                  />
+                                                </motion.div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </motion.div>
+                                    );
+                                  })}
+                              </div>
+                            ) : (
+                              // Flat structure: regular status groups
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3 md:gap-4">
+                                {clusterItemsByGroup(itemsOrMonths as MediaItem[]).map((cluster, index) => {
+                                  if (cluster.items.length > 1) {
+                                    const groupSpan = Math.min(cluster.items.length, 6);
+                                    return (
+                                      <motion.div
+                                        key={cluster.groupId || `group-${index}`}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ 
+                                          duration: 0.3, 
+                                          delay: index * 0.05,
+                                          ease: 'easeOut'
+                                        }}
+                                        className="rounded-lg bg-muted/70 p-2"
+                                        style={{ gridColumn: `span ${groupSpan}` }}
+                                      >
+                                        <div
+                                          className="grid gap-3 md:gap-4"
+                                          style={{ gridTemplateColumns: `repeat(${groupSpan}, minmax(0, 1fr))` }}
+                                        >
+                                          {cluster.items.map((item) => (
+                                            <MediaCard 
+                                              key={item.id}
+                                              item={item}
+                                              onClick={() => {
+                                                openMediaModal(item);
+                                              }}
+                                              onDelete={() => handleDeleteClick(item)}
+                                            />
+                                          ))}
+                                        </div>
+                                      </motion.div>
+                                    );
+                                  }
+
+                                  const singleItem = cluster.items[0];
+                                  return (
+                                    <motion.div
+                                      key={singleItem.id}
+                                      initial={{ opacity: 0, y: 20 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ 
+                                        duration: 0.3, 
+                                        delay: index * 0.05,
+                                        ease: 'easeOut'
+                                      }}
+                                    >
+                                      <MediaCard 
+                                        item={singleItem}
+                                        onClick={() => {
+                                          openMediaModal(singleItem);
+                                        }}
+                                        onDelete={() => handleDeleteClick(singleItem)}
+                                      />
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -1439,17 +1886,15 @@ export function MediaView({ colorPalette }: MediaViewProps = {}) {
           setIsModalOpen(false);
           setSelectedMedia(null);
         }}
-        mediaList={Object.values(groupedMedia).flat()}
+        mediaList={flatMediaList}
         currentIndex={(() => {
           if (!selectedMedia) return 0;
-          const flatList = Object.values(groupedMedia).flat();
-          const index = flatList.findIndex(item => item.id === selectedMedia.id);
+          const index = flatMediaList.findIndex(item => item.id === selectedMedia.id);
           return index >= 0 ? index : 0;
         })()}
         onNavigate={(index) => {
-          const flatList = Object.values(groupedMedia).flat();
-          if (index >= 0 && index < flatList.length) {
-            setSelectedMedia(flatList[index]);
+          if (index >= 0 && index < flatMediaList.length) {
+            setSelectedMedia(flatMediaList[index]);
           }
         }}
         onUpdate={(updatedItem) => {

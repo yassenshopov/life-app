@@ -13,6 +13,7 @@ interface TrackingWeeklyViewProps {
   currentWeek: Date;
   onNavigate: (date: Date) => void;
   onWeekClick?: (weekStart: Date, weekEnd: Date) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 // Helper to extract property value
@@ -69,6 +70,7 @@ export function TrackingWeeklyView({
   currentWeek,
   onNavigate,
   onWeekClick,
+  colorPalette,
 }: TrackingWeeklyViewProps) {
   // Group entries by week
   const weeksData = useMemo(() => {
@@ -239,7 +241,13 @@ export function TrackingWeeklyView({
       </div>
 
       {/* Weeks Grid */}
-      <Card className="flex-1 overflow-hidden">
+      <Card 
+        className="flex-1 overflow-hidden transition-all duration-1000"
+        style={colorPalette ? {
+          backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+          borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+        } : undefined}
+      >
         <div className="h-full overflow-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
             {displayWeeks.map((week, index) => {
@@ -251,9 +259,13 @@ export function TrackingWeeklyView({
                 <Card
                   key={format(week.weekStart, 'yyyy-MM-dd')}
                   className={cn(
-                    'p-4 cursor-pointer transition-all hover:shadow-md',
+                    'p-4 cursor-pointer transition-all duration-1000 hover:shadow-md',
                     !hasData && 'opacity-60'
                   )}
+                  style={colorPalette ? {
+                    backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                    borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                  } : undefined}
                   onClick={() => onWeekClick?.(week.weekStart, week.weekEnd)}
                 >
                   <div className="space-y-3">
