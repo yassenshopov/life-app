@@ -389,8 +389,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               yearData.deepSleepValues.push(deepPercent);
 
@@ -400,8 +400,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               yearData.remSleepValues.push(remPercent);
 
@@ -417,8 +417,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               yearData.lightSleepValues.push(lightPercent);
           }
@@ -593,8 +593,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               quarterData.deepSleepValues.push(deepPercent);
 
@@ -604,8 +604,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               quarterData.remSleepValues.push(remPercent);
 
@@ -621,8 +621,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               quarterData.lightSleepValues.push(lightPercent);
           }
@@ -800,8 +800,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               monthData.deepSleepValues.push(deepPercent);
 
@@ -811,8 +811,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               monthData.remSleepValues.push(remPercent);
 
@@ -828,8 +828,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               monthData.lightSleepValues.push(lightPercent);
           }
@@ -1004,8 +1004,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               weekData.deepSleepValues.push(deepPercent);
 
@@ -1015,8 +1015,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               weekData.remSleepValues.push(remPercent);
 
@@ -1032,8 +1032,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               weekData.lightSleepValues.push(lightPercent);
           }
@@ -1202,8 +1202,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleep) * 100
-                : null;
+                  ? (deepSleepHours / sleep) * 100
+                  : null;
 
             remSleep =
               remSleepPercent !== null
@@ -1211,8 +1211,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleep) * 100
-                : null;
+                  ? (remSleepHours / sleep) * 100
+                  : null;
 
             awake =
               awakeTime !== null && typeof awakeTime === 'number'
@@ -1225,8 +1225,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepSleep !== null && remSleep !== null && awake !== null
-                ? Math.max(0, 100 - deepSleep - remSleep - (awake || 0))
-                : null;
+                  ? Math.max(0, 100 - deepSleep - remSleep - (awake || 0))
+                  : null;
           }
 
           let displayDate = '';
@@ -1515,64 +1515,64 @@ export function HealthMetricsTrends({
                   </Button>
                 ))
               : viewMode === 'quarterly'
-              ? QUARTERLY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.quarters}
-                    variant={selectedQuartersPeriod === period.quarters ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedQuartersPeriod(period.quarters);
-                      setCookie('tracking-quarters-period', period.quarters.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))
-              : viewMode === 'monthly'
-              ? MONTHLY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.months}
-                    variant={selectedMonthsPeriod === period.months ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedMonthsPeriod(period.months);
-                      setCookie('tracking-months-period', period.months.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))
-              : viewMode === 'weekly'
-              ? WEEKLY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.weeks}
-                    variant={selectedWeeksPeriod === period.weeks ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedWeeksPeriod(period.weeks);
-                      setCookie('tracking-weeks-period', period.weeks.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))
-              : DAILY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.days}
-                    variant={selectedDaysPeriod === period.days ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedDaysPeriod(period.days);
-                      setCookie('tracking-days-period', period.days.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))}
+                ? QUARTERLY_TIME_PERIODS.map((period) => (
+                    <Button
+                      key={period.quarters}
+                      variant={selectedQuartersPeriod === period.quarters ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedQuartersPeriod(period.quarters);
+                        setCookie('tracking-quarters-period', period.quarters.toString());
+                      }}
+                      className="h-8 px-3"
+                    >
+                      {period.label}
+                    </Button>
+                  ))
+                : viewMode === 'monthly'
+                  ? MONTHLY_TIME_PERIODS.map((period) => (
+                      <Button
+                        key={period.months}
+                        variant={selectedMonthsPeriod === period.months ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMonthsPeriod(period.months);
+                          setCookie('tracking-months-period', period.months.toString());
+                        }}
+                        className="h-8 px-3"
+                      >
+                        {period.label}
+                      </Button>
+                    ))
+                  : viewMode === 'weekly'
+                    ? WEEKLY_TIME_PERIODS.map((period) => (
+                        <Button
+                          key={period.weeks}
+                          variant={selectedWeeksPeriod === period.weeks ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setSelectedWeeksPeriod(period.weeks);
+                            setCookie('tracking-weeks-period', period.weeks.toString());
+                          }}
+                          className="h-8 px-3"
+                        >
+                          {period.label}
+                        </Button>
+                      ))
+                    : DAILY_TIME_PERIODS.map((period) => (
+                        <Button
+                          key={period.days}
+                          variant={selectedDaysPeriod === period.days ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setSelectedDaysPeriod(period.days);
+                            setCookie('tracking-days-period', period.days.toString());
+                          }}
+                          className="h-8 px-3"
+                        >
+                          {period.label}
+                        </Button>
+                      ))}
           </div>
         </div>
 
@@ -1813,9 +1813,10 @@ export function HealthMetricsTrends({
                         strokeWidth={2.5}
                         fill="url(#rhrAreaGradient)"
                         dot={(props: any) => {
-                          const { cx, cy } = props;
+                          const { cx, cy, index } = props;
                           return (
                             <circle
+                              key={`rhr-dot-${index}`}
                               cx={cx}
                               cy={cy}
                               r={2}
@@ -2154,8 +2155,17 @@ export function HealthMetricsTrends({
                           strokeWidth={2.5}
                           fill="url(#weightAreaGradient)"
                           dot={(props: any) => {
-                            const { cx, cy } = props;
-                            return <circle cx={cx} cy={cy} r={2} fill="#eab308" opacity={0.6} />;
+                            const { cx, cy, index } = props;
+                            return (
+                              <circle
+                                key={`weight-dot-${index}`}
+                                cx={cx}
+                                cy={cy}
+                                r={2}
+                                fill="#eab308"
+                                opacity={0.6}
+                              />
+                            );
                           }}
                           activeDot={{ r: 4 }}
                         />
@@ -2261,8 +2271,17 @@ export function HealthMetricsTrends({
                         strokeWidth={2.5}
                         fill="url(#stepsAreaGradient)"
                         dot={(props: any) => {
-                          const { cx, cy } = props;
-                          return <circle cx={cx} cy={cy} r={2} fill="#22c55e" opacity={0.6} />;
+                          const { cx, cy, index } = props;
+                          return (
+                            <circle
+                              key={`steps-dot-${index}`}
+                              cx={cx}
+                              cy={cy}
+                              r={2}
+                              fill="#22c55e"
+                              opacity={0.6}
+                            />
+                          );
                         }}
                         activeDot={{ r: 4 }}
                       />
@@ -2367,8 +2386,17 @@ export function HealthMetricsTrends({
                         strokeWidth={2.5}
                         fill="url(#sleepAreaGradient)"
                         dot={(props: any) => {
-                          const { cx, cy } = props;
-                          return <circle cx={cx} cy={cy} r={2} fill="#a855f7" opacity={0.6} />;
+                          const { cx, cy, index } = props;
+                          return (
+                            <circle
+                              key={`sleep-dot-${index}`}
+                              cx={cx}
+                              cy={cy}
+                              r={2}
+                              fill="#a855f7"
+                              opacity={0.6}
+                            />
+                          );
                         }}
                         activeDot={{ r: 4 }}
                       />
@@ -2511,9 +2539,16 @@ export function HealthMetricsTrends({
                                 strokeWidth={2.5}
                                 fill="url(#bfPercentAreaGradient)"
                                 dot={(props: any) => {
-                                  const { cx, cy } = props;
+                                  const { cx, cy, index } = props;
                                   return (
-                                    <circle cx={cx} cy={cy} r={2} fill="#8b4513" opacity={0.6} />
+                                    <circle
+                                      key={`caffeine-dot-${index}`}
+                                      cx={cx}
+                                      cy={cy}
+                                      r={2}
+                                      fill="#8b4513"
+                                      opacity={0.6}
+                                    />
                                   );
                                 }}
                                 activeDot={{ r: 4 }}
@@ -2663,9 +2698,16 @@ export function HealthMetricsTrends({
                                 strokeWidth={2.5}
                                 fill="url(#boneMineralPercentAreaGradient)"
                                 dot={(props: any) => {
-                                  const { cx, cy } = props;
+                                  const { cx, cy, index } = props;
                                   return (
-                                    <circle cx={cx} cy={cy} r={2} fill="#f5f5dc" opacity={0.6} />
+                                    <circle
+                                      key={`creatine-dot-${index}`}
+                                      cx={cx}
+                                      cy={cy}
+                                      r={2}
+                                      fill="#f5f5dc"
+                                      opacity={0.6}
+                                    />
                                   );
                                 }}
                                 activeDot={{ r: 4 }}
@@ -2819,9 +2861,16 @@ export function HealthMetricsTrends({
                                 strokeWidth={2.5}
                                 fill="url(#musclePercentAreaGradient)"
                                 dot={(props: any) => {
-                                  const { cx, cy } = props;
+                                  const { cx, cy, index } = props;
                                   return (
-                                    <circle cx={cx} cy={cy} r={2} fill="#dc2626" opacity={0.6} />
+                                    <circle
+                                      key={`alcohol-dot-${index}`}
+                                      cx={cx}
+                                      cy={cy}
+                                      r={2}
+                                      fill="#dc2626"
+                                      opacity={0.6}
+                                    />
                                   );
                                 }}
                                 activeDot={{ r: 4 }}
