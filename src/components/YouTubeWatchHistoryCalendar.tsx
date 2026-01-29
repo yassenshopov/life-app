@@ -11,12 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Calendar, List, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDominantColor } from '@/lib/youtube-color';
@@ -107,7 +102,7 @@ export function YouTubeWatchHistoryCalendar({
       const weekStart = new Date(currentWeek);
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = new Date(currentWeek);
-      weekEnd.setDate(currentWeek.getDate() + 7);
+      weekEnd.setDate(currentWeek.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
 
       const response = await fetch(
@@ -132,70 +127,103 @@ export function YouTubeWatchHistoryCalendar({
     fetchVideos();
   }, [fetchVideos]);
 
-  // Extract colors from thumbnails
+  // Extract colors from thumbnails in batches to prevent UI freeze
   React.useEffect(() => {
+    let isCancelled = false;
+    const BATCH_SIZE = 30;
+
     const extractColors = async () => {
-      const colorMap = new Map<string, string>();
       const videosNeedingColors = videos.filter(
         (video) => video.thumbnail_url && !videoColors.has(video.id)
       );
-      
+
       if (videosNeedingColors.length === 0) return;
 
-      const promises = videosNeedingColors.map(async (video) => {
-        if (!video.thumbnail_url) return;
-        try {
-          const color = await getDominantColor(video.thumbnail_url);
-          colorMap.set(video.id, color);
-        } catch (error) {
-          console.error('Error extracting color for video:', video.id, error);
-        }
-      });
+      // Process in batches to avoid UI freeze
+      for (let i = 0; i < videosNeedingColors.length; i += BATCH_SIZE) {
+        if (isCancelled) return;
 
-      await Promise.all(promises);
-      
-      if (colorMap.size > 0) {
-        setVideoColors((prev) => {
-          const newMap = new Map(prev);
-          colorMap.forEach((color, id) => {
-            newMap.set(id, color);
-          });
-          return newMap;
+        const batch = videosNeedingColors.slice(i, i + BATCH_SIZE);
+        const batchColorMap = new Map<string, string>();
+
+        const promises = batch.map(async (video) => {
+          if (!video.thumbnail_url) return;
+          try {
+            const color = await getDominantColor(video.thumbnail_url);
+            batchColorMap.set(video.id, color);
+          } catch (error) {
+            console.error('Error extracting color for video:', video.id, error);
+          }
         });
+
+        await Promise.all(promises);
+
+        if (isCancelled) return;
+
+        // Merge batch results into state
+        if (batchColorMap.size > 0) {
+          setVideoColors((prev) => {
+            const newMap = new Map(prev);
+            batchColorMap.forEach((color, id) => {
+              newMap.set(id, color);
+            });
+            return newMap;
+          });
+        }
+
+        // Yield to main thread between batches using requestIdleCallback or setTimeout fallback
+        if (i + BATCH_SIZE < videosNeedingColors.length) {
+          await new Promise<void>((resolve) => {
+            if (typeof requestIdleCallback !== 'undefined') {
+              requestIdleCallback(() => resolve(), { timeout: 100 });
+            } else {
+              setTimeout(resolve, 0);
+            }
+          });
+        }
       }
     };
 
     if (videos.length > 0) {
       extractColors();
     }
+
+    return () => {
+      isCancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videos]);
 
+  // Helper to compute local date key (YYYY-M-D format for comparison)
+  const getLocalDateKey = (date: Date): string => {
+    return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+  };
+
   // Get videos for a specific day
   const getVideosForDay = (day: Date): YouTubeVideo[] => {
-    const dateKey = day.toISOString().split('T')[0];
+    const dateKey = getLocalDateKey(day);
     return videos.filter((video) => {
       const videoDate = new Date(video.watched_at);
-      return videoDate.toISOString().split('T')[0] === dateKey;
+      return getLocalDateKey(videoDate) === dateKey;
     });
   };
 
   // Group videos into sessions (videos within 60 minutes of each other - more generous)
   const groupVideosIntoSessions = (videos: YouTubeVideo[]): YouTubeVideo[][] => {
     if (videos.length === 0) return [];
-    
-    const sorted = [...videos].sort((a, b) => 
-      new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime()
+
+    const sorted = [...videos].sort(
+      (a, b) => new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime()
     );
-    
+
     const sessions: YouTubeVideo[][] = [];
     let currentSession: YouTubeVideo[] = [sorted[0]];
-    
+
     for (let i = 1; i < sorted.length; i++) {
       const prevTime = new Date(sorted[i - 1].watched_at).getTime();
       const currentTime = new Date(sorted[i].watched_at).getTime();
       const minutesDiff = (currentTime - prevTime) / (1000 * 60);
-      
+
       // If videos are within 60 minutes (1 hour), group them together
       if (minutesDiff <= 60) {
         currentSession.push(sorted[i]);
@@ -204,34 +232,34 @@ export function YouTubeWatchHistoryCalendar({
         currentSession = [sorted[i]];
       }
     }
-    
+
     if (currentSession.length > 0) {
       sessions.push(currentSession);
     }
-    
+
     return sessions;
   };
 
   // Calculate session position and duration
   const getSessionPosition = (session: YouTubeVideo[], day: Date) => {
     if (session.length === 0) return null;
-    
+
     const firstVideo = session[0];
     const lastVideo = session[session.length - 1];
     const firstTime = new Date(firstVideo.watched_at);
     const lastTime = new Date(lastVideo.watched_at);
-    
-    // Check if session is on this day
-    if (firstTime.toISOString().split('T')[0] !== day.toISOString().split('T')[0]) {
+
+    // Check if session is on this day (using local date comparison)
+    if (getLocalDateKey(firstTime) !== getLocalDateKey(day)) {
       return null;
     }
 
     const startMinutes = firstTime.getHours() * 60 + firstTime.getMinutes();
     const endMinutes = lastTime.getHours() * 60 + lastTime.getMinutes();
-    
+
     // Calculate duration: time between first and last video, with minimum of 15 minutes
     const sessionDuration = Math.max(endMinutes - startMinutes + 15, 15);
-    
+
     const top = startMinutes * PIXELS_PER_MINUTE;
     const height = sessionDuration * PIXELS_PER_MINUTE;
 
@@ -325,7 +353,9 @@ export function YouTubeWatchHistoryCalendar({
             style={
               colorPalette
                 ? {
-                    backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.95)'),
+                    backgroundColor: colorPalette.primary
+                      .replace('rgb', 'rgba')
+                      .replace(')', ', 0.95)'),
                     borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
                   }
                 : undefined
@@ -340,7 +370,10 @@ export function YouTubeWatchHistoryCalendar({
                   YouTube Watch History
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Select value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
+                  <Select
+                    value={viewMode}
+                    onValueChange={(value) => setViewMode(value as ViewMode)}
+                  >
                     <SelectTrigger className="w-[120px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -383,21 +416,24 @@ export function YouTubeWatchHistoryCalendar({
                       </Button>
                       <h2 className="text-xl font-semibold ml-4">{weekRangeString}</h2>
                     </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm text-muted-foreground">
-                      {videos.length} videos this week
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm text-muted-foreground">
+                        {videos.length} videos this week
+                      </div>
+                      <Select
+                        value={timeFormat}
+                        onValueChange={(value) => setTimeFormat(value as '12h' | '24h')}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="12h">12h</SelectItem>
+                          <SelectItem value="24h">24h</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={timeFormat} onValueChange={(value) => setTimeFormat(value as '12h' | '24h')}>
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="12h">12h</SelectItem>
-                        <SelectItem value="24h">24h</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
-                </div>
 
                   {/* Weekly Timeline View */}
                   <div className="flex-1 overflow-auto">
@@ -431,7 +467,10 @@ export function YouTubeWatchHistoryCalendar({
                       </div>
 
                       {/* Time slots and videos */}
-                      <div className="relative" style={{ height: `${24 * 60 * PIXELS_PER_MINUTE}px` }}>
+                      <div
+                        className="relative"
+                        style={{ height: `${24 * 60 * PIXELS_PER_MINUTE}px` }}
+                      >
                         {/* Time labels */}
                         <div className="absolute left-0 top-0 bottom-0 w-[60px] border-r bg-background z-10">
                           {timeSlots.map((slot, index) => (
@@ -451,96 +490,101 @@ export function YouTubeWatchHistoryCalendar({
                         </div>
 
                         {/* Day columns - using grid to match header */}
-                        <div className="absolute left-[60px] right-0 top-0 bottom-0 grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                        <div
+                          className="absolute left-[60px] right-0 top-0 bottom-0 grid"
+                          style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}
+                        >
                           {weekDays.map((day) => {
                             const dayVideos = getVideosForDay(day);
                             const sessions = groupVideosIntoSessions(dayVideos);
-                            
+
                             return (
                               <div
                                 key={day.toISOString()}
                                 className="relative border-r last:border-r-0"
                                 style={{ height: `${24 * 60 * PIXELS_PER_MINUTE}px` }}
                               >
-                              {/* Hour lines */}
-                              {timeSlots.map((_, index) => (
-                                <div
-                                  key={index}
-                                  className="absolute border-t border-border/50 w-full"
-                                  style={{
-                                    top: `${index * 60 * PIXELS_PER_MINUTE}px`,
-                                  }}
-                                />
-                              ))}
-
-                              {/* Video sessions */}
-                              {sessions.map((session, sessionIndex) => {
-                                const position = getSessionPosition(session, day);
-                                if (!position) return null;
-
-                                const sessionId = `${day.toISOString()}-${sessionIndex}`;
-                                const bgColor = videoColors.get(session[0].id) || 'rgba(66, 133, 244, 0.7)';
-                                const sessionDuration = Math.round(
-                                  (position.endTime.getTime() - position.startTime.getTime()) / (1000 * 60)
-                                );
-
-                                return (
+                                {/* Hour lines */}
+                                {timeSlots.map((_, index) => (
                                   <div
-                                    key={sessionId}
-                                    className="absolute left-1 right-1 rounded overflow-hidden hover:opacity-90 transition-opacity"
+                                    key={index}
+                                    className="absolute border-t border-border/50 w-full"
                                     style={{
-                                      ...position,
-                                      backgroundColor: bgColor.startsWith('rgb')
-                                        ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.7)')
-                                        : bgColor + 'B3',
-                                      cursor: 'pointer',
+                                      top: `${index * 60 * PIXELS_PER_MINUTE}px`,
                                     }}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      setSelectedSession({
-                                        videos: session,
-                                        day,
-                                        startTime: position.startTime,
-                                        endTime: position.endTime,
-                                      });
-                                    }}
-                                  >
-                                    <a
-                                      href={session[0].video_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="block h-full"
+                                  />
+                                ))}
+
+                                {/* Video sessions */}
+                                {sessions.map((session, sessionIndex) => {
+                                  const position = getSessionPosition(session, day);
+                                  if (!position) return null;
+
+                                  const sessionId = `${day.toISOString()}-${sessionIndex}`;
+                                  const bgColor =
+                                    videoColors.get(session[0].id) || 'rgba(66, 133, 244, 0.7)';
+                                  const sessionDuration = Math.round(
+                                    (position.endTime.getTime() - position.startTime.getTime()) /
+                                      (1000 * 60)
+                                  );
+
+                                  return (
+                                    <div
+                                      key={sessionId}
+                                      className="absolute left-1 right-1 rounded overflow-hidden hover:opacity-90 transition-opacity"
+                                      style={{
+                                        ...position,
+                                        backgroundColor: bgColor.startsWith('rgb')
+                                          ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.7)')
+                                          : bgColor + 'B3',
+                                        cursor: 'pointer',
+                                      }}
                                       onClick={(e) => {
-                                        if (session.length > 1) {
-                                          e.preventDefault();
-                                        }
+                                        e.preventDefault();
+                                        setSelectedSession({
+                                          videos: session,
+                                          day,
+                                          startTime: position.startTime,
+                                          endTime: position.endTime,
+                                        });
                                       }}
                                     >
-                                      <div className="flex items-center gap-1 p-1 h-full">
-                                        {session[0].thumbnail_url && (
-                                          <img
-                                            src={session[0].thumbnail_url}
-                                            alt={session[0].video_title}
-                                            className="w-8 h-6 rounded object-cover flex-shrink-0"
-                                          />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs font-medium truncate text-white">
-                                            {session.length > 1
-                                              ? `${session.length} videos • ${sessionDuration} min`
-                                              : session[0].video_title}
-                                          </p>
-                                          {session.length > 1 && (
-                                            <p className="text-xs text-white/70">
-                                              Click for details
-                                            </p>
+                                      <a
+                                        href={session[0].video_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block h-full"
+                                        onClick={(e) => {
+                                          if (session.length > 1) {
+                                            e.preventDefault();
+                                          }
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-1 p-1 h-full">
+                                          {session[0].thumbnail_url && (
+                                            <img
+                                              src={session[0].thumbnail_url}
+                                              alt={session[0].video_title}
+                                              className="w-8 h-6 rounded object-cover flex-shrink-0"
+                                            />
                                           )}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-medium truncate text-white">
+                                              {session.length > 1
+                                                ? `${session.length} videos • ${sessionDuration} min`
+                                                : session[0].video_title}
+                                            </p>
+                                            {session.length > 1 && (
+                                              <p className="text-xs text-white/70">
+                                                Click for details
+                                              </p>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    </a>
-                                  </div>
-                                );
-                              })}
+                                      </a>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })}
@@ -641,7 +685,9 @@ export function YouTubeWatchHistoryCalendar({
             {selectedDay && (
               <div className="space-y-2">
                 {getVideosForDay(selectedDay)
-                  .sort((a, b) => new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime())
+                  .sort(
+                    (a, b) => new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime()
+                  )
                   .map((video) => {
                     const watchedAt = new Date(video.watched_at);
                     const bgColor = videoColors.get(video.id);
@@ -766,9 +812,7 @@ export function YouTubeWatchHistoryCalendar({
                     <div className="font-semibold text-lg">
                       {
                         new Set(
-                          selectedSession.videos
-                            .map((v) => v.channel_name)
-                            .filter((name) => name)
+                          selectedSession.videos.map((v) => v.channel_name).filter((name) => name)
                         ).size
                       }
                     </div>
@@ -778,9 +822,9 @@ export function YouTubeWatchHistoryCalendar({
                     <div className="font-semibold text-lg">
                       {selectedSession.videos.length > 1
                         ? Math.round(
-                            ((selectedSession.endTime.getTime() -
+                            (selectedSession.endTime.getTime() -
                               selectedSession.startTime.getTime()) /
-                              (1000 * 60)) /
+                              (1000 * 60) /
                               (selectedSession.videos.length - 1)
                           )
                         : 0}{' '}

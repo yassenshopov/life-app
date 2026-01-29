@@ -40,15 +40,15 @@ interface YouTubeVideo {
 }
 
 // Typed text animation component
-function TypedText({ 
-  text, 
-  delay = 0, 
+function TypedText({
+  text,
+  delay = 0,
   className = '',
   speed = 20,
-  onComplete
-}: { 
-  text: string; 
-  delay?: number; 
+  onComplete,
+}: {
+  text: string;
+  delay?: number;
   className?: string;
   speed?: number;
   onComplete?: () => void;
@@ -58,29 +58,32 @@ function TypedText({
 
   React.useEffect(() => {
     if (!text) return;
-    
+
     setDisplayedText('');
     setIsComplete(false);
-    
+
+    let typingInterval: ReturnType<typeof setInterval> | null = null;
+
     const timeout = setTimeout(() => {
       let currentIndex = 0;
-      const typingInterval = setInterval(() => {
+      typingInterval = setInterval(() => {
         if (currentIndex < text.length) {
           setDisplayedText(text.slice(0, currentIndex + 1));
           currentIndex++;
         } else {
           setIsComplete(true);
-          clearInterval(typingInterval);
+          if (typingInterval) clearInterval(typingInterval);
           if (onComplete) {
             setTimeout(() => onComplete(), 0);
           }
         }
       }, speed);
-
-      return () => clearInterval(typingInterval);
     }, delay);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      if (typingInterval) clearInterval(typingInterval);
+    };
   }, [text, delay, speed, onComplete]);
 
   return (
@@ -130,11 +133,11 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
 
       const data = await response.json();
       setResult(data);
-      
+
       // Parse insights from the analysis text
       const parsedInsights = parseInsights(data.analysis);
       setInsights(parsedInsights);
-      
+
       // Parse YouTube videos from the analysis text
       const parsedVideos = parseYouTubeVideos(data.analysis);
       setYoutubeVideos(parsedVideos);
@@ -151,7 +154,7 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
       /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
     ];
-    
+
     for (const pattern of patterns) {
       const match = url.match(pattern);
       if (match && match[1]) {
@@ -169,20 +172,21 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
   // Parse YouTube videos from text
   const parseYouTubeVideos = (text: string): YouTubeVideo[] => {
     const videos: YouTubeVideo[] = [];
-    const urlPattern = /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)[^\s\)]+)/gi;
+    const urlPattern =
+      /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)[^\s\)]+)/gi;
     const matches = text.matchAll(urlPattern);
-    
+
     for (const match of matches) {
       const url = match[0];
       const videoId = extractVideoId(url);
-      if (videoId && !videos.find(v => v.id === videoId)) {
+      if (videoId && !videos.find((v) => v.id === videoId)) {
         videos.push({
           id: videoId,
           url: url,
         });
       }
     }
-    
+
     return videos;
   };
 
@@ -191,34 +195,34 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
     // Split by numbered list items (e.g., "1. **Title**: Description")
     const insightPattern = /(\d+)\.\s+\*\*([\s\S]+?)\*\*:\s*([\s\S]+?)(?=\d+\.\s+\*\*|$)/g;
     let match;
-    
+
     while ((match = insightPattern.exec(text)) !== null) {
       const number = parseInt(match[1], 10);
       const title = match[2].trim();
       const description = match[3].trim();
-      
+
       insights.push({ number, title, description });
     }
-    
+
     // If no matches found with the pattern, try a simpler approach
     if (insights.length === 0) {
-      const lines = text.split('\n').filter(line => line.trim());
+      const lines = text.split('\n').filter((line) => line.trim());
       let currentInsight: Partial<Insight> | null = null;
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
         const numberedMatch = trimmed.match(/^(\d+)[\.\)]\s+(.+)$/);
-        
+
         if (numberedMatch) {
           // Save previous insight if exists
           if (currentInsight && currentInsight.title) {
             insights.push(currentInsight as Insight);
           }
-          
+
           const fullText = numberedMatch[2];
           // Try to extract bold title
           const boldMatch = fullText.match(/\*\*(.+?)\*\*:\s*(.+)$/);
-          
+
           if (boldMatch) {
             currentInsight = {
               number: parseInt(numberedMatch[1], 10),
@@ -247,13 +251,13 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
           currentInsight.description += ' ' + trimmed;
         }
       }
-      
+
       // Add last insight
       if (currentInsight && currentInsight.title) {
         insights.push(currentInsight as Insight);
       }
     }
-    
+
     return insights;
   };
 
@@ -271,23 +275,23 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
         const shouldShow = index <= currentInsightIndex;
         const isCurrentlyTyping = index === currentInsightIndex;
         const isComplete = index < currentInsightIndex;
-        
+
         if (!shouldShow) return null;
-        
+
         const handleTitleComplete = () => {
           // Title is done, description will start automatically
         };
-        
+
         const handleDescriptionComplete = () => {
           // Move to next insight after a brief pause
           setTimeout(() => {
-            setCurrentInsightIndex(prev => Math.min(prev + 1, insights.length));
+            setCurrentInsightIndex((prev) => Math.min(prev + 1, insights.length));
           }, 300);
         };
-        
+
         return (
-          <div 
-            key={insight.number} 
+          <div
+            key={insight.number}
             className="mb-6 last:mb-0 p-4 rounded-lg bg-background/50 border border-border/50 hover:border-border transition-colors"
           >
             <div className="flex items-start gap-3">
@@ -299,8 +303,8 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
                   {isComplete ? (
                     insight.title
                   ) : isCurrentlyTyping ? (
-                    <TypedText 
-                      text={insight.title} 
+                    <TypedText
+                      text={insight.title}
                       delay={0}
                       speed={30}
                       className="text-foreground"
@@ -314,8 +318,8 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
                   </p>
                 ) : isCurrentlyTyping ? (
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    <TypedText 
-                      text={insight.description} 
+                    <TypedText
+                      text={insight.description}
                       delay={insight.title.length * 30 + 200}
                       speed={20}
                       className="text-muted-foreground"
@@ -329,12 +333,12 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
         );
       });
     }
-    
+
     // Fallback to original formatting if parsing failed
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.split('\n').filter((line) => line.trim());
     return lines.map((line, index) => {
       const trimmed = line.trim();
-      
+
       // Check if it's a heading (starts with # or is all caps)
       if (trimmed.startsWith('#') || (trimmed.length < 50 && trimmed === trimmed.toUpperCase())) {
         return (
@@ -343,7 +347,7 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
           </h3>
         );
       }
-      
+
       // Check if it's a numbered list item
       if (/^\d+[\.\)]\s/.test(trimmed)) {
         return (
@@ -353,7 +357,7 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
           </p>
         );
       }
-      
+
       // Check if it's a bullet point
       if (/^[-•*]\s/.test(trimmed)) {
         return (
@@ -362,7 +366,7 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
           </li>
         );
       }
-      
+
       // Regular paragraph
       return (
         <p key={index} className="mb-3 leading-relaxed">
@@ -407,11 +411,14 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs value={analysisType} onValueChange={(v) => {
-          setAnalysisType(v as AnalysisType);
-          setCurrentInsightIndex(0);
-          setYoutubeVideos([]);
-        }}>
+        <Tabs
+          value={analysisType}
+          onValueChange={(v) => {
+            setAnalysisType(v as AnalysisType);
+            setCurrentInsightIndex(0);
+            setYoutubeVideos([]);
+          }}
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="insights" className="gap-2">
               <Lightbulb className="h-4 w-4" />
@@ -426,22 +433,23 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
               Recommendations
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="insights" className="mt-4">
             <div className="text-sm text-muted-foreground mb-4">
               Get personalized insights about your watching patterns, preferences, and habits.
             </div>
           </TabsContent>
-          
+
           <TabsContent value="wrapped" className="mt-4">
             <div className="text-sm text-muted-foreground mb-4">
               Generate a fun "YouTube Wrapped" style summary of your year in videos.
             </div>
           </TabsContent>
-          
+
           <TabsContent value="recommendations" className="mt-4">
             <div className="text-sm text-muted-foreground mb-4">
-              Get personalized recommendations for channels and content based on your watching patterns.
+              Get personalized recommendations for channels and content based on your watching
+              patterns.
             </div>
           </TabsContent>
         </Tabs>
@@ -454,10 +462,8 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
 
         {result && (
           <div className="mt-6 space-y-4">
-            <div className="space-y-2">
-              {formatAnalysis(result.analysis)}
-            </div>
-            
+            <div className="space-y-2">{formatAnalysis(result.analysis)}</div>
+
             {/* Show YouTube videos for recommendations */}
             {analysisType === 'recommendations' && youtubeVideos.length > 0 && (
               <div className="mt-6 pt-6 border-t">
@@ -507,12 +513,13 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
                 </div>
               </div>
             )}
-            
+
             {result.context && (
               <div className="pt-4 border-t text-xs text-muted-foreground">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="font-semibold">Total Videos:</span> {result.context.totalVideos.toLocaleString()}
+                    <span className="font-semibold">Total Videos:</span>{' '}
+                    {result.context.totalVideos.toLocaleString()}
                   </div>
                   <div>
                     <span className="font-semibold">Date Range:</span>{' '}
@@ -534,4 +541,3 @@ export function YouTubeLLMAnalysis({ colorPalette }: LLMAnalysisProps) {
     </Card>
   );
 }
-

@@ -60,7 +60,11 @@ export async function POST(request: NextRequest) {
     );
 
     if (youtubeItems.length === 0) {
-      return NextResponse.json({ message: 'No YouTube items found in history', synced: 0, total: 0 });
+      return NextResponse.json({
+        message: 'No YouTube items found in history',
+        synced: 0,
+        total: 0,
+      });
     }
 
     let syncedCount = 0;
@@ -94,7 +98,7 @@ export async function POST(request: NextRequest) {
         const thumbnailUrl = getYouTubeThumbnail(videoId);
 
         // Upsert video metadata
-        await supabase.from('youtube_videos').upsert(
+        const { error: videoUpsertError } = await supabase.from('youtube_videos').upsert(
           {
             video_id: videoId,
             title: videoTitle,
@@ -104,6 +108,12 @@ export async function POST(request: NextRequest) {
           },
           { onConflict: 'video_id' }
         );
+
+        if (videoUpsertError) {
+          console.error(`Failed to upsert video ${videoId}:`, videoUpsertError);
+          errors.push(`Failed to upsert video ${videoTitle}: ${videoUpsertError.message}`);
+          continue; // Skip watch history insert if video upsert failed
+        }
 
         // Insert watch history record
         const { error: historyError } = await supabase.from('youtube_watch_history').insert({
@@ -131,17 +141,16 @@ export async function POST(request: NextRequest) {
     const watchedDates = youtubeItems
       .map((item) => new Date(item.time))
       .filter((date) => !isNaN(date.getTime()));
-    
-    const oldestDate = watchedDates.length > 0 
-      ? new Date(Math.min(...watchedDates.map(d => d.getTime())))
-      : null;
-    const newestDate = watchedDates.length > 0 
-      ? new Date(Math.max(...watchedDates.map(d => d.getTime())))
-      : null;
-    
-    const daysBack = oldestDate && newestDate
-      ? Math.ceil((newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
+
+    const oldestDate =
+      watchedDates.length > 0 ? new Date(Math.min(...watchedDates.map((d) => d.getTime()))) : null;
+    const newestDate =
+      watchedDates.length > 0 ? new Date(Math.max(...watchedDates.map((d) => d.getTime()))) : null;
+
+    const daysBack =
+      oldestDate && newestDate
+        ? Math.ceil((newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
 
     return NextResponse.json({
       message: `Synced ${syncedCount} new videos from ${youtubeItems.length} total YouTube items`,
@@ -162,4 +171,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

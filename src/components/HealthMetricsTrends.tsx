@@ -1680,16 +1680,13 @@ export function HealthMetricsTrends({
               </div>
             )}
             {latestValues.bfPercent !== null && (
-              <div
-                className="px-5 py-4 rounded-2xl flex items-center gap-3"
-                style={{ backgroundColor: 'rgba(139, 69, 19, 0.1)' }}
-              >
-                <Scale className="w-5 h-5 flex-shrink-0" style={{ color: '#8b4513' }} />
+              <div className="bg-amber-100 dark:bg-amber-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                 <div>
-                  <div className="text-xs font-medium" style={{ color: '#8b4513' }}>
+                  <div className="text-xs text-amber-700 dark:text-amber-300 font-medium">
                     Body Fat %
                   </div>
-                  <div className="text-xl font-bold" style={{ color: '#8b4513' }}>
+                  <div className="text-xl font-bold text-amber-900 dark:text-amber-100">
                     {(latestValues.bfPercent < 1
                       ? latestValues.bfPercent * 100
                       : latestValues.bfPercent
@@ -1700,16 +1697,13 @@ export function HealthMetricsTrends({
               </div>
             )}
             {latestValues.boneMineralPercent !== null && (
-              <div
-                className="px-5 py-4 rounded-2xl flex items-center gap-3"
-                style={{ backgroundColor: 'rgba(245, 245, 220, 0.3)' }}
-              >
-                <Scale className="w-5 h-5 flex-shrink-0" style={{ color: '#8b7355' }} />
+              <div className="bg-stone-100 dark:bg-stone-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-stone-600 dark:text-stone-400 flex-shrink-0" />
                 <div>
-                  <div className="text-xs font-medium" style={{ color: '#8b7355' }}>
+                  <div className="text-xs text-stone-700 dark:text-stone-300 font-medium">
                     Bone Mineral %
                   </div>
-                  <div className="text-xl font-bold" style={{ color: '#8b7355' }}>
+                  <div className="text-xl font-bold text-stone-900 dark:text-stone-100">
                     {(latestValues.boneMineralPercent < 1
                       ? latestValues.boneMineralPercent * 100
                       : latestValues.boneMineralPercent
@@ -1720,16 +1714,11 @@ export function HealthMetricsTrends({
               </div>
             )}
             {latestValues.bfPercent !== null && latestValues.boneMineralPercent !== null && (
-              <div
-                className="px-5 py-4 rounded-2xl flex items-center gap-3"
-                style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)' }}
-              >
-                <Scale className="w-5 h-5 flex-shrink-0" style={{ color: '#dc2626' }} />
+              <div className="bg-red-100 dark:bg-red-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                 <div>
-                  <div className="text-xs font-medium" style={{ color: '#dc2626' }}>
-                    Muscle %
-                  </div>
-                  <div className="text-xl font-bold" style={{ color: '#dc2626' }}>
+                  <div className="text-xs text-red-700 dark:text-red-300 font-medium">Muscle %</div>
+                  <div className="text-xl font-bold text-red-900 dark:text-red-100">
                     {(() => {
                       // Calculate muscle % from BF% and Bone Mineral %
                       const bf =
@@ -2473,9 +2462,17 @@ export function HealthMetricsTrends({
                         <ResponsiveContainer width="100%" height={200}>
                           {chartType === 'line' ? (
                             <AreaChart
-                              data={chartData.filter(
-                                (d) => d.bfPercent !== null && d.bfPercent < 100
-                              )}
+                              data={chartData
+                                .filter((d) => d.bfPercent !== null && d.bfPercent < 100)
+                                .map((d) => ({
+                                  ...d,
+                                  bfPercentDisplay:
+                                    d.bfPercent !== null
+                                      ? d.bfPercent < 1
+                                        ? d.bfPercent * 100
+                                        : d.bfPercent
+                                      : null,
+                                }))}
                               margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             >
                               <defs>
@@ -2486,8 +2483,8 @@ export function HealthMetricsTrends({
                                   x2="0"
                                   y2="1"
                                 >
-                                  <stop offset="5%" stopColor="#8b4513" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#8b4513" stopOpacity={0} />
+                                  <stop offset="5%" stopColor="#92400e" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#92400e" stopOpacity={0} />
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
@@ -2497,7 +2494,7 @@ export function HealthMetricsTrends({
                                 interval="preserveStartEnd"
                               />
                               <YAxis
-                                domain={['dataMin - 1', 'dataMax + 1']}
+                                domain={[0, 'auto']}
                                 tick={{ fontSize: 10 }}
                                 label={{
                                   value: '%',
@@ -2520,11 +2517,7 @@ export function HealthMetricsTrends({
                                           {year && !data.date.includes(year) && `(${year})`}
                                         </p>
                                         <p className="text-sm font-bold text-amber-800">
-                                          {(data.bfPercent < 1
-                                            ? data.bfPercent * 100
-                                            : data.bfPercent
-                                          )?.toFixed(2)}
-                                          %
+                                          {data.bfPercentDisplay?.toFixed(2)}%
                                         </p>
                                       </div>
                                     );
@@ -2534,19 +2527,19 @@ export function HealthMetricsTrends({
                               />
                               <Area
                                 type="monotone"
-                                dataKey="bfPercent"
-                                stroke="#8b4513"
+                                dataKey="bfPercentDisplay"
+                                stroke="#92400e"
                                 strokeWidth={2.5}
                                 fill="url(#bfPercentAreaGradient)"
                                 dot={(props: any) => {
                                   const { cx, cy, index } = props;
                                   return (
                                     <circle
-                                      key={`caffeine-dot-${index}`}
+                                      key={`bf-dot-${index}`}
                                       cx={cx}
                                       cy={cy}
                                       r={2}
-                                      fill="#8b4513"
+                                      fill="#92400e"
                                       opacity={0.6}
                                     />
                                   );
@@ -2556,15 +2549,23 @@ export function HealthMetricsTrends({
                             </AreaChart>
                           ) : (
                             <BarChart
-                              data={chartData.filter(
-                                (d) => d.bfPercent !== null && d.bfPercent < 100
-                              )}
+                              data={chartData
+                                .filter((d) => d.bfPercent !== null && d.bfPercent < 100)
+                                .map((d) => ({
+                                  ...d,
+                                  bfPercentDisplay:
+                                    d.bfPercent !== null
+                                      ? d.bfPercent < 1
+                                        ? d.bfPercent * 100
+                                        : d.bfPercent
+                                      : null,
+                                }))}
                               margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             >
                               <defs>
                                 <linearGradient id="bfPercentGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#8b4513" stopOpacity={0.8} />
-                                  <stop offset="100%" stopColor="#8b4513" stopOpacity={0.3} />
+                                  <stop offset="0%" stopColor="#92400e" stopOpacity={0.8} />
+                                  <stop offset="100%" stopColor="#92400e" stopOpacity={0.3} />
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
@@ -2574,7 +2575,7 @@ export function HealthMetricsTrends({
                                 interval="preserveStartEnd"
                               />
                               <YAxis
-                                domain={['dataMin - 1', 'dataMax + 1']}
+                                domain={[0, 'auto']}
                                 tick={{ fontSize: 10 }}
                                 label={{
                                   value: '%',
@@ -2597,11 +2598,7 @@ export function HealthMetricsTrends({
                                           {year && !data.date.includes(year) && `(${year})`}
                                         </p>
                                         <p className="text-sm font-bold text-amber-800">
-                                          {(data.bfPercent < 1
-                                            ? data.bfPercent * 100
-                                            : data.bfPercent
-                                          )?.toFixed(2)}
-                                          %
+                                          {data.bfPercentDisplay?.toFixed(2)}%
                                         </p>
                                       </div>
                                     );
@@ -2610,7 +2607,7 @@ export function HealthMetricsTrends({
                                 }}
                               />
                               <Bar
-                                dataKey="bfPercent"
+                                dataKey="bfPercentDisplay"
                                 fill="url(#bfPercentGradient)"
                                 radius={[4, 4, 0, 0]}
                               />
@@ -2632,9 +2629,19 @@ export function HealthMetricsTrends({
                         <ResponsiveContainer width="100%" height={200}>
                           {chartType === 'line' ? (
                             <AreaChart
-                              data={chartData.filter(
-                                (d) => d.boneMineralPercent !== null && d.boneMineralPercent < 100
-                              )}
+                              data={chartData
+                                .filter(
+                                  (d) => d.boneMineralPercent !== null && d.boneMineralPercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  boneMineralPercentDisplay:
+                                    d.boneMineralPercent !== null
+                                      ? d.boneMineralPercent < 1
+                                        ? d.boneMineralPercent * 100
+                                        : d.boneMineralPercent
+                                      : null,
+                                }))}
                               margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             >
                               <defs>
@@ -2645,8 +2652,8 @@ export function HealthMetricsTrends({
                                   x2="0"
                                   y2="1"
                                 >
-                                  <stop offset="5%" stopColor="#f5f5dc" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="#f5f5dc" stopOpacity={0} />
+                                  <stop offset="5%" stopColor="#78716c" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#78716c" stopOpacity={0} />
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
@@ -2656,7 +2663,7 @@ export function HealthMetricsTrends({
                                 interval="preserveStartEnd"
                               />
                               <YAxis
-                                domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                                domain={[0, 'auto']}
                                 tick={{ fontSize: 10 }}
                                 label={{
                                   value: '%',
@@ -2678,12 +2685,8 @@ export function HealthMetricsTrends({
                                           {data.date}{' '}
                                           {year && !data.date.includes(year) && `(${year})`}
                                         </p>
-                                        <p className="text-sm font-bold text-amber-700">
-                                          {(data.boneMineralPercent < 1
-                                            ? data.boneMineralPercent * 100
-                                            : data.boneMineralPercent
-                                          )?.toFixed(2)}
-                                          %
+                                        <p className="text-sm font-bold text-stone-700">
+                                          {data.boneMineralPercentDisplay?.toFixed(2)}%
                                         </p>
                                       </div>
                                     );
@@ -2693,19 +2696,19 @@ export function HealthMetricsTrends({
                               />
                               <Area
                                 type="monotone"
-                                dataKey="boneMineralPercent"
-                                stroke="#f5f5dc"
+                                dataKey="boneMineralPercentDisplay"
+                                stroke="#78716c"
                                 strokeWidth={2.5}
                                 fill="url(#boneMineralPercentAreaGradient)"
                                 dot={(props: any) => {
                                   const { cx, cy, index } = props;
                                   return (
                                     <circle
-                                      key={`creatine-dot-${index}`}
+                                      key={`bone-dot-${index}`}
                                       cx={cx}
                                       cy={cy}
                                       r={2}
-                                      fill="#f5f5dc"
+                                      fill="#78716c"
                                       opacity={0.6}
                                     />
                                   );
@@ -2715,9 +2718,19 @@ export function HealthMetricsTrends({
                             </AreaChart>
                           ) : (
                             <BarChart
-                              data={chartData.filter(
-                                (d) => d.boneMineralPercent !== null && d.boneMineralPercent < 100
-                              )}
+                              data={chartData
+                                .filter(
+                                  (d) => d.boneMineralPercent !== null && d.boneMineralPercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  boneMineralPercentDisplay:
+                                    d.boneMineralPercent !== null
+                                      ? d.boneMineralPercent < 1
+                                        ? d.boneMineralPercent * 100
+                                        : d.boneMineralPercent
+                                      : null,
+                                }))}
                               margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             >
                               <defs>
@@ -2728,8 +2741,8 @@ export function HealthMetricsTrends({
                                   x2="0"
                                   y2="1"
                                 >
-                                  <stop offset="0%" stopColor="#f5f5dc" stopOpacity={0.8} />
-                                  <stop offset="100%" stopColor="#f5f5dc" stopOpacity={0.3} />
+                                  <stop offset="0%" stopColor="#78716c" stopOpacity={0.8} />
+                                  <stop offset="100%" stopColor="#78716c" stopOpacity={0.3} />
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
@@ -2739,7 +2752,7 @@ export function HealthMetricsTrends({
                                 interval="preserveStartEnd"
                               />
                               <YAxis
-                                domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                                domain={[0, 'auto']}
                                 tick={{ fontSize: 10 }}
                                 label={{
                                   value: '%',
@@ -2761,12 +2774,8 @@ export function HealthMetricsTrends({
                                           {data.date}{' '}
                                           {year && !data.date.includes(year) && `(${year})`}
                                         </p>
-                                        <p className="text-sm font-bold text-amber-700">
-                                          {(data.boneMineralPercent < 1
-                                            ? data.boneMineralPercent * 100
-                                            : data.boneMineralPercent
-                                          )?.toFixed(2)}
-                                          %
+                                        <p className="text-sm font-bold text-stone-700">
+                                          {data.boneMineralPercentDisplay?.toFixed(2)}%
                                         </p>
                                       </div>
                                     );
@@ -2775,7 +2784,7 @@ export function HealthMetricsTrends({
                                 }}
                               />
                               <Bar
-                                dataKey="boneMineralPercent"
+                                dataKey="boneMineralPercentDisplay"
                                 fill="url(#boneMineralPercentGradient)"
                                 radius={[4, 4, 0, 0]}
                               />
@@ -2795,9 +2804,17 @@ export function HealthMetricsTrends({
                         <ResponsiveContainer width="100%" height={200}>
                           {chartType === 'line' ? (
                             <AreaChart
-                              data={chartData.filter(
-                                (d) => d.musclePercent !== null && d.musclePercent < 100
-                              )}
+                              data={chartData
+                                .filter((d) => d.musclePercent !== null && d.musclePercent < 100)
+                                .map((d) => ({
+                                  ...d,
+                                  musclePercentDisplay:
+                                    d.musclePercent !== null
+                                      ? d.musclePercent < 1
+                                        ? d.musclePercent * 100
+                                        : d.musclePercent
+                                      : null,
+                                }))}
                               margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             >
                               <defs>
@@ -2819,7 +2836,7 @@ export function HealthMetricsTrends({
                                 interval="preserveStartEnd"
                               />
                               <YAxis
-                                domain={['dataMin - 1', 'dataMax + 1']}
+                                domain={[0, 'auto']}
                                 tick={{ fontSize: 10 }}
                                 label={{
                                   value: '%',
@@ -2842,11 +2859,7 @@ export function HealthMetricsTrends({
                                           {year && !data.date.includes(year) && `(${year})`}
                                         </p>
                                         <p className="text-sm font-bold text-red-600">
-                                          {(data.musclePercent < 1
-                                            ? data.musclePercent * 100
-                                            : data.musclePercent
-                                          )?.toFixed(2)}
-                                          %
+                                          {data.musclePercentDisplay?.toFixed(2)}%
                                         </p>
                                       </div>
                                     );
@@ -2856,7 +2869,7 @@ export function HealthMetricsTrends({
                               />
                               <Area
                                 type="monotone"
-                                dataKey="musclePercent"
+                                dataKey="musclePercentDisplay"
                                 stroke="#dc2626"
                                 strokeWidth={2.5}
                                 fill="url(#musclePercentAreaGradient)"
@@ -2864,7 +2877,7 @@ export function HealthMetricsTrends({
                                   const { cx, cy, index } = props;
                                   return (
                                     <circle
-                                      key={`alcohol-dot-${index}`}
+                                      key={`muscle-dot-${index}`}
                                       cx={cx}
                                       cy={cy}
                                       r={2}
@@ -2878,9 +2891,17 @@ export function HealthMetricsTrends({
                             </AreaChart>
                           ) : (
                             <BarChart
-                              data={chartData.filter(
-                                (d) => d.musclePercent !== null && d.musclePercent < 100
-                              )}
+                              data={chartData
+                                .filter((d) => d.musclePercent !== null && d.musclePercent < 100)
+                                .map((d) => ({
+                                  ...d,
+                                  musclePercentDisplay:
+                                    d.musclePercent !== null
+                                      ? d.musclePercent < 1
+                                        ? d.musclePercent * 100
+                                        : d.musclePercent
+                                      : null,
+                                }))}
                               margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             >
                               <defs>
@@ -2902,7 +2923,7 @@ export function HealthMetricsTrends({
                                 interval="preserveStartEnd"
                               />
                               <YAxis
-                                domain={['dataMin - 1', 'dataMax + 1']}
+                                domain={[0, 'auto']}
                                 tick={{ fontSize: 10 }}
                                 label={{
                                   value: '%',
@@ -2925,11 +2946,7 @@ export function HealthMetricsTrends({
                                           {year && !data.date.includes(year) && `(${year})`}
                                         </p>
                                         <p className="text-sm font-bold text-red-600">
-                                          {(data.musclePercent < 1
-                                            ? data.musclePercent * 100
-                                            : data.musclePercent
-                                          )?.toFixed(2)}
-                                          %
+                                          {data.musclePercentDisplay?.toFixed(2)}%
                                         </p>
                                       </div>
                                     );
@@ -2938,7 +2955,7 @@ export function HealthMetricsTrends({
                                 }}
                               />
                               <Bar
-                                dataKey="musclePercent"
+                                dataKey="musclePercentDisplay"
                                 fill="url(#musclePercentGradient)"
                                 radius={[4, 4, 0, 0]}
                               />

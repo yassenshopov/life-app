@@ -4,6 +4,15 @@ import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
 const supabase = getSupabaseServiceRoleClient();
 
+// Cache TTL in seconds based on time range
+function getCacheTTL(timeRange: string): number {
+  if (timeRange === 'all') return 300; // 5 minutes for full history
+  const days = parseInt(timeRange);
+  if (days <= 7) return 60; // 1 minute for weekly
+  if (days <= 30) return 120; // 2 minutes for monthly
+  return 180; // 3 minutes for longer ranges
+}
+
 export async function GET(request: Request) {
   try {
     const { userId } = await auth();
@@ -13,7 +22,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const timeRange = searchParams.get('range') || 'all';
-    
+
     // If 'all', don't filter by date - get all stored history
     let startDate: Date | null = null;
     if (timeRange !== 'all') {
@@ -24,18 +33,20 @@ export async function GET(request: Request) {
       }
     }
 
-    // Pagination variables (used throughout)
+    // Pagination variables
     const pageSize = 1000;
     let page = 0;
     let hasMore = true;
     const today = new Date(); // Used for streak and memory lane calculations
+    const todayDay = today.getDate();
+    const todayMonthNum = today.getMonth() + 1;
 
-    // Get total count (efficient)
+    // Get total count (efficient HEAD request)
     let countQuery = supabase
       .from('youtube_watch_history')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId);
-    
+
     if (startDate) {
       countQuery = countQuery.gte('watched_at', startDate.toISOString());
     }
@@ -43,7 +54,7 @@ export async function GET(request: Request) {
     const { count: totalVideos } = await countQuery;
 
     if (!totalVideos || totalVideos === 0) {
-      return NextResponse.json({
+      const emptyResponse = NextResponse.json({
         totalVideos: 0,
         uniqueVideos: 0,
         uniqueChannels: 0,
@@ -55,68 +66,75 @@ export async function GET(request: Request) {
         timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
         dateRange: null,
       });
+      emptyResponse.headers.set('Cache-Control', `public, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`);
+      return emptyResponse;
     }
 
-    // Get unique counts with pagination
+    // ============================================
+    // SINGLE PAGINATED LOOP - Aggregate everything in memory
+    // ============================================
+    
+    // Unique sets
     const videoIdSet = new Set<string>();
     const channelNameSet = new Set<string>();
     
-    page = 0;
-    hasMore = true;
+    // Video counts for top videos
+    const videoCounts = new Map<
+      string,
+      {
+        count: number;
+        video: {
+          id: string;
+          title: string;
+          channel_name: string | null;
+          thumbnail_url: string | null;
+          video_url: string;
+        };
+        lastWatched: Date;
+      }
+    >();
+    
+    // Channel counts for top channels
+    const channelCounts = new Map<
+      string,
+      {
+        count: number;
+        name: string;
+        channel_url: string | null;
+      }
+    >();
+    
+    // Watching patterns
+    const hourCounts = new Array(24).fill(0);
+    const dayCounts = new Array(7).fill(0);
+    const uniqueDates = new Set<string>();
+    
+    // Trends
+    const monthlyTrends = new Map<string, number>();
+    const yearlyTrends = new Map<string, number>();
+    const channelDiscovery = new Map<string, string>(); // channel -> first watched date
+    const topChannelsByYear = new Map<string, Map<string, number>>();
+    
+    // Binge detection
+    const recordsByDate = new Map<string, Array<{ video_id: string; watched_at: Date }>>();
+    
+    // Memory lane
+    const memoryLane: Array<{
+      year: number;
+      videos: Array<{ title: string; channel: string; url: string; date: string }>;
+    }> = [];
+    
+    // Date range tracking
+    let oldestDate: Date | null = null;
+    let newestDate: Date | null = null;
+    
+    // Single paginated loop fetching all required columns
     while (hasMore && page < 100) {
       let query = supabase
         .from('youtube_watch_history')
-        .select('video_id, channel_name')
+        .select('video_id, video_title, channel_name, channel_url, thumbnail_url, video_url, watched_at')
         .eq('user_id', userId);
-      
-      if (startDate) {
-        query = query.gte('watched_at', startDate.toISOString());
-      }
 
-      const { data: records, error } = await query
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error || !records || records.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      records.forEach((record) => {
-        videoIdSet.add(record.video_id);
-        if (record.channel_name) {
-          channelNameSet.add(record.channel_name);
-        }
-      });
-
-      hasMore = records.length === pageSize;
-      page++;
-    }
-
-    const uniqueVideos = videoIdSet.size;
-    const uniqueChannels = channelNameSet.size;
-
-    // Get top videos using aggregation query with pagination
-    // Fetch all records for top videos calculation with pagination
-    page = 0;
-    hasMore = true;
-    const videoCounts = new Map<string, {
-      count: number;
-      video: {
-        id: string;
-        title: string;
-        channel_name: string | null;
-        thumbnail_url: string | null;
-        video_url: string;
-      };
-      lastWatched: Date;
-    }>();
-
-    while (hasMore && page < 100) { // Safety limit
-      let query = supabase
-        .from('youtube_watch_history')
-        .select('video_id, video_title, channel_name, thumbnail_url, video_url, watched_at')
-        .eq('user_id', userId);
-      
       if (startDate) {
         query = query.gte('watched_at', startDate.toISOString());
       }
@@ -130,13 +148,28 @@ export async function GET(request: Request) {
         break;
       }
 
-      records.forEach((record) => {
-        const existing = videoCounts.get(record.video_id);
+      // Process each record once, aggregating all metrics
+      for (const record of records) {
         const watchedAt = new Date(record.watched_at);
-        if (existing) {
-          existing.count++;
-          if (watchedAt > existing.lastWatched) {
-            existing.lastWatched = watchedAt;
+        const year = watchedAt.getFullYear();
+        const yearStr = String(year);
+        const month = `${year}-${String(watchedAt.getMonth() + 1).padStart(2, '0')}`;
+        const dateKey = watchedAt.toDateString();
+        const hour = watchedAt.getHours();
+        const day = watchedAt.getDay();
+
+        // Track unique videos and channels
+        videoIdSet.add(record.video_id);
+        if (record.channel_name) {
+          channelNameSet.add(record.channel_name);
+        }
+
+        // Video counts (for top videos)
+        const existingVideo = videoCounts.get(record.video_id);
+        if (existingVideo) {
+          existingVideo.count++;
+          if (watchedAt > existingVideo.lastWatched) {
+            existingVideo.lastWatched = watchedAt;
           }
         } else {
           videoCounts.set(record.video_id, {
@@ -151,49 +184,12 @@ export async function GET(request: Request) {
             lastWatched: watchedAt,
           });
         }
-      });
 
-      hasMore = records.length === pageSize;
-      page++;
-    }
-
-    const topVideosListResult = Array.from(videoCounts.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 100);
-
-    // Get top channels with pagination
-    const channelCounts = new Map<string, {
-      count: number;
-      name: string;
-      channel_url: string | null;
-    }>();
-
-    page = 0;
-    hasMore = true;
-    while (hasMore && page < 100) {
-      let query = supabase
-        .from('youtube_watch_history')
-        .select('channel_name, channel_url')
-        .eq('user_id', userId);
-      
-      if (startDate) {
-        query = query.gte('watched_at', startDate.toISOString());
-      }
-
-      const { data: records, error } = await query
-        .order('watched_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error || !records || records.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      records.forEach((record) => {
+        // Channel counts (for top channels)
         if (record.channel_name) {
-          const existing = channelCounts.get(record.channel_name);
-          if (existing) {
-            existing.count++;
+          const existingChannel = channelCounts.get(record.channel_name);
+          if (existingChannel) {
+            existingChannel.count++;
           } else {
             channelCounts.set(record.channel_name, {
               count: 1,
@@ -202,56 +198,93 @@ export async function GET(request: Request) {
             });
           }
         }
-      });
+
+        // Watching patterns
+        hourCounts[hour]++;
+        dayCounts[day]++;
+        uniqueDates.add(dateKey);
+
+        // Monthly and yearly trends
+        monthlyTrends.set(month, (monthlyTrends.get(month) || 0) + 1);
+        yearlyTrends.set(yearStr, (yearlyTrends.get(yearStr) || 0) + 1);
+
+        // Channel discovery (track earliest watch date per channel)
+        if (record.channel_name) {
+          const existingDate = channelDiscovery.get(record.channel_name);
+          if (!existingDate || watchedAt < new Date(existingDate)) {
+            channelDiscovery.set(record.channel_name, watchedAt.toISOString());
+          }
+        }
+
+        // Top channels by year
+        if (record.channel_name) {
+          if (!topChannelsByYear.has(yearStr)) {
+            topChannelsByYear.set(yearStr, new Map());
+          }
+          const yearChannels = topChannelsByYear.get(yearStr)!;
+          yearChannels.set(record.channel_name, (yearChannels.get(record.channel_name) || 0) + 1);
+        }
+
+        // Binge detection grouping
+        if (!recordsByDate.has(dateKey)) {
+          recordsByDate.set(dateKey, []);
+        }
+        recordsByDate.get(dateKey)!.push({
+          video_id: record.video_id,
+          watched_at: watchedAt,
+        });
+
+        // Memory lane: videos watched on this day in previous years
+        if (
+          watchedAt.getMonth() + 1 === todayMonthNum &&
+          watchedAt.getDate() === todayDay &&
+          watchedAt.getFullYear() < today.getFullYear()
+        ) {
+          const yearKey = watchedAt.getFullYear();
+          let memoryEntry = memoryLane.find((m) => m.year === yearKey);
+          if (!memoryEntry) {
+            memoryEntry = { year: yearKey, videos: [] };
+            memoryLane.push(memoryEntry);
+          }
+          if (memoryEntry.videos.length < 5) {
+            memoryEntry.videos.push({
+              title: record.video_title,
+              channel: record.channel_name || 'Unknown',
+              url: record.video_url,
+              date: watchedAt.toISOString(),
+            });
+          }
+        }
+
+        // Track date range (since results are ordered desc, first is newest, last is oldest)
+        if (!newestDate) {
+          newestDate = watchedAt;
+        }
+        oldestDate = watchedAt;
+      }
 
       hasMore = records.length === pageSize;
       page++;
     }
 
+    // ============================================
+    // Post-processing: Format aggregated data
+    // ============================================
+
+    const uniqueVideos = videoIdSet.size;
+    const uniqueChannels = channelNameSet.size;
+
+    // Top videos
+    const topVideosListResult = Array.from(videoCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 100);
+
+    // Top channels
     const topChannelsList = Array.from(channelCounts.values())
       .sort((a, b) => b.count - a.count)
       .slice(0, 100);
 
-    // Get watching patterns by hour and day with pagination
-    const hourCounts = new Array(24).fill(0);
-    const dayCounts = new Array(7).fill(0);
-    const uniqueDates = new Set<string>();
-
-    page = 0;
-    hasMore = true;
-    while (hasMore && page < 100) {
-      let query = supabase
-        .from('youtube_watch_history')
-        .select('watched_at')
-        .eq('user_id', userId);
-      
-      if (startDate) {
-        query = query.gte('watched_at', startDate.toISOString());
-      }
-
-      const { data: records, error } = await query
-        .order('watched_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error || !records || records.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      records.forEach((record) => {
-        const watchedAt = new Date(record.watched_at);
-        const hour = watchedAt.getHours();
-        const day = watchedAt.getDay();
-        hourCounts[hour]++;
-        dayCounts[day]++;
-        uniqueDates.add(watchedAt.toDateString());
-      });
-
-      hasMore = records.length === pageSize;
-      page++;
-    }
-
-    // Get watching streak
+    // Watching streak
     let streak = 0;
     for (let i = 0; i < 365; i++) {
       const checkDate = new Date(today);
@@ -263,177 +296,25 @@ export async function GET(request: Request) {
       }
     }
 
-    // Get date range using min/max queries
-    let oldestQuery = supabase
-      .from('youtube_watch_history')
-      .select('watched_at')
-      .eq('user_id', userId);
-    
-    if (startDate) {
-      oldestQuery = oldestQuery.gte('watched_at', startDate.toISOString());
-    }
+    // Date range
+    const finalOldestDate = oldestDate || new Date();
+    const finalNewestDate = newestDate || new Date();
+    const daysBack = Math.ceil(
+      (finalNewestDate.getTime() - finalOldestDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-    const { data: oldestRecord } = await oldestQuery
-      .order('watched_at', { ascending: true })
-      .limit(1)
-      .single();
-
-    let newestQuery = supabase
-      .from('youtube_watch_history')
-      .select('watched_at')
-      .eq('user_id', userId);
-    
-    if (startDate) {
-      newestQuery = newestQuery.gte('watched_at', startDate.toISOString());
-    }
-
-    const { data: newestRecord } = await newestQuery
-      .order('watched_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    const oldestDate = oldestRecord ? new Date(oldestRecord.watched_at) : new Date();
-    const newestDate = newestRecord ? new Date(newestRecord.watched_at) : new Date();
-    const daysBack = Math.ceil((newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    // Calculate monthly and yearly trends
-    const monthlyTrends = new Map<string, number>();
-    const yearlyTrends = new Map<string, number>();
-    const channelDiscovery = new Map<string, string>(); // channel -> first watched date
+    // Binge sessions (days with 10+ videos)
     const bingeSessions: Array<{ date: string; count: number; videos: string[] }> = [];
-    const memoryLane: Array<{ year: number; videos: Array<{ title: string; channel: string; url: string; date: string }> }> = [];
-
-    // Process all records for trends and additional analytics
-    page = 0;
-    hasMore = true;
-    const todayMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    const todayDay = today.getDate();
-    const todayMonthNum = today.getMonth() + 1;
-
-    // Group records by date for binge detection
-    const recordsByDate = new Map<string, Array<{ video_id: string; watched_at: Date }>>();
-
-    while (hasMore && page < 100) {
-      let query = supabase
-        .from('youtube_watch_history')
-        .select('video_id, video_title, channel_name, video_url, watched_at')
-        .eq('user_id', userId);
-      
-      if (startDate) {
-        query = query.gte('watched_at', startDate.toISOString());
-      }
-
-      const { data: records, error } = await query
-        .order('watched_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error || !records || records.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      records.forEach((record) => {
-        const watchedAt = new Date(record.watched_at);
-        const year = watchedAt.getFullYear();
-        const month = `${year}-${String(watchedAt.getMonth() + 1).padStart(2, '0')}`;
-        const dateKey = watchedAt.toDateString();
-
-        // Monthly trends
-        monthlyTrends.set(month, (monthlyTrends.get(month) || 0) + 1);
-        
-        // Yearly trends
-        yearlyTrends.set(String(year), (yearlyTrends.get(String(year)) || 0) + 1);
-
-        // Channel discovery (first time watching a channel)
-        if (record.channel_name) {
-          if (!channelDiscovery.has(record.channel_name)) {
-            channelDiscovery.set(record.channel_name, watchedAt.toISOString());
-          }
-        }
-
-        // Group by date for binge detection
-        if (!recordsByDate.has(dateKey)) {
-          recordsByDate.set(dateKey, []);
-        }
-        recordsByDate.get(dateKey)!.push({
-          video_id: record.video_id,
-          watched_at: watchedAt,
-        });
-
-        // Memory lane: videos watched on this day in previous years
-        if (watchedAt.getMonth() + 1 === todayMonthNum && watchedAt.getDate() === todayDay && watchedAt.getFullYear() < today.getFullYear()) {
-          const yearKey = watchedAt.getFullYear();
-          if (!memoryLane.find(m => m.year === yearKey)) {
-            memoryLane.push({ year: yearKey, videos: [] });
-          }
-          const memoryEntry = memoryLane.find(m => m.year === yearKey)!;
-          if (memoryEntry.videos.length < 5) {
-            memoryEntry.videos.push({
-              title: record.video_title,
-              channel: record.channel_name || 'Unknown',
-              url: record.video_url,
-              date: watchedAt.toISOString(),
-            });
-          }
-        }
-      });
-
-      hasMore = records.length === pageSize;
-      page++;
-    }
-
-    // Detect binge sessions (days with 10+ videos watched)
     recordsByDate.forEach((videos, date) => {
       if (videos.length >= 10) {
         bingeSessions.push({
           date,
           count: videos.length,
-          videos: [...new Set(videos.map(v => v.video_id))],
+          videos: [...new Set(videos.map((v) => v.video_id))],
         });
       }
     });
-
-    // Sort binge sessions by count
     bingeSessions.sort((a, b) => b.count - a.count);
-
-    // Get top channels by year
-    const topChannelsByYear = new Map<string, Map<string, number>>();
-    page = 0;
-    hasMore = true;
-
-    while (hasMore && page < 100) {
-      let query = supabase
-        .from('youtube_watch_history')
-        .select('channel_name, watched_at')
-        .eq('user_id', userId);
-      
-      if (startDate) {
-        query = query.gte('watched_at', startDate.toISOString());
-      }
-
-      const { data: records, error } = await query
-        .order('watched_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error || !records || records.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      records.forEach((record) => {
-        if (record.channel_name) {
-          const year = String(new Date(record.watched_at).getFullYear());
-          if (!topChannelsByYear.has(year)) {
-            topChannelsByYear.set(year, new Map());
-          }
-          const yearChannels = topChannelsByYear.get(year)!;
-          yearChannels.set(record.channel_name, (yearChannels.get(record.channel_name) || 0) + 1);
-        }
-      });
-
-      hasMore = records.length === pageSize;
-      page++;
-    }
 
     // Format top channels by year
     const topChannelsByYearFormatted: Record<string, Array<{ name: string; count: number }>> = {};
@@ -460,22 +341,24 @@ export async function GET(request: Request) {
 
     // Get enriched data insights
     const enrichedInsights: any = {};
-    
+
     // Get ALL unique video IDs from watch history (not just top videos)
     const allUniqueVideoIds = Array.from(videoIdSet);
-    
+
     if (allUniqueVideoIds.length > 0) {
       // Fetch enriched data for all unique videos in chunks
       const chunkSize = 1000;
       const enrichedVideoData = new Map<string, any>();
-      
+
       for (let i = 0; i < allUniqueVideoIds.length; i += chunkSize) {
         const chunk = allUniqueVideoIds.slice(i, i + chunkSize);
         const { data: enrichedVideos } = await supabase
           .from('youtube_videos')
-          .select('video_id, view_count, like_count, comment_count, duration_seconds, category_id, tags, published_at')
+          .select(
+            'video_id, view_count, like_count, comment_count, duration_seconds, category_id, tags, published_at'
+          )
           .in('video_id', chunk);
-        
+
         if (enrichedVideos) {
           enrichedVideos.forEach((video) => {
             enrichedVideoData.set(video.video_id, video);
@@ -504,14 +387,17 @@ export async function GET(request: Request) {
         const enriched = enrichedVideoData.get(videoId);
         const watchCount = videoCounts.get(videoId)?.count || 1;
         const videoInfo = videoCounts.get(videoId);
-        
+
         if (enriched?.duration_seconds) {
           totalWatchTimeSeconds += enriched.duration_seconds * watchCount;
           videosWithDuration++;
         }
 
         if (enriched?.category_id) {
-          categoryCounts.set(enriched.category_id, (categoryCounts.get(enriched.category_id) || 0) + watchCount);
+          categoryCounts.set(
+            enriched.category_id,
+            (categoryCounts.get(enriched.category_id) || 0) + watchCount
+          );
         }
 
         if (enriched?.tags && Array.isArray(enriched.tags)) {
@@ -546,9 +432,8 @@ export async function GET(request: Request) {
       };
 
       // Calculate average watch time
-      const averageWatchTimeSeconds = videosWithDuration > 0 
-        ? Math.round(totalWatchTimeSeconds / videosWithDuration) 
-        : 0;
+      const averageWatchTimeSeconds =
+        videosWithDuration > 0 ? Math.round(totalWatchTimeSeconds / videosWithDuration) : 0;
 
       // Top categories
       const topCategories = Array.from(categoryCounts.entries())
@@ -571,7 +456,7 @@ export async function GET(request: Request) {
       let totalLikes = 0;
       let totalComments = 0;
       let videosWithEngagement = 0;
-      
+
       popularVideos.forEach((video) => {
         if (video.like_count !== null) {
           totalLikes += video.like_count;
@@ -597,7 +482,8 @@ export async function GET(request: Request) {
         totalLikes,
         totalComments,
         averageLikes: videosWithEngagement > 0 ? Math.round(totalLikes / videosWithEngagement) : 0,
-        averageComments: videosWithEngagement > 0 ? Math.round(totalComments / videosWithEngagement) : 0,
+        averageComments:
+          videosWithEngagement > 0 ? Math.round(totalComments / videosWithEngagement) : 0,
         videosWithEngagement,
       };
     }
@@ -635,4 +521,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

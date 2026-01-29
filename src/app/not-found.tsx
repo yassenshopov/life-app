@@ -22,7 +22,7 @@ function parseRgb(rgbString: string): { r: number; g: number; b: number } {
 // Generate color variations for animated gradient
 function generateGradientColors(baseColor: string): string[] {
   const rgb = parseRgb(baseColor);
-  
+
   // Create variations: lighter, base, darker, and complementary
   const variations = [
     `rgb(${Math.min(255, rgb.r + 30)}, ${Math.min(255, rgb.g + 30)}, ${Math.min(255, rgb.b + 30)})`, // Lighter
@@ -30,33 +30,30 @@ function generateGradientColors(baseColor: string): string[] {
     `rgb(${Math.max(0, rgb.r - 30)}, ${Math.max(0, rgb.g - 30)}, ${Math.max(0, rgb.b - 30)})`, // Darker
     `rgb(${Math.min(255, rgb.r + 20)}, ${Math.max(0, rgb.g - 10)}, ${Math.min(255, rgb.b + 20)})`, // Slight variation
   ];
-  
+
   return variations;
 }
 
-interface CurrentlyPlaying {
-  isPlaying: boolean;
-  item?: {
-    name: string;
-    artists: Array<{ name: string }>;
-    album: {
-      name: string;
-      images: Array<{ url: string }>;
-    };
-  };
-  is_playing?: boolean;
-}
+// Default color that matches the server-side render to avoid hydration mismatch
+const DEFAULT_BG_COLOR = 'rgb(241, 245, 249)';
+const DEFAULT_GRADIENT_COLORS = generateGradientColors(DEFAULT_BG_COLOR);
 
 export default function NotFound() {
-  const [bgColor, setBgColor] = React.useState<string>(() => getDefaultBgColor());
+  // Use static default values for initial render to avoid hydration mismatch
+  const [bgColor, setBgColor] = React.useState<string>(DEFAULT_BG_COLOR);
   const [isUsingCustomColor, setIsUsingCustomColor] = React.useState(false);
-  const [currentlyPlaying, setCurrentlyPlaying] = React.useState<CurrentlyPlaying | null>(null);
-  const [gradientColors, setGradientColors] = React.useState<string[]>(() => 
-    generateGradientColors(getDefaultBgColor())
-  );
-  const [lastTrackId, setLastTrackId] = React.useState<string | null>(null);
+  const [gradientColors, setGradientColors] = React.useState<string[]>(DEFAULT_GRADIENT_COLORS);
   const [isConnected, setIsConnected] = React.useState(false);
   const lastTrackIdRef = React.useRef<string | null>(null);
+
+  // Update to actual theme color after hydration (client-side only)
+  React.useEffect(() => {
+    const actualColor = getDefaultBgColor();
+    if (actualColor !== DEFAULT_BG_COLOR) {
+      setBgColor(actualColor);
+      setGradientColors(generateGradientColors(actualColor));
+    }
+  }, []);
 
   // Check connection status
   React.useEffect(() => {
@@ -79,13 +76,11 @@ export default function NotFound() {
       if (response.ok) {
         const data = await response.json();
         const currentTrackId = data.item?.id;
-        
+
         // Only update colors if track has changed
         if (currentTrackId && currentTrackId !== lastTrackIdRef.current) {
-          setCurrentlyPlaying(data);
-          setLastTrackId(currentTrackId);
           lastTrackIdRef.current = currentTrackId;
-          
+
           // Extract color from album art if available
           if (data.item?.album?.images && data.item.album.images.length > 0) {
             const imageUrl =
@@ -119,9 +114,7 @@ export default function NotFound() {
           }
         } else if (!currentTrackId && lastTrackIdRef.current) {
           // Track stopped playing
-          setLastTrackId(null);
           lastTrackIdRef.current = null;
-          setCurrentlyPlaying(null);
           const defaultColor = getDefaultBgColor();
           setBgColor(defaultColor);
           setGradientColors(generateGradientColors(defaultColor));
@@ -310,7 +303,8 @@ export default function NotFound() {
           position: relative;
           z-index: 1;
         }
-      `}</style>
+      `}
+      </style>
       <div
         className={`min-h-screen flex items-center justify-center px-4 transition-all duration-500 relative ${
           !isUsingCustomColor ? 'animated-gradient-default' : ''
@@ -333,87 +327,77 @@ export default function NotFound() {
             <div className="gradient-overlay default-gradient-layer-4" />
           </>
         )}
-      <div className="text-center space-y-6 max-w-md gradient-content">
-        <div className="space-y-2">
-          <h1
-            className="text-9xl font-bold transition-colors duration-500"
-            style={{
-              color: !isUsingCustomColor 
-                ? 'rgba(var(--primary), 0.2)' 
-                : 'rgba(255, 255, 255, 0.3)',
-            }}
-          >
-            404
-          </h1>
-          <h2
-            className="text-3xl font-bold transition-colors duration-500"
-            style={{
-              color: !isUsingCustomColor 
-                ? 'hsl(var(--foreground))' 
-                : 'rgba(255, 255, 255, 0.95)',
-            }}
-          >
-            Page Not Found
-          </h2>
-          <p
-            className="transition-colors duration-500"
-            style={{
-              color: !isUsingCustomColor 
-                ? 'hsl(var(--muted-foreground))' 
-                : 'rgba(255, 255, 255, 0.8)',
-            }}
-          >
-            The page you're looking for doesn't exist or has been moved.
-          </p>
+        <div className="text-center space-y-6 max-w-md gradient-content">
+          <div className="space-y-2">
+            <h1
+              className="text-9xl font-bold transition-colors duration-500"
+              style={{
+                color: !isUsingCustomColor
+                  ? 'rgba(var(--primary), 0.2)'
+                  : 'rgba(255, 255, 255, 0.3)',
+              }}
+            >
+              404
+            </h1>
+            <h2
+              className="text-3xl font-bold transition-colors duration-500"
+              style={{
+                color: !isUsingCustomColor ? 'hsl(var(--foreground))' : 'rgba(255, 255, 255, 0.95)',
+              }}
+            >
+              Page Not Found
+            </h2>
+            <p
+              className="transition-colors duration-500"
+              style={{
+                color: !isUsingCustomColor
+                  ? 'hsl(var(--muted-foreground))'
+                  : 'rgba(255, 255, 255, 0.8)',
+              }}
+            >
+              The page you're looking for doesn't exist or has been moved.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button
+              asChild
+              size="lg"
+              style={
+                isUsingCustomColor
+                  ? {
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                    }
+                  : undefined
+              }
+              className={isUsingCustomColor ? 'hover:bg-white/30' : undefined}
+            >
+              <Link href="/">
+                <Home className="mr-2 h-4 w-4" />
+                Go Home
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              style={
+                isUsingCustomColor
+                  ? {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                    }
+                  : undefined
+              }
+              className={isUsingCustomColor ? 'hover:bg-white/20' : undefined}
+            >
+              <Link href="/hq">Go to HQ</Link>
+            </Button>
+          </div>
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button
-            asChild
-            size="lg"
-            style={
-              isUsingCustomColor
-                ? {
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                  }
-                : undefined
-            }
-            className={
-              isUsingCustomColor
-                ? 'hover:bg-white/30'
-                : undefined
-            }
-          >
-            <Link href="/">
-              <Home className="mr-2 h-4 w-4" />
-              Go Home
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            style={
-              isUsingCustomColor
-                ? {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                  }
-                : undefined
-            }
-            className={
-              isUsingCustomColor
-                ? 'hover:bg-white/20'
-                : undefined
-            }
-          >
-            <Link href="/hq">Go to HQ</Link>
-          </Button>
-        </div>
-      </div>
       </div>
     </>
   );
