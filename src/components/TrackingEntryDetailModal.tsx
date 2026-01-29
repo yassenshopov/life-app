@@ -208,6 +208,9 @@ export function TrackingEntryDetailModal({
       tiredness,
       weight: extractPropertyValue(props['Weight [kg]'] || props['Weight'] || {}),
       steps: extractPropertyValue(props['Steps'] || {}),
+      bfPercent: extractPropertyValue(props['BF%'] || {}),
+      boneMineralPercent: extractPropertyValue(props['Bone Mineral %'] || {}),
+      musclePercent: extractPropertyValue(props['Muscle %'] || {}),
     };
   }, [entry]);
 
@@ -612,7 +615,7 @@ export function TrackingEntryDetailModal({
             </div>
           </div>
 
-          {/* Health Metrics Grid - RHR, Weight, Steps side by side */}
+          {/* Health Metrics Grid - RHR, Weight, Steps, BF%, Bone Mineral %, Muscle % */}
           <div className="pt-4 border-t">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* RHR Section */}
@@ -983,6 +986,53 @@ export function TrackingEntryDetailModal({
               )}
             </div>
           </div>
+
+          {/* Body Composition Metrics */}
+          {(sleepData.bfPercent !== null || sleepData.boneMineralPercent !== null || sleepData.musclePercent !== null) && (
+            <div className="pt-4 border-t">
+              <h3 className="text-base font-semibold text-foreground mb-4">Body Composition</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* BF% Section */}
+                {sleepData.bfPercent !== null && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Scale className="w-4 h-4 text-orange-500" />
+                        <span className="text-sm font-semibold text-foreground">Body Fat %</span>
+                      </div>
+                      <span className="text-lg font-bold text-foreground">{sleepData.bfPercent.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bone Mineral % Section */}
+                {sleepData.boneMineralPercent !== null && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Scale className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm font-semibold text-foreground">Bone Mineral %</span>
+                      </div>
+                      <span className="text-lg font-bold text-foreground">{sleepData.boneMineralPercent.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Muscle % Section */}
+                {sleepData.musclePercent !== null && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Scale className="w-4 h-4 text-green-500" />
+                        <span className="text-sm font-semibold text-foreground">Muscle %</span>
+                      </div>
+                      <span className="text-lg font-bold text-foreground">{sleepData.musclePercent.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tiredness */}
           {sleepData.tiredness !== null && (

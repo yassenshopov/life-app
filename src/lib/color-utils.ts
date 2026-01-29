@@ -181,4 +181,3 @@ export function colorToRgba(color: string | undefined | null, opacity: number): 
   console.warn(`Unable to parse color format: ${color}. Using default.`);
   return `rgba(66, 133, 244, ${opacity})`; // Default blue
 }
-

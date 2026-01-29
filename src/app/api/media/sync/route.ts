@@ -264,6 +264,9 @@ export async function POST(request: NextRequest) {
             case 'Created':
               mediaData.created = value ? new Date(value).toISOString() : null;
               break;
+            case 'Related':
+              mediaData.related_notion_page_ids = Array.isArray(value) ? value : [];
+              break;
             default:
               // Handle relation properties (could be named "Month", "Monthly Tracking", etc.)
               if (prop.type === 'relation' && Array.isArray(value) && value.length > 0) {

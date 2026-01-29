@@ -439,6 +439,9 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
     const rhr = extractPropertyValue(props['RHR [bpm]'] || props['RHR'] || {});
     const steps = extractPropertyValue(props['Steps'] || {});
     const weight = extractPropertyValue(props['Weight [kg]'] || props['Weight'] || {});
+    const bfPercent = extractPropertyValue(props['BF%'] || {});
+    const boneMineralPercent = extractPropertyValue(props['Bone Mineral %'] || {});
+    const musclePercent = extractPropertyValue(props['Muscle %'] || {});
     
     // Only return if we have at least sleep data
     if (sleepHours === null && deepSleepPercent === null && remSleepPercent === null) {
@@ -462,6 +465,9 @@ export const ScheduleCalendarView = React.forwardRef<ScheduleCalendarViewRef, Sc
       rhr,
       steps,
       weight,
+      bfPercent,
+      boneMineralPercent,
+      musclePercent,
     };
   }, [extractPropertyValue]);
 

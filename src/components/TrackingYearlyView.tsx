@@ -14,6 +14,7 @@ interface TrackingYearlyViewProps {
   currentYear: Date;
   onNavigate: (date: Date) => void;
   onYearClick?: (yearStart: Date, yearEnd: Date) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 // Helper to extract property value
@@ -70,6 +71,7 @@ export function TrackingYearlyView({
   currentYear,
   onNavigate,
   onYearClick,
+  colorPalette,
 }: TrackingYearlyViewProps) {
   // Group entries by year
   const yearsData = useMemo(() => {
@@ -204,9 +206,13 @@ export function TrackingYearlyView({
             <Card
               key={year}
               className={cn(
-                'p-4 cursor-pointer transition-all hover:shadow-md',
+                'p-4 cursor-pointer transition-all duration-1000 hover:shadow-md',
                 !hasData && 'opacity-60'
               )}
+              style={colorPalette ? {
+                backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+              } : undefined}
               onClick={() => onYearClick?.(yearData.yearStart, yearData.yearEnd)}
             >
               <div className="flex items-center justify-between mb-3">

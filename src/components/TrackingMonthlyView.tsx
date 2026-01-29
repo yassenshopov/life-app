@@ -13,6 +13,7 @@ interface TrackingMonthlyViewProps {
   currentYear: Date;
   onNavigate: (date: Date) => void;
   onMonthClick?: (monthStart: Date, monthEnd: Date) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 // Helper to extract property value
@@ -69,6 +70,7 @@ export function TrackingMonthlyView({
   currentYear,
   onNavigate,
   onMonthClick,
+  colorPalette,
 }: TrackingMonthlyViewProps) {
   // Group entries by month
   const monthsData = useMemo(() => {
@@ -245,7 +247,13 @@ export function TrackingMonthlyView({
       </div>
 
       {/* Months Grid */}
-      <Card className="flex-1 overflow-hidden">
+      <Card 
+        className="flex-1 overflow-hidden transition-all duration-1000"
+        style={colorPalette ? {
+          backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+          borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+        } : undefined}
+      >
         <div className="h-full overflow-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
             {displayMonths.map((month, index) => {
@@ -257,9 +265,13 @@ export function TrackingMonthlyView({
                 <Card
                   key={format(month.monthStart, 'yyyy-MM')}
                   className={cn(
-                    'p-4 cursor-pointer transition-all hover:shadow-md',
+                    'p-4 cursor-pointer transition-all duration-1000 hover:shadow-md',
                     !hasData && 'opacity-60'
                   )}
+                  style={colorPalette ? {
+                    backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                    borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                  } : undefined}
                   onClick={() => onMonthClick?.(month.monthStart, month.monthEnd)}
                 >
                   <div className="space-y-3">

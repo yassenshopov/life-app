@@ -42,6 +42,18 @@ export const NOTION_DATABASE_TEMPLATES: NotionDatabaseTemplate[] = [
         type: 'number',
         description: 'Morning weight in kg',
       },
+      'BF%': {
+        type: 'number',
+        description: 'Body fat percentage',
+      },
+      'Bone Mineral %': {
+        type: 'number',
+        description: 'Bone mineral percentage',
+      },
+      'Muscle %': {
+        type: 'formula',
+        description: 'Muscle percentage (formula: 1 - BF% - Bone Mineral %)',
+      },
       Mood: {
         type: 'select',
         description: 'Daily mood rating',

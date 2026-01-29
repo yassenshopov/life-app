@@ -13,6 +13,7 @@ interface TrackingCalendarViewProps {
   currentMonth: Date;
   onNavigate: (date: Date) => void;
   onEntryClick?: (entry: TrackingEntry) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 export function TrackingCalendarView({
@@ -20,6 +21,7 @@ export function TrackingCalendarView({
   currentMonth,
   onNavigate,
   onEntryClick,
+  colorPalette,
 }: TrackingCalendarViewProps) {
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -209,13 +211,28 @@ export function TrackingCalendarView({
       </div>
 
       {/* Calendar Grid */}
-      <Card className="flex-1 overflow-hidden">
+      <Card 
+        className="flex-1 overflow-hidden transition-all duration-1000"
+        style={colorPalette ? {
+          backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+          borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+        } : undefined}
+      >
         <div className="h-full overflow-auto">
           <div className="min-w-full">
             {/* Weekday headers */}
             <div
-              className="grid border-b sticky top-0 z-10 bg-background"
-              style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
+              className={cn(
+                "grid border-b sticky top-0 z-10 transition-all duration-1000",
+                !colorPalette && "bg-background"
+              )}
+              style={{
+                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                ...(colorPalette ? {
+                  backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                  borderBottomColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                } : {}),
+              }}
             >
               {weekDays.map((day, index) => (
                 <div
