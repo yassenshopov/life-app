@@ -14,13 +14,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const timeMin = searchParams.get('timeMin');
     const timeMax = searchParams.get('timeMax');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 1000;
+
+    // Parse and validate limit parameter
+    const DEFAULT_LIMIT = 1000;
+    const MAX_LIMIT = 10000;
+    const limitParam = searchParams.get('limit');
+    let limit = DEFAULT_LIMIT;
+
+    if (limitParam) {
+      const parsed = parseInt(limitParam, 10);
+      if (Number.isInteger(parsed) && parsed > 0 && parsed <= MAX_LIMIT) {
+        limit = parsed;
+      }
+      // Invalid values (NaN, negative, zero, or exceeds max) fall back to DEFAULT_LIMIT
+    }
 
     // Build query
-    let query = supabase
-      .from('youtube_watch_history')
-      .select('*')
-      .eq('user_id', userId);
+    let query = supabase.from('youtube_watch_history').select('*').eq('user_id', userId);
 
     // Apply date range filters
     if (timeMin) {
@@ -33,10 +43,8 @@ export async function GET(request: Request) {
     // Order by watched_at descending (most recent first)
     query = query.order('watched_at', { ascending: false });
 
-    // Apply limit
-    if (limit) {
-      query = query.limit(limit);
-    }
+    // Apply limit (always valid positive integer)
+    query = query.limit(limit);
 
     const { data, error } = await query;
 

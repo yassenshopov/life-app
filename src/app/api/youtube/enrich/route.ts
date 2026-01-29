@@ -21,11 +21,11 @@ function getYouTubeClient() {
 function parseDuration(duration: string): number {
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return 0;
-  
+
   const hours = parseInt(match[1] || '0', 10);
   const minutes = parseInt(match[2] || '0', 10);
   const seconds = parseInt(match[3] || '0', 10);
-  
+
   return hours * 3600 + minutes * 60 + seconds;
 }
 
@@ -39,7 +39,7 @@ function extractChannelId(channelUrl: string | null): string | null {
     // https://youtube.com/c/channelname
     const url = new URL(channelUrl);
     const pathParts = url.pathname.split('/').filter(Boolean);
-    
+
     if (pathParts[0] === 'channel' && pathParts[1]) {
       return pathParts[1];
     }
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       // Process each video ID
       for (const record of watchHistory) {
         const videoId = record.video_id;
-        
+
         // Skip if we've already seen this video ID or if it's already enriched
         if (seenVideoIds.has(videoId) || enrichedVideoIds.has(videoId)) {
           continue;
@@ -150,7 +150,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`Enriching ${videosNeedingEnrichment.length} videos (limited to ${limit} per session)`);
+    console.log(
+      `Enriching ${videosNeedingEnrichment.length} videos (limited to ${limit} per session)`
+    );
 
     const youtube = getYouTubeClient();
     let enrichedCount = 0;
@@ -158,10 +160,50 @@ export async function POST(request: NextRequest) {
     let apiCallsMade = 0; // Track API usage
     const errors: string[] = [];
 
+    // Bulk fetch channel_url from youtube_watch_history and youtube_videos to avoid N+1 queries
+    const watchHistoryChannelUrlMap = new Map<string, string>();
+    const existingVideosChannelUrlMap = new Map<string, string>();
+
+    // Fetch channel_url from youtube_watch_history in chunks (Supabase has limits on IN clause)
+    const chunkSize = 500;
+    for (let i = 0; i < videosNeedingEnrichment.length; i += chunkSize) {
+      const chunk = videosNeedingEnrichment.slice(i, i + chunkSize);
+
+      const { data: watchHistoryData } = await supabase
+        .from('youtube_watch_history')
+        .select('video_id, channel_url')
+        .in('video_id', chunk);
+
+      if (watchHistoryData) {
+        for (const record of watchHistoryData) {
+          if (record.channel_url && !watchHistoryChannelUrlMap.has(record.video_id)) {
+            watchHistoryChannelUrlMap.set(record.video_id, record.channel_url);
+          }
+        }
+      }
+
+      const { data: existingVideosData } = await supabase
+        .from('youtube_videos')
+        .select('video_id, channel_url')
+        .in('video_id', chunk);
+
+      if (existingVideosData) {
+        for (const record of existingVideosData) {
+          if (record.channel_url) {
+            existingVideosChannelUrlMap.set(record.video_id, record.channel_url);
+          }
+        }
+      }
+    }
+
+    console.log(
+      `Pre-fetched ${watchHistoryChannelUrlMap.size} channel URLs from watch history, ${existingVideosChannelUrlMap.size} from existing videos`
+    );
+
     // Process in batches of 50 (YouTube API limit)
     for (let i = 0; i < videosNeedingEnrichment.length; i += batchSize) {
       const batch = videosNeedingEnrichment.slice(i, i + batchSize);
-      
+
       try {
         // Fetch video details from YouTube API
         // Each videos.list call costs 1 quota unit
@@ -188,27 +230,17 @@ export async function POST(request: NextRequest) {
 
             // Extract channel ID from snippet
             let channelId = snippet?.channelId || null;
-            
-            // If we don't have channel ID, try to get it from existing data
+
+            // If we don't have channel ID, try to get it from pre-fetched watch history data
             if (!channelId) {
-              const { data: existing } = await supabase
-                .from('youtube_watch_history')
-                .select('channel_url')
-                .eq('video_id', videoId)
-                .limit(1)
-                .single();
-              
-              if (existing?.channel_url) {
-                channelId = extractChannelId(existing.channel_url);
+              const existingChannelUrl = watchHistoryChannelUrlMap.get(videoId);
+              if (existingChannelUrl) {
+                channelId = extractChannelId(existingChannelUrl);
               }
             }
 
-            // Get existing video data to preserve channel_url
-            const { data: existingVideo } = await supabase
-              .from('youtube_videos')
-              .select('channel_url')
-              .eq('video_id', videoId)
-              .single();
+            // Get existing channel_url from pre-fetched data to preserve it
+            const existingVideoChannelUrl = existingVideosChannelUrlMap.get(videoId) || null;
 
             // Prepare enriched data
             const enrichedData: any = {
@@ -216,18 +248,23 @@ export async function POST(request: NextRequest) {
               title: snippet?.title || null,
               channel_name: snippet?.channelTitle || null,
               channel_id: channelId,
-              channel_url: existingVideo?.channel_url || null, // Preserve existing channel_url
-              thumbnail_url: snippet?.thumbnails?.maxres?.url || 
-                           snippet?.thumbnails?.high?.url || 
-                           snippet?.thumbnails?.medium?.url || 
-                           null,
-              duration_seconds: contentDetails?.duration 
-                ? parseDuration(contentDetails.duration) 
+              channel_url: existingVideoChannelUrl, // Preserve existing channel_url from pre-fetched data
+              thumbnail_url:
+                snippet?.thumbnails?.maxres?.url ||
+                snippet?.thumbnails?.high?.url ||
+                snippet?.thumbnails?.medium?.url ||
+                null,
+              duration_seconds: contentDetails?.duration
+                ? parseDuration(contentDetails.duration)
                 : null,
               view_count: statistics?.viewCount ? parseInt(statistics.viewCount, 10) : null,
               like_count: statistics?.likeCount ? parseInt(statistics.likeCount, 10) : null,
-              comment_count: statistics?.commentCount ? parseInt(statistics.commentCount, 10) : null,
-              published_at: snippet?.publishedAt ? new Date(snippet.publishedAt).toISOString() : null,
+              comment_count: statistics?.commentCount
+                ? parseInt(statistics.commentCount, 10)
+                : null,
+              published_at: snippet?.publishedAt
+                ? new Date(snippet.publishedAt).toISOString()
+                : null,
               description: snippet?.description || null,
               category_id: snippet?.categoryId || null,
               tags: snippet?.tags || null,
@@ -254,7 +291,7 @@ export async function POST(request: NextRequest) {
         // Each videos.list call costs 1 unit, so we can make many calls
         // But we'll add a small delay to be safe
         if (i + batchSize < videosNeedingEnrichment.length) {
-          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay between batches
+          await new Promise((resolve) => setTimeout(resolve, 100)); // 100ms delay between batches
         }
       } catch (error: any) {
         const errorMessage = error.message || 'Unknown error';
@@ -291,4 +328,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

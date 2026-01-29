@@ -66,18 +66,21 @@ export async function GET(request: Request) {
         timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
         dateRange: null,
       });
-      emptyResponse.headers.set('Cache-Control', `public, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`);
+      emptyResponse.headers.set(
+        'Cache-Control',
+        `public, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
+      );
       return emptyResponse;
     }
 
     // ============================================
     // SINGLE PAGINATED LOOP - Aggregate everything in memory
     // ============================================
-    
+
     // Unique sets
     const videoIdSet = new Set<string>();
     const channelNameSet = new Set<string>();
-    
+
     // Video counts for top videos
     const videoCounts = new Map<
       string,
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
         lastWatched: Date;
       }
     >();
-    
+
     // Channel counts for top channels
     const channelCounts = new Map<
       string,
@@ -103,36 +106,38 @@ export async function GET(request: Request) {
         channel_url: string | null;
       }
     >();
-    
+
     // Watching patterns
     const hourCounts = new Array(24).fill(0);
     const dayCounts = new Array(7).fill(0);
     const uniqueDates = new Set<string>();
-    
+
     // Trends
     const monthlyTrends = new Map<string, number>();
     const yearlyTrends = new Map<string, number>();
     const channelDiscovery = new Map<string, string>(); // channel -> first watched date
     const topChannelsByYear = new Map<string, Map<string, number>>();
-    
+
     // Binge detection
     const recordsByDate = new Map<string, Array<{ video_id: string; watched_at: Date }>>();
-    
+
     // Memory lane
     const memoryLane: Array<{
       year: number;
       videos: Array<{ title: string; channel: string; url: string; date: string }>;
     }> = [];
-    
+
     // Date range tracking
     let oldestDate: Date | null = null;
     let newestDate: Date | null = null;
-    
+
     // Single paginated loop fetching all required columns
     while (hasMore && page < 100) {
       let query = supabase
         .from('youtube_watch_history')
-        .select('video_id, video_title, channel_name, channel_url, thumbnail_url, video_url, watched_at')
+        .select(
+          'video_id, video_title, channel_name, channel_url, thumbnail_url, video_url, watched_at'
+        )
         .eq('user_id', userId);
 
       if (startDate) {
@@ -488,7 +493,8 @@ export async function GET(request: Request) {
       };
     }
 
-    return NextResponse.json({
+    // Build the response with cache headers
+    const response = NextResponse.json({
       totalVideos: totalVideos || 0,
       uniqueVideos,
       uniqueChannels,
@@ -499,8 +505,8 @@ export async function GET(request: Request) {
       watchingByDay: dayCounts,
       timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
       dateRange: {
-        oldest: oldestDate.toISOString(),
-        newest: newestDate.toISOString(),
+        oldest: finalOldestDate.toISOString(),
+        newest: finalNewestDate.toISOString(),
         daysBack,
       },
       // New analytics
@@ -513,6 +519,16 @@ export async function GET(request: Request) {
       // Enriched data insights
       enrichedInsights: Object.keys(enrichedInsights).length > 0 ? enrichedInsights : undefined,
     });
+
+    // Add cache headers for CDN/edge caching
+    // s-maxage: how long CDN/shared caches should cache
+    // stale-while-revalidate: serve stale content while revalidating in background
+    response.headers.set(
+      'Cache-Control',
+      `public, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
+    );
+
+    return response;
   } catch (error: any) {
     console.error('Error fetching YouTube analytics:', error);
     return NextResponse.json(

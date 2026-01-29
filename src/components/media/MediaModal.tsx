@@ -15,7 +15,7 @@ function getDominantColor(imageUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
-    
+
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -24,32 +24,35 @@ function getDominantColor(imageUrl: string): Promise<string> {
           resolve('#8b5cf6');
           return;
         }
-        
+
         const maxSize = 100;
         const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
-        
+
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
+
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-        
-        let r = 0, g = 0, b = 0, count = 0;
+
+        let r = 0,
+          g = 0,
+          b = 0,
+          count = 0;
         const step = Math.max(1, Math.floor(data.length / 4 / 200));
-        
+
         for (let i = 0; i < data.length; i += step * 4) {
           r += data[i];
           g += data[i + 1];
           b += data[i + 2];
           count++;
         }
-        
+
         if (count > 0) {
           r = Math.max(0, Math.floor((r / count) * 0.7));
           g = Math.max(0, Math.floor((g / count) * 0.7));
           b = Math.max(0, Math.floor((b / count) * 0.7));
-          
+
           const toHex = (n: number) => {
             const hex = n.toString(16);
             return hex.length === 1 ? '0' + hex : hex;
@@ -62,27 +65,35 @@ function getDominantColor(imageUrl: string): Promise<string> {
         resolve('#8b5cf6');
       }
     };
-    
+
     img.onerror = () => resolve('#8b5cf6');
     setTimeout(() => {
       if (!img.complete) resolve('#8b5cf6');
     }, 3000);
-    
+
     img.src = imageUrl;
   });
 }
 
 // Typed text animation component
-function TypedText({ text, delay = 0, className = '' }: { text: string; delay?: number; className?: string }) {
+function TypedText({
+  text,
+  delay = 0,
+  className = '',
+}: {
+  text: string;
+  delay?: number;
+  className?: string;
+}) {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isComplete, setIsComplete] = React.useState(false);
 
   React.useEffect(() => {
     if (!text) return;
-    
+
     setDisplayedText('');
     setIsComplete(false);
-    
+
     const timeout = setTimeout(() => {
       let currentIndex = 0;
       const typingInterval = setInterval(() => {
@@ -127,44 +138,80 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
   const [shouldAnimateDescription, setShouldAnimateDescription] = React.useState(false);
   const [localItem, setLocalItem] = React.useState(item);
   const { toast } = useToast();
-  
+
   // Update local item when prop changes
   React.useEffect(() => {
     setLocalItem(item);
   }, [item]);
-  
-  const thumbnailUrl = localItem?.thumbnail_url || (() => {
-    if (!localItem?.thumbnail || !Array.isArray(localItem.thumbnail) || localItem.thumbnail.length === 0) {
+
+  const thumbnailUrl =
+    localItem?.thumbnail_url ||
+    (() => {
+      if (
+        !localItem?.thumbnail ||
+        !Array.isArray(localItem.thumbnail) ||
+        localItem.thumbnail.length === 0
+      ) {
+        return null;
+      }
+      const firstFile = localItem.thumbnail[0];
+      if (firstFile.type === 'external' && firstFile.external?.url) {
+        return firstFile.external.url;
+      }
+      if (firstFile.type === 'file' && firstFile.file?.url) {
+        return firstFile.file.url;
+      }
       return null;
-    }
-    const firstFile = localItem.thumbnail[0];
-    if (firstFile.type === 'external' && firstFile.external?.url) {
-      return firstFile.external.url;
-    }
-    if (firstFile.type === 'file' && firstFile.file?.url) {
-      return firstFile.file.url;
-    }
-    return null;
-  })();
+    })();
 
   React.useEffect(() => {
+    // Helper to convert a number to 2-digit hex
+    const toHex = (n: number): string => {
+      const clamped = Math.max(0, Math.min(255, Math.round(n)));
+      const hex = clamped.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+
+    // Helper to parse color string to hex format
+    const parseColorToHex = (color: string): string | null => {
+      const trimmed = color.trim();
+
+      // Handle hex format (#RGB or #RRGGBB)
+      if (trimmed.startsWith('#')) {
+        const hexMatch = trimmed.match(/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/);
+        if (hexMatch) {
+          const hex = hexMatch[1];
+          // Convert 3-char hex to 6-char hex (#RGB -> #RRGGBB)
+          if (hex.length === 3) {
+            return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`.toLowerCase();
+          }
+          return `#${hex.toLowerCase()}`;
+        }
+        return null; // Invalid hex format
+      }
+
+      // Handle rgb/rgba format: rgb(r, g, b) or rgba(r, g, b, a)
+      const rgbMatch = trimmed.match(/^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+      if (rgbMatch) {
+        const r = parseInt(rgbMatch[1], 10);
+        const g = parseInt(rgbMatch[2], 10);
+        const b = parseInt(rgbMatch[3], 10);
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      }
+
+      return null; // Unrecognized format
+    };
+
     // Prioritize Spotify color palette if available
     if (colorPalette?.primary) {
-      // Convert RGB to hex for consistency
-      const rgbMatch = colorPalette.primary.match(/\d+/g);
-      if (rgbMatch && rgbMatch.length >= 3) {
-        const r = parseInt(rgbMatch[0]);
-        const g = parseInt(rgbMatch[1]);
-        const b = parseInt(rgbMatch[2]);
-        const toHex = (n: number) => {
-          const hex = n.toString(16);
-          return hex.length === 1 ? '0' + hex : hex;
-        };
-        setBgColor(`#${toHex(r)}${toHex(g)}${toHex(b)}`);
+      const parsedHex = parseColorToHex(colorPalette.primary);
+      if (parsedHex) {
+        setBgColor(parsedHex);
         return;
       }
+      // Invalid color format, fall through to thumbnail extraction or default
     }
-    
+
     // Fallback to thumbnail color extraction
     if (thumbnailUrl && localItem) {
       setBgColor('#8b5cf6');
@@ -182,7 +229,7 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
 
   const handleFillDescription = async () => {
     if (!localItem || !localItem.id) return;
-    
+
     setIsFillingDescription(true);
     try {
       const response = await fetch(`/api/media/${localItem.id}/fill-description`, {
@@ -197,12 +244,12 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
 
       setLocalItem(data.media);
       setShouldAnimateDescription(true);
-      
+
       // Call onUpdate if provided
       if (onUpdate) {
         onUpdate(data.media);
       }
-      
+
       toast({
         title: 'Description filled',
         description: 'The description has been fetched and updated successfully.',
@@ -225,7 +272,7 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
     <Dialog open={isOpen} onOpenChange={onClose}>
       <AnimatePresence mode="wait">
         {isOpen && localItem && (
-          <DialogContent 
+          <DialogContent
             className="sm:max-w-[900px] h-[650px] p-0 border-white/10 overflow-hidden"
             key={localItem.id}
           >
@@ -236,13 +283,15 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
               className="flex h-full w-full transition-all duration-500"
-              style={{
-                backgroundColor: bgColor,
-                backgroundImage: `linear-gradient(135deg, ${bgColor}ee, ${bgColor}cc)`,
-              } as React.CSSProperties}
+              style={
+                {
+                  backgroundColor: bgColor,
+                  backgroundImage: `linear-gradient(135deg, ${bgColor}ee, ${bgColor}cc)`,
+                } as React.CSSProperties
+              }
             >
               <DialogTitle className="sr-only">{localItem.name}</DialogTitle>
-              
+
               <div className="flex h-full w-full">
                 {/* Left: Thumbnail */}
                 <motion.div
@@ -283,9 +332,7 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
                     <div className="flex-1 min-w-0">
                       <h2 className="text-2xl font-bold mb-1">{localItem.name}</h2>
                       {localItem.by && localItem.by.length > 0 && (
-                        <p className="text-white/90 text-lg mb-1">
-                          {localItem.by.join(', ')}
-                        </p>
+                        <p className="text-white/90 text-lg mb-1">{localItem.by.join(', ')}</p>
                       )}
                       {localItem.category && (
                         <p className="text-white/70 text-sm mb-2">{localItem.category}</p>
@@ -305,27 +352,28 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-semibold text-white/90">Synopsis</h3>
-                      {(!localItem.ai_synopsis || localItem.ai_synopsis.trim().length === 0) && localItem.url && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs bg-white/20 hover:bg-white/30 text-white border-white/30"
-                          onClick={handleFillDescription}
-                          disabled={isFillingDescription}
-                        >
-                          {isFillingDescription ? (
-                            <>
-                              <Spinner size="sm" className="mr-1" />
-                              Filling...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-3 w-3 mr-1" />
-                              Fill Description
-                            </>
-                          )}
-                        </Button>
-                      )}
+                      {(!localItem.ai_synopsis || localItem.ai_synopsis.trim().length === 0) &&
+                        localItem.url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs bg-white/20 hover:bg-white/30 text-white border-white/30"
+                            onClick={handleFillDescription}
+                            disabled={isFillingDescription}
+                          >
+                            {isFillingDescription ? (
+                              <>
+                                <Spinner size="sm" className="mr-1" />
+                                Filling...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                Fill Description
+                              </>
+                            )}
+                          </Button>
+                        )}
                     </div>
                     <div className="h-32 max-h-32 overflow-y-auto pr-2">
                       {localItem.ai_synopsis ? (
@@ -348,9 +396,9 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
                       <h3 className="text-sm font-semibold mb-2 text-white/90">Topics</h3>
                       <div className="flex flex-wrap gap-2">
                         {localItem.topic.map((topic: string, idx: number) => (
-                          <Badge 
-                            key={idx} 
-                            variant="secondary" 
+                          <Badge
+                            key={idx}
+                            variant="secondary"
                             className="text-xs px-2 py-1 bg-white/20 text-white border-white/30"
                           >
                             {topic}
@@ -371,49 +419,50 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
 
                   {/* Actions */}
                   <div className="mt-auto pt-4">
-                    {localItem.url && (() => {
-                      const url = localItem.url.toLowerCase();
-                      const isIMDB = url.includes('imdb.com');
-                      const isGoodreads = url.includes('goodreads.com');
-                      
-                      return (
-                        <Button
-                          className={`w-full font-semibold border-white/30 ${
-                            isIMDB 
-                              ? 'bg-[#F5C518] hover:bg-[#F5C518]/90 text-black' 
-                              : isGoodreads 
-                              ? 'bg-[#382110] hover:bg-[#382110]/90 text-white' 
-                              : 'bg-white/20 hover:bg-white/30 text-white'
-                          }`}
-                          onClick={() => window.open(localItem.url!, '_blank')}
-                        >
-                          {isIMDB ? (
-                            <>
-                              <img 
-                                src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/IMDb_Logo_Square.svg/2048px-IMDb_Logo_Square.svg.png" 
-                                alt="IMDb" 
-                                className="mr-2 h-5 w-5 object-contain"
-                              />
-                              <span>View on IMDb</span>
-                            </>
-                          ) : isGoodreads ? (
-                            <>
-                              <img 
-                                src="https://static.vecteezy.com/system/resources/previews/055/030/405/non_2x/goodreads-circle-icon-logo-symbol-free-png.png" 
-                                alt="Goodreads" 
-                                className="mr-2 h-5 w-5 object-contain"
-                              />
-                              <span>View on Goodreads</span>
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              Open Link
-                            </>
-                          )}
-                        </Button>
-                      );
-                    })()}
+                    {localItem.url &&
+                      (() => {
+                        const url = localItem.url.toLowerCase();
+                        const isIMDB = url.includes('imdb.com');
+                        const isGoodreads = url.includes('goodreads.com');
+
+                        return (
+                          <Button
+                            className={`w-full font-semibold border-white/30 ${
+                              isIMDB
+                                ? 'bg-[#F5C518] hover:bg-[#F5C518]/90 text-black'
+                                : isGoodreads
+                                  ? 'bg-[#382110] hover:bg-[#382110]/90 text-white'
+                                  : 'bg-white/20 hover:bg-white/30 text-white'
+                            }`}
+                            onClick={() => window.open(localItem.url!, '_blank')}
+                          >
+                            {isIMDB ? (
+                              <>
+                                <img
+                                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/IMDb_Logo_Square.svg/2048px-IMDb_Logo_Square.svg.png"
+                                  alt="IMDb"
+                                  className="mr-2 h-5 w-5 object-contain"
+                                />
+                                <span>View on IMDb</span>
+                              </>
+                            ) : isGoodreads ? (
+                              <>
+                                <img
+                                  src="https://static.vecteezy.com/system/resources/previews/055/030/405/non_2x/goodreads-circle-icon-logo-symbol-free-png.png"
+                                  alt="Goodreads"
+                                  className="mr-2 h-5 w-5 object-contain"
+                                />
+                                <span>View on Goodreads</span>
+                              </>
+                            ) : (
+                              <>
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Open Link
+                              </>
+                            )}
+                          </Button>
+                        );
+                      })()}
                   </div>
                 </motion.div>
               </div>
@@ -424,4 +473,3 @@ export function MediaModal({ item, isOpen, onClose, onUpdate, colorPalette }: Me
     </Dialog>
   );
 }
-

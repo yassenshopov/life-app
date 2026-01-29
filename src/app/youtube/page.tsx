@@ -4,15 +4,29 @@ import * as React from 'react';
 import HQSidebar from '@/components/HQSidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Video, Upload, CheckCircle2, AlertCircle, Sparkles, MoreVertical, Calendar } from 'lucide-react';
+import {
+  Video,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  MoreVertical,
+  Calendar,
+} from 'lucide-react';
 import { Outfit } from 'next/font/google';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/use-toast';
 import { YouTubeAnalytics } from '@/components/YouTubeAnalytics';
 import { YouTubeLLMAnalysis } from '@/components/YouTubeLLMAnalysis';
 import { YouTubeWatchHistoryCalendar } from '@/components/YouTubeWatchHistoryCalendar';
-import { getColorPalette as getYouTubeColorPalette, getDefaultBgColor as getYouTubeDefaultBgColor } from '@/lib/youtube-color';
-import { getColorPalette as getSpotifyColorPalette, getDefaultBgColor as getSpotifyDefaultBgColor } from '@/lib/spotify-color';
+import {
+  getColorPalette as getYouTubeColorPalette,
+  getDefaultBgColor as getYouTubeDefaultBgColor,
+} from '@/lib/youtube-color';
+import {
+  getColorPalette as getSpotifyColorPalette,
+  getDefaultBgColor as getSpotifyDefaultBgColor,
+} from '@/lib/spotify-color';
 import {
   Dialog,
   DialogContent,
@@ -101,36 +115,11 @@ export default function YouTubePage() {
   const [isWatchHistoryCalendarOpen, setIsWatchHistoryCalendarOpen] = React.useState(false);
 
   // Update background color based on Spotify track (priority)
-  const updateSpotifyBackgroundColor = React.useCallback((track: CurrentlyPlaying['item'] | null) => {
-    if (!track?.album?.images || track.album.images.length === 0) {
-      if (!lastTrackRef.current) {
-        // Only reset if no last track and no YouTube video
-        if (!currentVideoIdRef.current) {
-          const defaultColor = getSpotifyDefaultBgColor();
-          setColorPalette({
-            primary: defaultColor,
-            secondary: defaultColor,
-            accent: defaultColor,
-          });
-        }
-      }
-      return;
-    }
-
-    // Use the largest available image for better color extraction
-    const imageUrl =
-      track.album.images[0]?.url || track.album.images[1]?.url || track.album.images[2]?.url;
-    if (imageUrl) {
-      getSpotifyColorPalette(imageUrl)
-        .then((palette) => {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Spotify color palette extracted:', palette);
-          }
-          setColorPalette(palette);
-        })
-        .catch((error) => {
-          console.error('Error extracting Spotify color palette:', error);
-          // Fall back to YouTube colors if available
+  const updateSpotifyBackgroundColor = React.useCallback(
+    (track: CurrentlyPlaying['item'] | null) => {
+      if (!track?.album?.images || track.album.images.length === 0) {
+        if (!lastTrackRef.current) {
+          // Only reset if no last track and no YouTube video
           if (!currentVideoIdRef.current) {
             const defaultColor = getSpotifyDefaultBgColor();
             setColorPalette({
@@ -139,46 +128,77 @@ export default function YouTubePage() {
               accent: defaultColor,
             });
           }
-        });
-    } else {
-      const defaultColor = getSpotifyDefaultBgColor();
-      setColorPalette({
-        primary: defaultColor,
-        secondary: defaultColor,
-        accent: defaultColor,
-      });
-    }
-  }, []);
+        }
+        return;
+      }
 
-  // Update background color based on recently watched video (fallback)
-  const updateYouTubeBackgroundColor = React.useCallback((video: { thumbnail_url: string | null; video_id: string } | null) => {
-    // Only update with YouTube colors if Spotify is not connected or not playing
-    if (!isSpotifyConnected || !lastTrackRef.current) {
-      if (!video?.thumbnail_url) {
+      // Use the largest available image for better color extraction
+      const imageUrl =
+        track.album.images[0]?.url || track.album.images[1]?.url || track.album.images[2]?.url;
+      if (imageUrl) {
+        getSpotifyColorPalette(imageUrl)
+          .then((palette) => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Spotify color palette extracted:', palette);
+            }
+            setColorPalette(palette);
+          })
+          .catch((error) => {
+            console.error('Error extracting Spotify color palette:', error);
+            // Fall back to YouTube colors if available
+            if (!currentVideoIdRef.current) {
+              const defaultColor = getSpotifyDefaultBgColor();
+              setColorPalette({
+                primary: defaultColor,
+                secondary: defaultColor,
+                accent: defaultColor,
+              });
+            }
+          });
+      } else {
         const defaultColor = getSpotifyDefaultBgColor();
         setColorPalette({
           primary: defaultColor,
           secondary: defaultColor,
           accent: defaultColor,
         });
-        return;
       }
+    },
+    []
+  );
 
-      getYouTubeColorPalette(video.thumbnail_url)
-        .then((palette) => {
-          setColorPalette(palette);
-        })
-        .catch((error) => {
-          console.error('Error extracting YouTube color palette:', error);
+  // Update background color based on recently watched video (fallback)
+  const updateYouTubeBackgroundColor = React.useCallback(
+    (video: { thumbnail_url: string | null; video_id: string } | null) => {
+      // Only update with YouTube colors if Spotify is not connected or not playing
+      if (!isSpotifyConnected || !lastTrackRef.current) {
+        if (!video?.thumbnail_url) {
           const defaultColor = getSpotifyDefaultBgColor();
           setColorPalette({
             primary: defaultColor,
             secondary: defaultColor,
             accent: defaultColor,
           });
-        });
-    }
-  }, [isSpotifyConnected]);
+          return;
+        }
+
+        getYouTubeColorPalette(video.thumbnail_url)
+          .then((palette) => {
+            setColorPalette(palette);
+          })
+          .catch((error) => {
+            console.error('Error extracting YouTube color palette:', error);
+            const defaultColor = getSpotifyDefaultBgColor();
+            setColorPalette({
+              primary: defaultColor,
+              secondary: defaultColor,
+              accent: defaultColor,
+            });
+          });
+      }
+    },
+    [isSpotifyConnected]
+  );
 
   // Check Spotify connection and fetch currently playing
   React.useEffect(() => {
@@ -213,12 +233,12 @@ export default function YouTubePage() {
       const response = await fetch('/api/spotify/currently-playing');
       if (response.ok) {
         const data: CurrentlyPlaying = await response.json();
-        
+
         // Only update color if track changed
         const trackId = data.item?.album?.images?.[0]?.url || null;
         if (trackId !== currentTrackIdRef.current) {
           currentTrackIdRef.current = trackId;
-          
+
           // Store last track info if we have a track
           if (data.item) {
             lastTrackRef.current = data.item;
@@ -343,6 +363,11 @@ export default function YouTubePage() {
           description: 'Please upload a valid JSON file from Google Takeout',
           variant: 'destructive',
         });
+        // Clear file input so re-selecting the same file will trigger onChange
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setIsSyncing(false);
         return;
       }
 
@@ -458,7 +483,8 @@ export default function YouTubePage() {
     };
   }, [colorPalette]);
 
-  const effectiveColorPalette = (isSpotifyConnected || hasHistory) && gradientColors ? colorPalette : null;
+  const effectiveColorPalette =
+    (isSpotifyConnected || hasHistory) && gradientColors ? colorPalette : null;
 
   return (
     <div className={`flex h-screen bg-background ${outfit.className}`}>
@@ -471,9 +497,10 @@ export default function YouTubePage() {
               : ''
           }`}
           style={{
-            background: (isSpotifyConnected || hasHistory) && gradientColors
-              ? `linear-gradient(135deg, ${gradientColors.primary}, ${gradientColors.secondary}, ${gradientColors.accent})`
-              : undefined,
+            background:
+              (isSpotifyConnected || hasHistory) && gradientColors
+                ? `linear-gradient(135deg, ${gradientColors.primary}, ${gradientColors.secondary}, ${gradientColors.accent})`
+                : undefined,
           }}
         >
           <div className="max-w-7xl mx-auto space-y-6">
@@ -484,27 +511,36 @@ export default function YouTubePage() {
                   YouTube
                 </h1>
                 <p className="text-muted-foreground mt-2">
-                  {hasHistory 
+                  {hasHistory
                     ? 'Explore insights from your YouTube watch history'
                     : 'Sync your YouTube watch history from Google Takeout'}
                 </p>
                 {hasHistory && enrichmentStats && (
                   <div className="mt-2 space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">{enrichmentStats.enriched}</span>
+                      <span className="font-semibold text-foreground">
+                        {enrichmentStats.enriched}
+                      </span>
                       {' / '}
                       <span className="font-semibold text-foreground">{enrichmentStats.total}</span>
                       {' videos enriched ('}
-                      <span className="font-semibold text-foreground">{enrichmentStats.percentage}%</span>
+                      <span className="font-semibold text-foreground">
+                        {enrichmentStats.percentage}%
+                      </span>
                       {')'}
                     </div>
                     {apiUsage && (
                       <div className="text-xs text-muted-foreground">
-                        API Usage: <span className="font-semibold text-foreground">{apiUsage.todayUsage}</span>
+                        API Usage:{' '}
+                        <span className="font-semibold text-foreground">{apiUsage.todayUsage}</span>
                         {' / '}
-                        <span className="font-semibold text-foreground">{apiUsage.dailyQuota.toLocaleString()}</span>
+                        <span className="font-semibold text-foreground">
+                          {apiUsage.dailyQuota.toLocaleString()}
+                        </span>
                         {' units today ('}
-                        <span className={`font-semibold ${apiUsage.quotaPercentage > 80 ? 'text-yellow-500' : apiUsage.quotaPercentage > 95 ? 'text-red-500' : 'text-foreground'}`}>
+                        <span
+                          className={`font-semibold ${apiUsage.quotaPercentage > 95 ? 'text-red-500' : apiUsage.quotaPercentage > 80 ? 'text-yellow-500' : 'text-foreground'}`}
+                        >
                           {apiUsage.quotaPercentage.toFixed(1)}%
                         </span>
                         {')'}
@@ -549,7 +585,6 @@ export default function YouTubePage() {
               </>
             ) : (
               <>
-
                 {/* Instructions Card */}
                 <Card>
                   <CardHeader>
@@ -631,7 +666,9 @@ export default function YouTubePage() {
                         <span className="font-semibold">{syncResult.synced}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Total videos processed:</span>
+                        <span className="text-sm text-muted-foreground">
+                          Total videos processed:
+                        </span>
                         <span className="font-semibold">{syncResult.total}</span>
                       </div>
                       {syncResult.dateRange && (
@@ -670,7 +707,8 @@ export default function YouTubePage() {
               Enrich Video Data
             </DialogTitle>
             <DialogDescription>
-              Fetch detailed metadata (views, likes, duration, etc.) from YouTube Data API for up to 5,000 videos
+              Fetch detailed metadata (views, likes, duration, etc.) from YouTube Data API for up to
+              5,000 videos
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -746,7 +784,9 @@ export default function YouTubePage() {
                 )}
                 {enrichResult.apiUsage && (
                   <div className="pt-2 border-t space-y-1">
-                    <div className="text-xs font-medium text-muted-foreground">API Usage (This Session)</div>
+                    <div className="text-xs font-medium text-muted-foreground">
+                      API Usage (This Session)
+                    </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Quota used:</span>
                       <span className="font-semibold">{enrichResult.apiUsage.quotaUsed}</span>
@@ -771,4 +811,3 @@ export default function YouTubePage() {
     </div>
   );
 }
-

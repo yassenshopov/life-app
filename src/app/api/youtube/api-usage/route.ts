@@ -18,29 +18,62 @@ export async function GET() {
     // Get API usage from logs (if we're tracking it)
     // For now, we'll calculate based on enriched videos
     // Each enriched video = 1 API call = 1 quota unit
-    
-    const { data: enrichedVideos, error } = await supabase
-      .from('youtube_videos')
-      .select('video_id, updated_at')
-      .not('view_count', 'is', null)
-      .order('updated_at', { ascending: false })
-      .limit(10000); // Get recent enriched videos
 
-    if (error) {
-      throw new Error(`Failed to fetch enriched videos: ${error.message}`);
+    // Calculate start of today in Pacific Time (YouTube quota resets at midnight PT)
+    const now = new Date();
+    const pacificParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false,
+    }).formatToParts(now);
+
+    const getPart = (type: string) =>
+      parseInt(pacificParts.find((p) => p.type === type)?.value || '0');
+
+    const pacificHour = getPart('hour');
+    const pacificMinute = getPart('minute');
+    const pacificSecond = getPart('second');
+
+    // Calculate milliseconds since midnight Pacific Time today
+    const msSinceMidnightPT =
+      (pacificHour * 3600 + pacificMinute * 60 + pacificSecond) * 1000 + now.getMilliseconds();
+
+    // Subtract from current time to get start of today in Pacific Time as UTC Date
+    const startOfTodayPT = new Date(now.getTime() - msSinceMidnightPT);
+    const todayISOString = startOfTodayPT.toISOString();
+
+    // Use server-side counts instead of fetching all rows
+    const [totalCountResult, todayCountResult] = await Promise.all([
+      // Total enriched videos for this user
+      supabase
+        .from('youtube_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .not('view_count', 'is', null),
+      // Videos enriched today for this user
+      supabase
+        .from('youtube_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .not('view_count', 'is', null)
+        .gte('updated_at', todayISOString),
+    ]);
+
+    if (totalCountResult.error) {
+      throw new Error(`Failed to fetch total enriched count: ${totalCountResult.error.message}`);
     }
 
-    // Calculate today's usage (videos enriched today)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const todayEnriched = (enrichedVideos || []).filter((video) => {
-      const updatedAt = new Date(video.updated_at);
-      return updatedAt >= today;
-    });
+    if (todayCountResult.error) {
+      throw new Error(`Failed to fetch today's enriched count: ${todayCountResult.error.message}`);
+    }
 
-    const todayUsage = todayEnriched.length;
-    const totalUsage = enrichedVideos?.length || 0;
+    const todayUsage = todayCountResult.count || 0;
+    const totalUsage = totalCountResult.count || 0;
     const remainingQuota = Math.max(0, DAILY_QUOTA - todayUsage);
     const quotaPercentage = (todayUsage / DAILY_QUOTA) * 100;
 
@@ -62,4 +95,3 @@ export async function GET() {
     );
   }
 }
-
