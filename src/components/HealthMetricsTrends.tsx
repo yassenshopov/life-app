@@ -2469,7 +2469,10 @@ export function HealthMetricsTrends({
                           {chartType === 'line' ? (
                             <AreaChart
                               data={chartData
-                                .filter((d) => d.bfPercent !== null && d.bfPercent < 100)
+                                .filter(
+                                  (d): d is typeof d & { bfPercent: number } =>
+                                    'bfPercent' in d && d.bfPercent !== null && d.bfPercent < 100
+                                )
                                 .map((d) => ({
                                   ...d,
                                   bfPercentDisplay:
@@ -2556,7 +2559,10 @@ export function HealthMetricsTrends({
                           ) : (
                             <BarChart
                               data={chartData
-                                .filter((d) => d.bfPercent !== null && d.bfPercent < 100)
+                                .filter(
+                                  (d): d is typeof d & { bfPercent: number } =>
+                                    'bfPercent' in d && d.bfPercent !== null && d.bfPercent < 100
+                                )
                                 .map((d) => ({
                                   ...d,
                                   bfPercentDisplay:
@@ -2637,7 +2643,10 @@ export function HealthMetricsTrends({
                             <AreaChart
                               data={chartData
                                 .filter(
-                                  (d) => d.boneMineralPercent !== null && d.boneMineralPercent < 100
+                                  (d): d is typeof d & { boneMineralPercent: number } =>
+                                    'boneMineralPercent' in d &&
+                                    d.boneMineralPercent !== null &&
+                                    d.boneMineralPercent < 100
                                 )
                                 .map((d) => ({
                                   ...d,
@@ -2726,7 +2735,10 @@ export function HealthMetricsTrends({
                             <BarChart
                               data={chartData
                                 .filter(
-                                  (d) => d.boneMineralPercent !== null && d.boneMineralPercent < 100
+                                  (d): d is typeof d & { boneMineralPercent: number } =>
+                                    'boneMineralPercent' in d &&
+                                    d.boneMineralPercent !== null &&
+                                    d.boneMineralPercent < 100
                                 )
                                 .map((d) => ({
                                   ...d,
@@ -2811,7 +2823,12 @@ export function HealthMetricsTrends({
                           {chartType === 'line' ? (
                             <AreaChart
                               data={chartData
-                                .filter((d) => d.musclePercent !== null && d.musclePercent < 100)
+                                .filter(
+                                  (d): d is typeof d & { musclePercent: number } =>
+                                    'musclePercent' in d &&
+                                    d.musclePercent !== null &&
+                                    d.musclePercent < 100
+                                )
                                 .map((d) => ({
                                   ...d,
                                   musclePercentDisplay:
@@ -2898,7 +2915,12 @@ export function HealthMetricsTrends({
                           ) : (
                             <BarChart
                               data={chartData
-                                .filter((d) => d.musclePercent !== null && d.musclePercent < 100)
+                                .filter(
+                                  (d): d is typeof d & { musclePercent: number } =>
+                                    'musclePercent' in d &&
+                                    d.musclePercent !== null &&
+                                    d.musclePercent < 100
+                                )
                                 .map((d) => ({
                                   ...d,
                                   musclePercentDisplay:
