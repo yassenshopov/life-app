@@ -540,13 +540,15 @@ export function YouTubeWatchHistoryCalendar({
                                         cursor: 'pointer',
                                       }}
                                       onClick={(e) => {
-                                        e.preventDefault();
-                                        setSelectedSession({
-                                          videos: session,
-                                          day,
-                                          startTime: position.startTime,
-                                          endTime: position.endTime,
-                                        });
+                                        if (session.length > 1) {
+                                          e.preventDefault();
+                                          setSelectedSession({
+                                            videos: session,
+                                            day,
+                                            startTime: position.startTime,
+                                            endTime: position.endTime,
+                                          });
+                                        }
                                       }}
                                     >
                                       <a

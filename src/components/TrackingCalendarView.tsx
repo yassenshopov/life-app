@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { TrackingEntry, formatStoredPropertyValue } from '@/components/TrackingView';
+import { colorToRgba } from '@/lib/color-utils';
 
 interface TrackingCalendarViewProps {
   entries: TrackingEntry[];
@@ -214,8 +215,8 @@ export function TrackingCalendarView({
       <Card 
         className="flex-1 overflow-hidden transition-all duration-1000"
         style={colorPalette ? {
-          backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
-          borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+          backgroundColor: colorToRgba(colorPalette.primary, 0.1),
+          borderColor: colorToRgba(colorPalette.accent, 0.3),
         } : undefined}
       >
         <div className="h-full overflow-auto">
@@ -229,8 +230,8 @@ export function TrackingCalendarView({
               style={{
                 gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
                 ...(colorPalette ? {
-                  backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
-                  borderBottomColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                  backgroundColor: colorToRgba(colorPalette.primary, 0.15),
+                  borderBottomColor: colorToRgba(colorPalette.accent, 0.2),
                 } : {}),
               }}
             >

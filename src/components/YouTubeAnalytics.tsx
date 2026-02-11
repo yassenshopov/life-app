@@ -38,6 +38,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { format, parse, parseISO } from 'date-fns';
+import { colorToRgba } from '@/lib/color-utils';
 
 // YouTube Category ID to Name Mapping
 const YOUTUBE_CATEGORIES: Record<string, string> = {
@@ -292,19 +293,26 @@ interface YouTubeAnalyticsProps {
 export function YouTubeAnalytics({ colorPalette }: YouTubeAnalyticsProps) {
   const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [timeRange, setTimeRange] = React.useState<number | 'all'>(30);
 
   const fetchAnalytics = React.useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const rangeParam = timeRange === 'all' ? 'all' : timeRange.toString();
       const response = await fetch(`/api/youtube/analytics?range=${rangeParam}`);
       if (response.ok) {
         const data = await response.json();
         setAnalytics(data);
+      } else {
+        setError('Failed to load analytics');
+        setAnalytics(null);
       }
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+      setError('Failed to load analytics');
+      setAnalytics(null);
     } finally {
       setLoading(false);
     }
@@ -319,6 +327,17 @@ export function YouTubeAnalytics({ colorPalette }: YouTubeAnalyticsProps) {
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" className="text-muted-foreground" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Error</CardTitle>
+          <CardDescription>{error}</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
@@ -337,12 +356,14 @@ export function YouTubeAnalytics({ colorPalette }: YouTubeAnalyticsProps) {
   const maxDay = Math.max(...analytics.watchingByDay, 1);
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Helper function to get card style based on color palette
+  // Helper function to get card style based on color palette (robust rgb/rgba/hex)
   const getCardStyle = (): React.CSSProperties | undefined => {
     if (!colorPalette) return undefined;
+    const bg = colorToRgba(colorPalette.primary, 0.15);
+    const border = colorToRgba(colorPalette.accent, 0.3);
     return {
-      backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
-      borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
+      backgroundColor: bg,
+      borderColor: border,
     };
   };
 

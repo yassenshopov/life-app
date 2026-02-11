@@ -21,15 +21,24 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const timeRange = searchParams.get('range') || 'all';
+    const timeRangeParam = searchParams.get('range') || 'all';
 
-    // If 'all', don't filter by date - get all stored history
+    // Validate and normalize time range: non-numeric or negative → treat as 'all'
     let startDate: Date | null = null;
-    if (timeRange !== 'all') {
-      const days = parseInt(timeRange);
-      if (!isNaN(days)) {
-        startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
+    let timeRange: string = timeRangeParam;
+    if (timeRangeParam !== 'all') {
+      const days = parseInt(timeRangeParam, 10);
+      if (isNaN(days) || days < 0) {
+        timeRange = 'all';
+      } else {
+        const clampedDays = Math.max(0, days);
+        if (clampedDays === 0) {
+          timeRange = 'all';
+        } else {
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - clampedDays);
+          timeRange = String(clampedDays);
+        }
       }
     }
 
@@ -51,7 +60,14 @@ export async function GET(request: Request) {
       countQuery = countQuery.gte('watched_at', startDate.toISOString());
     }
 
-    const { count: totalVideos } = await countQuery;
+    const { count: totalVideos, error: countError } = await countQuery;
+    if (countError) {
+      console.error('YouTube analytics count query error:', countError);
+      return NextResponse.json(
+        { error: 'Failed to fetch analytics' },
+        { status: 500 }
+      );
+    }
 
     if (!totalVideos || totalVideos === 0) {
       const emptyResponse = NextResponse.json({
@@ -63,13 +79,14 @@ export async function GET(request: Request) {
         topChannels: [],
         watchingByHour: new Array(24).fill(0),
         watchingByDay: new Array(7).fill(0),
-        timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
+        timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange, 10),
         dateRange: null,
       });
       emptyResponse.headers.set(
         'Cache-Control',
-        `public, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
+        `private, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
       );
+      emptyResponse.headers.set('Vary', 'Cookie, Authorization');
       return emptyResponse;
     }
 
@@ -148,7 +165,14 @@ export async function GET(request: Request) {
         .order('watched_at', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (error || !records || records.length === 0) {
+      if (error) {
+        console.error('YouTube analytics pagination query error:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch analytics' },
+          { status: 500 }
+        );
+      }
+      if (!records || records.length === 0) {
         hasMore = false;
         break;
       }
@@ -339,10 +363,11 @@ export async function GET(request: Request) {
       .map(([year, count]) => ({ year, count }))
       .sort((a, b) => a.year.localeCompare(b.year));
 
-    // Format channel discovery timeline
+    // Format channel discovery timeline (oldest→newest); take last 50 = most recently discovered
     const channelDiscoveryArray = Array.from(channelDiscovery.entries())
       .map(([channel, firstWatched]) => ({ channel, firstWatched }))
-      .sort((a, b) => new Date(a.firstWatched).getTime() - new Date(b.firstWatched).getTime());
+      .sort((a, b) => new Date(a.firstWatched).getTime() - new Date(b.firstWatched).getTime())
+      .slice(-50);
 
     // Get enriched data insights
     const enrichedInsights: any = {};
@@ -357,12 +382,17 @@ export async function GET(request: Request) {
 
       for (let i = 0; i < allUniqueVideoIds.length; i += chunkSize) {
         const chunk = allUniqueVideoIds.slice(i, i + chunkSize);
-        const { data: enrichedVideos } = await supabase
+        const { data: enrichedVideos, error: enrichedError } = await supabase
           .from('youtube_videos')
           .select(
             'video_id, view_count, like_count, comment_count, duration_seconds, category_id, tags, published_at'
           )
+          .eq('user_id', userId)
           .in('video_id', chunk);
+        if (enrichedError) {
+          console.error('YouTube analytics enriched videos query error:', enrichedError);
+          // Continue without enriched data rather than failing the whole request
+        }
 
         if (enrichedVideos) {
           enrichedVideos.forEach((video) => {
@@ -503,7 +533,7 @@ export async function GET(request: Request) {
       topChannels: topChannelsList,
       watchingByHour: hourCounts,
       watchingByDay: dayCounts,
-      timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange),
+      timeRange: timeRange === 'all' ? 'all' : parseInt(timeRange, 10),
       dateRange: {
         oldest: finalOldestDate.toISOString(),
         newest: finalNewestDate.toISOString(),
@@ -513,20 +543,19 @@ export async function GET(request: Request) {
       monthlyTrends: monthlyTrendsArray,
       yearlyTrends: yearlyTrendsArray,
       topChannelsByYear: topChannelsByYearFormatted,
-      channelDiscovery: channelDiscoveryArray.slice(0, 50), // Last 50 discovered channels
+      channelDiscovery: channelDiscoveryArray, // Last 50 discovered channels
       bingeSessions: bingeSessions.slice(0, 10), // Top 10 binge sessions
       memoryLane: memoryLane.sort((a, b) => b.year - a.year), // Most recent years first
       // Enriched data insights
       enrichedInsights: Object.keys(enrichedInsights).length > 0 ? enrichedInsights : undefined,
     });
 
-    // Add cache headers for CDN/edge caching
-    // s-maxage: how long CDN/shared caches should cache
-    // stale-while-revalidate: serve stale content while revalidating in background
+    // Per-user cache: private so shared caches do not serve another user's analytics
     response.headers.set(
       'Cache-Control',
-      `public, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
+      `private, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
     );
+    response.headers.set('Vary', 'Cookie, Authorization');
 
     return response;
   } catch (error: any) {

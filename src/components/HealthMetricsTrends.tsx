@@ -1300,6 +1300,9 @@ export function HealthMetricsTrends({
     return [minDomain, maxDomain];
   }, [chartData, hasWeight]);
 
+  // Normalize percent to fraction [0,1] (input may be 0-100 or 0-1)
+  const toFraction = (p: number) => (p > 1 ? p / 100 : p);
+
   // Calculate body composition domain to ensure it doesn't start from 0
   const bodyCompositionDomain = useMemo(() => {
     if (!hasBodyComposition) return ['dataMin', 'dataMax'];
@@ -1312,12 +1315,14 @@ export function HealthMetricsTrends({
           d.bfPercent !== null &&
           d.boneMineralPercent !== null &&
           d.musclePercent !== null &&
-          d.musclePercent < 100;
+          (d.musclePercent < 100 || d.musclePercent <= 1);
 
-        if (hasAllValues) {
-          // Calculate total from composition (percentages are already in decimal form, e.g., 0.20 for 20%)
+        if (hasAllValues && d.bfPercent !== null && d.boneMineralPercent !== null && d.musclePercent !== null) {
+          const bfFrac = toFraction(d.bfPercent);
+          const boneFrac = toFraction(d.boneMineralPercent);
+          const muscleFrac = toFraction(d.musclePercent);
           const total =
-            d.bfPercent * d.weight + d.boneMineralPercent * d.weight + d.musclePercent * d.weight;
+            (bfFrac + boneFrac + muscleFrac) * d.weight;
           allValues.push(total);
         } else {
           // Just use weight
@@ -1713,22 +1718,27 @@ export function HealthMetricsTrends({
                 </div>
               </div>
             )}
-            {latestValues.bfPercent !== null && latestValues.boneMineralPercent !== null && (
+            {(latestValues.musclePercent !== null && latestValues.musclePercent !== undefined) ||
+            (latestValues.bfPercent !== null && latestValues.boneMineralPercent !== null) ? (
               <div className="bg-red-100 dark:bg-red-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
                 <Scale className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                 <div>
                   <div className="text-xs text-red-700 dark:text-red-300 font-medium">Muscle %</div>
                   <div className="text-xl font-bold text-red-900 dark:text-red-100">
                     {(() => {
-                      // Calculate muscle % from BF% and Bone Mineral %
+                      if (latestValues.musclePercent !== null && latestValues.musclePercent !== undefined) {
+                        const raw = latestValues.musclePercent;
+                        const display = raw > 1 ? raw : raw * 100;
+                        return display.toFixed(1);
+                      }
                       const bf =
-                        latestValues.bfPercent < 1
-                          ? latestValues.bfPercent * 100
-                          : latestValues.bfPercent;
+                        latestValues.bfPercent! < 1
+                          ? latestValues.bfPercent! * 100
+                          : latestValues.bfPercent!;
                       const bone =
-                        latestValues.boneMineralPercent < 1
-                          ? latestValues.boneMineralPercent * 100
-                          : latestValues.boneMineralPercent;
+                        latestValues.boneMineralPercent! < 1
+                          ? latestValues.boneMineralPercent! * 100
+                          : latestValues.boneMineralPercent!;
                       const muscle = Math.max(0, 100 - bf - bone);
                       return muscle.toFixed(1);
                     })()}
@@ -1736,7 +1746,7 @@ export function HealthMetricsTrends({
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
@@ -1916,6 +1926,8 @@ export function HealthMetricsTrends({
                     // Transform chartData to show actual kg values instead of percentages
                     // Percentages already come as percentages (not decimals), so no need to divide by 100
                     // Include ALL entries - show weight bar when composition is missing
+                    // Normalize percent to fraction [0,1] (input may be 0-100 or 0-1)
+                    const toFrac = (p: number) => (p > 1 ? p / 100 : p);
                     const bodyCompositionData = chartData.map((d) => {
                       const totalWeight = d.weight || 0;
                       // Check if this entry has all three values and muscle % is not 100
@@ -1923,7 +1935,7 @@ export function HealthMetricsTrends({
                         d.bfPercent !== null &&
                         d.boneMineralPercent !== null &&
                         d.musclePercent !== null &&
-                        d.musclePercent < 100;
+                        (d.musclePercent < 100 || d.musclePercent <= 1);
 
                       if (!hasAllValues) {
                         // Missing composition data - show weight bar if weight is available
@@ -1936,20 +1948,14 @@ export function HealthMetricsTrends({
                         };
                       }
 
+                      const bfFrac = d.bfPercent !== null ? toFrac(d.bfPercent) : 0;
+                      const boneFrac = d.boneMineralPercent !== null ? toFrac(d.boneMineralPercent) : 0;
+                      const muscleFrac = d.musclePercent !== null ? toFrac(d.musclePercent) : 0;
                       return {
                         ...d,
-                        bfKg:
-                          d.bfPercent !== null && totalWeight > 0
-                            ? d.bfPercent * totalWeight
-                            : null,
-                        boneMineralKg:
-                          d.boneMineralPercent !== null && totalWeight > 0
-                            ? d.boneMineralPercent * totalWeight
-                            : null,
-                        muscleKg:
-                          d.musclePercent !== null && totalWeight > 0
-                            ? d.musclePercent * totalWeight
-                            : null,
+                        bfKg: totalWeight > 0 ? bfFrac * totalWeight : null,
+                        boneMineralKg: totalWeight > 0 ? boneFrac * totalWeight : null,
+                        muscleKg: totalWeight > 0 ? muscleFrac * totalWeight : null,
                         weightKg: null, // Don't show weight bar when we have composition data
                       };
                     });
