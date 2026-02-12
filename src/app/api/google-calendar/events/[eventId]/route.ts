@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 // Dynamic import for googleapis
 let google: any;
@@ -184,6 +185,8 @@ export async function PATCH(
         { status: 400 }
       );
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Fetch user's Google Calendar credentials
     const { data: user, error: userError } = await supabase

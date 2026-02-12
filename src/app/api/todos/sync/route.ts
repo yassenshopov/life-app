@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 import { getPropertyValue } from '@/lib/notion-helpers';
 
 const notion = new Client({
@@ -19,6 +20,8 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Get user's databases from their notion_databases array
     const { data: user, error: userError } = await supabase

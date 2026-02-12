@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,25 @@ import {
   NOTION_DATABASE_TEMPLATES,
   type NotionDatabaseTemplate,
 } from '@/constants/notion-templates';
+
+/** Notion title can be a string or a rich text object/array (e.g. { plain_text, type, annotations }). */
+function getDatabaseTitle(name: unknown): string {
+  if (typeof name === 'string') return name;
+  if (name && typeof name === 'object' && !Array.isArray(name)) {
+    const obj = name as { plain_text?: string };
+    if (typeof obj.plain_text === 'string') return obj.plain_text;
+  }
+  if (Array.isArray(name)) {
+    return name
+      .map((seg) =>
+        seg && typeof seg === 'object' && 'plain_text' in seg
+          ? (seg as { plain_text: string }).plain_text
+          : ''
+      )
+      .join('');
+  }
+  return 'Untitled Database';
+}
 
 interface NotionDatabase {
   database_id: string;
@@ -70,6 +89,15 @@ export default function NotionSetup() {
       fetchDatabases();
     }
   }, [user]);
+
+  const uniqueDatabases = useMemo(() => {
+    const seen = new Set<string>();
+    return databases.filter((db) => {
+      if (seen.has(db.database_id)) return false;
+      seen.add(db.database_id);
+      return true;
+    });
+  }, [databases]);
 
   const extractDatabaseId = (url: string) => {
     const match = url.match(/[a-zA-Z0-9]{32}/);
@@ -266,7 +294,7 @@ export default function NotionSetup() {
       </div>
 
       <div className="grid gap-4">
-        {databases.map((database) => (
+        {uniqueDatabases.map((database) => (
           <Card key={database.database_id}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="flex items-center space-x-2">
@@ -291,7 +319,7 @@ export default function NotionSetup() {
                 ) : (
                   <Database className="w-4 h-4" />
                 )}
-                <CardTitle className="text-base">{database.database_name}</CardTitle>
+                <CardTitle className="text-base">{getDatabaseTitle(database.database_name)}</CardTitle>
               </div>
               <Button
                 variant="ghost"

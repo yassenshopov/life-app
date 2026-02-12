@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY,
@@ -59,6 +60,8 @@ export async function POST(
 
     // Initialize Supabase client inside the request handler
     const supabase = getSupabaseServiceRoleClient();
+
+    await ensureUserExists(supabase, userId);
 
     // Get current user's databases
     const { data: user, error: userError } = await supabase

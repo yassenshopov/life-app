@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 const supabase = getSupabaseServiceRoleClient();
 
@@ -12,6 +13,8 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Get user's notion_databases
     const { data: user, error: userError } = await supabase

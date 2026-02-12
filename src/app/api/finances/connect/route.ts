@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
@@ -44,6 +45,15 @@ export async function POST(request: NextRequest) {
     const assetsTitle = (assetsDb as any).title?.[0]?.plain_text || 'Assets';
     const investmentsTitle = (investmentsDb as any).title?.[0]?.plain_text || 'Investments';
     const placesTitle = (placesDb as any).title?.[0]?.plain_text || 'Net Worth';
+
+    // Ensure user row exists (e.g. if Clerk webhook didn't run in production)
+    const ensured = await ensureUserExists(supabase, userId);
+    if (!ensured) {
+      return NextResponse.json(
+        { error: 'Failed to initialize user. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     // Get user's current databases
     const { data: user, error: userError } = await supabase

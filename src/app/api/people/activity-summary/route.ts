@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 import { google } from 'googleapis';
 
 const supabase = getSupabaseServiceRoleClient();
@@ -54,6 +55,8 @@ export async function GET(request: NextRequest) {
 
     // Get unique event IDs
     const eventIds = [...new Set(eventPeople.map((ep: any) => ep.event_id))];
+
+    await ensureUserExists(supabase, userId);
 
     // Fetch user's Google Calendar credentials
     const { data: user, error: userError } = await supabase
