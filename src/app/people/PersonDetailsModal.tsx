@@ -13,9 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
 // Helper functions (duplicated from PeopleView for modularity)
+// Strips both emoji (🦀) and misc symbols (♈♎⚖) so "♎ Libra" / "⚖ Libra" -> "Libra"
 function extractZodiacSign(starSign: string | null): string {
   if (!starSign) return '';
-  return starSign.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/u, '').trim() || starSign;
+  return starSign.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\s\uFE0F]*/u, '').trim() || starSign;
 }
 
 function extractFlag(location: string | null): { flag: string; text: string } {

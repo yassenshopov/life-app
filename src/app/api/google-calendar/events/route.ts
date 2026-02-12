@@ -335,25 +335,51 @@ export async function GET(req: Request) {
     const calendarList = await calendar.calendarList.list();
     const calendarListData = calendarList.data;
 
+    // Always include the primary (main/personal) calendar so "Yassen Shopov" etc. always sync
+    const primaryCal = calendarListData?.items?.find((cal: any) => cal.primary === true);
+    if (primaryCal?.id && !calendarsToFetch.includes(primaryCal.id)) {
+      calendarsToFetch = [...calendarsToFetch, primaryCal.id];
+    }
+
     // Fetch events from each calendar and cache them
     const allEvents: any[] = [];
     const eventsToCache: any[] = [];
 
     for (const calendarId of calendarsToFetch) {
       try {
-        const response = await calendar.events.list({
-          calendarId,
-          timeMin: timeMinParam.toISOString(),
-          timeMax: timeMaxParam.toISOString(),
-          singleEvents: true,
-          orderBy: 'startTime',
-        });
+        let response: Awaited<ReturnType<typeof calendar.events.list>>;
+        let effectiveIdForInfo = calendarId;
+
+        try {
+          response = await calendar.events.list({
+            calendarId,
+            timeMin: timeMinParam.toISOString(),
+            timeMax: timeMaxParam.toISOString(),
+            singleEvents: true,
+            orderBy: 'startTime',
+          });
+        } catch (listError: any) {
+          // Primary calendar is often stored by email in preferences but the API expects "primary".
+          // Retry with "primary" so the main/personal calendar (e.g. "Yassen Shopov") syncs.
+          if ((listError.code === 404 || listError.response?.status === 404) && calendarId !== 'primary') {
+            response = await calendar.events.list({
+              calendarId: 'primary',
+              timeMin: timeMinParam.toISOString(),
+              timeMax: timeMaxParam.toISOString(),
+              singleEvents: true,
+              orderBy: 'startTime',
+            });
+            effectiveIdForInfo = 'primary';
+          } else {
+            throw listError;
+          }
+        }
 
         // Try to get calendar info from cached calendars first, then from API response
         let calInfo = null;
         let backgroundColor = '#4285f4';
         
-        // Check cached calendars
+        // Check cached calendars (use original calendarId for DB lookup; effectiveIdForInfo for API list)
         const { data: cachedCalendar } = await supabase
           .from('google_calendars')
           .select('background_color, calendar_data')
@@ -365,7 +391,7 @@ export async function GET(req: Request) {
           calInfo = cachedCalendar.calendar_data;
           backgroundColor = cachedCalendar.background_color || calInfo?.backgroundColor || '#4285f4';
         } else if (calendarListData?.items) {
-          calInfo = calendarListData.items.find((cal: any) => cal.id === calendarId);
+          calInfo = calendarListData.items.find((cal: any) => cal.id === effectiveIdForInfo) ?? calendarListData.items.find((cal: any) => cal.id === calendarId);
           backgroundColor = calInfo?.backgroundColor || '#4285f4';
         }
         

@@ -39,6 +39,8 @@ function getPropertyValue(property: any, propertyType: string, propertyName?: st
       return property.number;
     case 'checkbox':
       return property.checkbox || false;
+    case 'last_edited_time':
+      return property.last_edited_time || null;
     case 'files':
       return property.files || [];
     case 'formula':

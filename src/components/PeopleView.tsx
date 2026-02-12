@@ -56,11 +56,11 @@ const zodiacSymbols: Record<string, string> = {
   Pisces: '♓',
 };
 
-// Helper to extract zodiac sign from emoji-prefixed string
+// Helper to extract zodiac sign from emoji/symbol-prefixed string
+// Strips both emoji (🦀) and misc symbols (♈♎⚖) so "♎ Libra" / "⚖ Libra" -> "Libra"
 function extractZodiacSign(starSign: string | null): string {
   if (!starSign) return '';
-  // Remove emoji and get sign name (e.g., "🦀 Cancer" -> "Cancer")
-  return starSign.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/u, '').trim() || starSign;
+  return starSign.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\s\uFE0F]*/u, '').trim() || starSign;
 }
 
 // Helper to extract flag from location string

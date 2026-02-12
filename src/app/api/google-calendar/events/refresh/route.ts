@@ -128,9 +128,7 @@ export async function POST(req: Request) {
 
     // Fetch calendar list for color info
     const calendarList = await calendar.calendarList.list();
-    const calInfo = calendarList.data.items?.find((cal: any) => cal.id === calendarId);
-    const backgroundColor = calInfo?.backgroundColor || '#4285f4';
-    const calendarColor = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
+    let effectiveIdForInfo = calendarId;
 
     // Fetch ALL events - use a wide time range (configurable, default: 10 years past to 10 years future)
     // Google Calendar API requires timeMin and timeMax, so we use a wide range
@@ -145,18 +143,40 @@ export async function POST(req: Request) {
     // Fetch events with pagination to get all events
     let allEvents: any[] = [];
     let pageToken: string | undefined = undefined;
+    let apiCalendarId = calendarId;
 
     try {
       do {
-        const response = await calendar.events.list({
-          calendarId,
-          timeMin: timeMin.toISOString(),
-          timeMax: timeMax.toISOString(),
-          singleEvents: true,
-          orderBy: 'startTime',
-          maxResults: 2500, // Maximum allowed by Google Calendar API
-          pageToken: pageToken,
-        });
+        let response: Awaited<ReturnType<typeof calendar.events.list>>;
+        try {
+          response = await calendar.events.list({
+            calendarId: apiCalendarId,
+            timeMin: timeMin.toISOString(),
+            timeMax: timeMax.toISOString(),
+            singleEvents: true,
+            orderBy: 'startTime',
+            maxResults: 2500, // Maximum allowed by Google Calendar API
+            pageToken: pageToken,
+          });
+        } catch (listErr: any) {
+          // Primary calendar may be stored by email in UI but API expects "primary". Retry once.
+          if ((listErr.code === 404 || listErr.response?.status === 404) && apiCalendarId !== 'primary') {
+            apiCalendarId = 'primary';
+            effectiveIdForInfo = 'primary';
+            pageToken = undefined;
+            response = await calendar.events.list({
+              calendarId: 'primary',
+              timeMin: timeMin.toISOString(),
+              timeMax: timeMax.toISOString(),
+              singleEvents: true,
+              orderBy: 'startTime',
+              maxResults: 2500,
+              pageToken: undefined,
+            });
+          } else {
+            throw listErr;
+          }
+        }
 
         if (response.data.items) {
           allEvents = [...allEvents, ...response.data.items];
@@ -182,6 +202,10 @@ export async function POST(req: Request) {
       // Re-throw other errors
       throw listError;
     }
+
+    const calInfo = calendarList.data.items?.find((cal: any) => cal.id === effectiveIdForInfo) ?? calendarList.data.items?.find((cal: any) => cal.id === calendarId);
+    const backgroundColor = calInfo?.backgroundColor || '#4285f4';
+    const calendarColor = backgroundColor.startsWith('#') ? backgroundColor : `#${backgroundColor}`;
 
     // Delete existing events for this calendar (all events, not just a time range)
     await supabase
