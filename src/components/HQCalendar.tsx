@@ -1515,6 +1515,7 @@ export function HQCalendar({
           setSelectedPerson(null);
         }}
         person={selectedPerson}
+        allPeople={people}
       />
 
       {/* Event Color Context Menu */}

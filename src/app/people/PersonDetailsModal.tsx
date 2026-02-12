@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { ConnectedCalendarEvents } from './ConnectedCalendarEvents';
 import { Badge } from '@/components/ui/badge';
+import { OriginOfConnectionBadges } from '@/components/OriginOfConnectionBadge';
 import { Calendar } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
 // Helper functions (duplicated from PeopleView for modularity)
@@ -82,6 +83,8 @@ interface Person {
 
 interface PersonDetailsModalProps {
   person: Person | null;
+  /** Full people list for resolving origin-of-connection to person avatars */
+  allPeople?: Person[];
   isOpen: boolean;
   onClose: () => void;
   onFetchEvents: (personId: string) => Promise<void>;
@@ -94,6 +97,7 @@ interface PersonDetailsModalProps {
  */
 export function PersonDetailsModal({
   person,
+  allPeople = [],
   isOpen,
   onClose,
   onFetchEvents,
@@ -255,11 +259,10 @@ export function PersonDetailsModal({
                     </Badge>
                   )}
                   {person.origin_of_connection && person.origin_of_connection.length > 0 ? (
-                    person.origin_of_connection.map((origin, idx) => (
-                      <Badge key={idx} variant="secondary" className="bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
-                        {origin}
-                      </Badge>
-                    ))
+                    <OriginOfConnectionBadges
+                      origins={person.origin_of_connection}
+                      people={allPeople}
+                    />
                   ) : null}
                 </div>
               </div>

@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { OriginOfConnectionBadges } from '@/components/OriginOfConnectionBadge';
 import { cn } from '@/lib/utils';
 import { MapPin, Calendar, Briefcase, Star, Users, Phone, List, User, Globe, Gift, Clock, Award, Tag, Hash } from 'lucide-react';
 
@@ -95,6 +96,8 @@ interface PersonDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   person: PersonWithDetails | null;
+  /** Full people list for resolving origin-of-connection to person avatars */
+  allPeople?: PersonWithDetails[] | Person[];
 }
 
 // Helper to format age from JSONB
@@ -114,7 +117,7 @@ function formatBirthday(birthday: any): string {
   return '';
 }
 
-export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModalProps) {
+export function PersonDetailModal({ isOpen, onClose, person, allPeople = [] }: PersonDetailModalProps) {
   if (!person) return null;
 
   const imageUrl = getImageUrl(person);
@@ -285,13 +288,7 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
 
             {person.origin_of_connection && person.origin_of_connection.length > 0 && (
               <Field label="Origin of connection" icon={Users}>
-                <div className="flex flex-wrap gap-1">
-                  {person.origin_of_connection.map((origin, idx) => (
-                    <Badge key={idx} variant="secondary" className="bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-100">
-                      {origin}
-                    </Badge>
-                  ))}
-                </div>
+                <OriginOfConnectionBadges origins={person.origin_of_connection} people={allPeople} />
               </Field>
             )}
 

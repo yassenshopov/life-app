@@ -284,9 +284,15 @@ export async function POST(request: NextRequest) {
           case 'Name':
             personData.name = value;
             break;
-          case 'Origin of connection':
-            personData.origin_of_connection = value;
+          case 'Origin of connection': {
+            const normalized = Array.isArray(value)
+              ? value
+              : typeof value === 'string'
+                ? value.split(',').map((s: string) => s.trim()).filter(Boolean)
+                : [];
+            personData.origin_of_connection = normalized;
             break;
+          }
           case 'Star sign':
             personData.star_sign = value;
             break;
