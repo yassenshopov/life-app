@@ -49,32 +49,50 @@ export async function POST(req: Request) {
     const { id, email_addresses, first_name, last_name, image_url, created_at, updated_at } =
       evt.data;
 
+    const primaryEmail = email_addresses?.find((e: { id: string }) => e.id === evt.data.primary_email_address_id)?.email_address
+      ?? email_addresses?.[0]?.email_address;
+
+    const row = {
+      id,
+      email: primaryEmail ?? null,
+      first_name: first_name ?? null,
+      last_name: last_name ?? null,
+      image_url: image_url ?? null,
+      created_at: new Date(Number(created_at)).toISOString(),
+      updated_at: new Date(Number(updated_at)).toISOString(),
+      notion_databases: [],
+      isdeleted: false,
+    };
+
     try {
-      const { error } = await supabase.from('users').insert({
-        id,
-        email: email_addresses[0]?.email_address,
-        first_name,
-        last_name,
-        image_url,
-        created_at: new Date(Number(created_at)).toISOString(),
-        updated_at: new Date(Number(updated_at)).toISOString(),
-      });
+      const { error } = await supabase
+        .from('users')
+        .upsert(row, { onConflict: 'id' });
 
       if (error) {
-        console.error('Error creating user in Supabase:', error);
-        return new Response('Error creating user in Supabase', {
+        const body = JSON.stringify({
+          error: 'Error creating user in Supabase',
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        });
+        console.error('Clerk webhook: Supabase upsert failed', { userId: id, code: error.code, message: error.message, details: error.details });
+        return new Response(body, {
           status: 500,
+          headers: { 'Content-Type': 'application/json' },
         });
       }
 
       return new Response('User created successfully', {
         status: 200,
       });
-    } catch (error) {
-      console.error('Error processing webhook:', error);
-      return new Response('Error processing webhook', {
-        status: 500,
-      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Clerk webhook: Error processing user.created', err);
+      return new Response(
+        JSON.stringify({ error: 'Error processing webhook', message }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
   }
 
