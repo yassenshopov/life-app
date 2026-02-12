@@ -88,9 +88,15 @@ export async function POST(req: Request) {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Clerk webhook: Error processing user.created', err);
+      const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : err instanceof Error && err.cause ? String(err.cause) : null;
+      console.error('Clerk webhook: Error processing user.created', { message, cause, err });
       return new Response(
-        JSON.stringify({ error: 'Error processing webhook', message }),
+        JSON.stringify({
+          error: 'Error processing webhook',
+          message,
+          cause: cause ?? undefined,
+          hint: 'If message is "fetch failed", check production env: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, and that the deployment can reach Supabase.',
+        }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
