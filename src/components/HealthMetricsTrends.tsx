@@ -323,6 +323,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -351,6 +354,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -372,6 +378,20 @@ export function HealthMetricsTrends({
           const sleepProp = entry.properties?.['Sleep [h]'] || entry.properties?.['Sleep'];
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') yearData.sleepValues.push(sleepValue);
+
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            yearData.bfPercentValues.push(bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue);
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            yearData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1 ? boneMineralPercentValue * 100 : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            yearData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
 
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
@@ -490,6 +510,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            yearData.bfPercentValues.length > 0
+              ? Math.round(
+                  (yearData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    yearData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            yearData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (yearData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    yearData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            yearData.musclePercentValues.length > 0
+              ? Math.round(
+                  (yearData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    yearData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const displayDate = format(yearData.yearStart, 'yyyy');
 
           return {
@@ -503,6 +548,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else if (viewMode === 'quarterly') {
@@ -525,6 +573,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -555,6 +606,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -576,6 +630,24 @@ export function HealthMetricsTrends({
           const sleepProp = entry.properties?.['Sleep [h]'] || entry.properties?.['Sleep'];
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') quarterData.sleepValues.push(sleepValue);
+
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            quarterData.bfPercentValues.push(
+              bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue
+            );
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            quarterData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1
+                ? boneMineralPercentValue * 100
+                : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            quarterData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
 
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
@@ -697,6 +769,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            quarterData.bfPercentValues.length > 0
+              ? Math.round(
+                  (quarterData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    quarterData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            quarterData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (quarterData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    quarterData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            quarterData.musclePercentValues.length > 0
+              ? Math.round(
+                  (quarterData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    quarterData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const quarter = getQuarter(quarterData.quarterStart);
           const year = format(quarterData.quarterStart, 'yyyy');
           const displayDate = `${year} Q${quarter}`;
@@ -712,6 +809,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else if (viewMode === 'monthly') {
@@ -734,6 +834,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -762,6 +865,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -783,6 +889,20 @@ export function HealthMetricsTrends({
           const sleepProp = entry.properties?.['Sleep [h]'] || entry.properties?.['Sleep'];
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') monthData.sleepValues.push(sleepValue);
+
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            monthData.bfPercentValues.push(bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue);
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            monthData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1 ? boneMineralPercentValue * 100 : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            monthData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
 
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
@@ -903,6 +1023,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            monthData.bfPercentValues.length > 0
+              ? Math.round(
+                  (monthData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    monthData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            monthData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (monthData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    monthData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            monthData.musclePercentValues.length > 0
+              ? Math.round(
+                  (monthData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    monthData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const displayDate = format(monthData.monthStart, 'MMM yyyy');
 
           return {
@@ -916,6 +1061,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else if (viewMode === 'weekly') {
@@ -938,6 +1086,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -966,6 +1117,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -987,6 +1141,20 @@ export function HealthMetricsTrends({
           const sleepProp = entry.properties?.['Sleep [h]'] || entry.properties?.['Sleep'];
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') weekData.sleepValues.push(sleepValue);
+
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            weekData.bfPercentValues.push(bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue);
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            weekData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1 ? boneMineralPercentValue * 100 : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            weekData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
 
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
@@ -1105,6 +1273,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            weekData.bfPercentValues.length > 0
+              ? Math.round(
+                  (weekData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    weekData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            weekData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (weekData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    weekData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            weekData.musclePercentValues.length > 0
+              ? Math.round(
+                  (weekData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    weekData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const displayDate = format(weekData.weekStart, 'MMM d');
 
           return {
@@ -1118,6 +1311,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else {
@@ -1444,7 +1640,10 @@ export function HealthMetricsTrends({
         sleep !== null &&
         bfPercent !== null &&
         boneMineralPercent !== null &&
-        musclePercent !== null
+        musclePercent !== null &&
+        deepSleep !== null &&
+        remSleep !== null &&
+        lightSleep !== null
       )
         break;
     }
@@ -2033,7 +2232,7 @@ export function HealthMetricsTrends({
                                       <p className="text-xs text-amber-800">
                                         Body Fat: {Number(data.bfKg).toFixed(2)}kg (
                                         {data.bfPercent !== null
-                                          ? Number(data.bfPercent).toFixed(1)
+                                          ? (data.bfPercent < 1 ? data.bfPercent * 100 : data.bfPercent).toFixed(1)
                                           : '-'}
                                         %)
                                       </p>
@@ -2042,7 +2241,7 @@ export function HealthMetricsTrends({
                                       <p className="text-xs text-amber-700">
                                         Bone Mineral: {Number(data.boneMineralKg).toFixed(2)}kg (
                                         {data.boneMineralPercent !== null
-                                          ? Number(data.boneMineralPercent).toFixed(1)
+                                          ? (data.boneMineralPercent < 1 ? data.boneMineralPercent * 100 : data.boneMineralPercent).toFixed(1)
                                           : '-'}
                                         %)
                                       </p>
@@ -2051,7 +2250,7 @@ export function HealthMetricsTrends({
                                       <p className="text-xs text-red-600">
                                         Muscle: {Number(data.muscleKg).toFixed(2)}kg (
                                         {data.musclePercent !== null
-                                          ? Number(data.musclePercent).toFixed(1)
+                                          ? (data.musclePercent < 1 ? data.musclePercent * 100 : data.musclePercent).toFixed(1)
                                           : '-'}
                                         %)
                                       </p>

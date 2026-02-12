@@ -84,7 +84,7 @@ export async function GET(request: Request) {
       });
       emptyResponse.headers.set(
         'Cache-Control',
-        `private, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
+        `private, max-age=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
       );
       emptyResponse.headers.set('Vary', 'Cookie, Authorization');
       return emptyResponse;
@@ -183,7 +183,7 @@ export async function GET(request: Request) {
         const year = watchedAt.getFullYear();
         const yearStr = String(year);
         const month = `${year}-${String(watchedAt.getMonth() + 1).padStart(2, '0')}`;
-        const dateKey = watchedAt.toDateString();
+        const dateKey = watchedAt.toISOString().slice(0, 10); // YYYY-MM-DD ISO
         const hour = watchedAt.getHours();
         const day = watchedAt.getDay();
 
@@ -313,12 +313,15 @@ export async function GET(request: Request) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 100);
 
-    // Watching streak
+    // Watching streak (start from today if present, else yesterday)
+    const todayString = today.toISOString().slice(0, 10);
+    const startIndex = uniqueDates.has(todayString) ? 0 : 1;
     let streak = 0;
-    for (let i = 0; i < 365; i++) {
+    for (let i = startIndex; i < 365; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(checkDate.getDate() - i);
-      if (uniqueDates.has(checkDate.toDateString())) {
+      const checkDateString = checkDate.toISOString().slice(0, 10);
+      if (uniqueDates.has(checkDateString)) {
         streak++;
       } else {
         break;
@@ -332,7 +335,7 @@ export async function GET(request: Request) {
       (finalNewestDate.getTime() - finalOldestDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    // Binge sessions (days with 10+ videos)
+    // Binge sessions (days with 10+ videos); date keys are ISO YYYY-MM-DD from recordsByDate
     const bingeSessions: Array<{ date: string; count: number; videos: string[] }> = [];
     recordsByDate.forEach((videos, date) => {
       if (videos.length >= 10) {
@@ -491,6 +494,7 @@ export async function GET(request: Request) {
       let totalLikes = 0;
       let totalComments = 0;
       let videosWithEngagement = 0;
+      let videosWithComments = 0;
 
       popularVideos.forEach((video) => {
         if (video.like_count !== null) {
@@ -499,6 +503,7 @@ export async function GET(request: Request) {
         }
         if (video.comment_count !== null) {
           totalComments += video.comment_count;
+          videosWithComments++;
         }
       });
 
@@ -518,8 +523,9 @@ export async function GET(request: Request) {
         totalComments,
         averageLikes: videosWithEngagement > 0 ? Math.round(totalLikes / videosWithEngagement) : 0,
         averageComments:
-          videosWithEngagement > 0 ? Math.round(totalComments / videosWithEngagement) : 0,
+          videosWithComments > 0 ? Math.round(totalComments / videosWithComments) : 0,
         videosWithEngagement,
+        videosWithComments,
       };
     }
 
@@ -553,7 +559,7 @@ export async function GET(request: Request) {
     // Per-user cache: private so shared caches do not serve another user's analytics
     response.headers.set(
       'Cache-Control',
-      `private, s-maxage=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
+      `private, max-age=${getCacheTTL(timeRange)}, stale-while-revalidate=60`
     );
     response.headers.set('Vary', 'Cookie, Authorization');
 
@@ -561,7 +567,7 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error('Error fetching YouTube analytics:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch analytics' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

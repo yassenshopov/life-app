@@ -14,8 +14,12 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Calendar, List, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { getDominantColor } from '@/lib/youtube-color';
 import { PIXELS_PER_MINUTE } from '@/lib/calendar-utils';
+
+const TIMELINE_ROW_HEIGHT = 136; // row content ~120px + mb-4
+const FETCH_VIDEOS_LIMIT = 1000;
 
 interface YouTubeVideo {
   id: string;
@@ -66,6 +70,45 @@ function formatTime(hour: number, minute: number, format: '12h' | '24h' = '12h')
   return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
 }
 
+/** Returns a CSS color string with the given alpha. Handles rgba, rgb, hex (#rrggbb), and hsl/hsla. */
+function withAlpha(color: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  const trimmed = color.trim();
+  if (trimmed.startsWith('rgba')) {
+    return trimmed.replace(/[\d.]+\)\s*$/, `${a})`);
+  }
+  if (trimmed.startsWith('rgb(')) {
+    return trimmed.replace('rgb(', 'rgba(').replace(')', `, ${a})`);
+  }
+  if (trimmed.startsWith('#')) {
+    const hex = trimmed.slice(1);
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+    if (hex.length === 8) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+  }
+  if (trimmed.startsWith('hsl')) {
+    const match = trimmed.match(/hsla?\(([^)]+)\)/);
+    if (match) {
+      const rest = match[1];
+      const parts = rest.split(',').map((p) => p.trim());
+      if (parts.length >= 4) {
+        return `hsla(${parts[0]}, ${parts[1]}, ${parts[2]}, ${a})`;
+      }
+      return `hsla(${rest}, ${a})`;
+    }
+  }
+  return trimmed;
+}
+
 export function YouTubeWatchHistoryCalendar({
   isOpen,
   onClose,
@@ -106,7 +149,7 @@ export function YouTubeWatchHistoryCalendar({
       weekEnd.setHours(23, 59, 59, 999);
 
       const response = await fetch(
-        `/api/youtube/watch-history?timeMin=${weekStart.toISOString()}&timeMax=${weekEnd.toISOString()}&limit=5000`
+        `/api/youtube/watch-history?timeMin=${weekStart.toISOString()}&timeMax=${weekEnd.toISOString()}&limit=${FETCH_VIDEOS_LIMIT}`
       );
 
       if (!response.ok) {
@@ -329,37 +372,42 @@ export function YouTubeWatchHistoryCalendar({
     });
   }, [videos]);
 
-  if (!isOpen) return null;
+  const timelineScrollRef = React.useRef<HTMLDivElement>(null);
+  const timelineVirtualizer = useVirtualizer({
+    count: sortedVideos.length,
+    getScrollElement: () => timelineScrollRef.current,
+    estimateSize: () => TIMELINE_ROW_HEIGHT,
+    overscan: 5,
+  });
 
   return (
     <>
       <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              onClose();
-            }
-          }}
-        >
+        {isOpen && (
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-7xl max-h-[90vh] bg-background rounded-lg shadow-2xl border overflow-hidden flex flex-col"
-            style={
-              colorPalette
-                ? {
-                    backgroundColor: colorPalette.primary
-                      .replace('rgb', 'rgba')
-                      .replace(')', ', 0.95)'),
-                    borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.3)'),
-                  }
-                : undefined
-            }
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                onClose();
+              }
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-7xl max-h-[90vh] bg-background rounded-lg shadow-2xl border overflow-hidden flex flex-col"
+              style={
+                colorPalette
+                  ? {
+                      backgroundColor: withAlpha(colorPalette.primary, 0.95),
+                      borderColor: withAlpha(colorPalette.accent, 0.3),
+                    }
+                  : undefined
+              }
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -437,6 +485,11 @@ export function YouTubeWatchHistoryCalendar({
 
                   {/* Weekly Timeline View */}
                   <div className="flex-1 overflow-auto">
+                    {loading ? (
+                      <div className="flex justify-center items-center h-full">
+                        <div className="text-muted-foreground">Loading videos...</div>
+                      </div>
+                    ) : (
                     <div className="min-w-[1000px]">
                       {/* Day headers */}
                       <div
@@ -534,9 +587,7 @@ export function YouTubeWatchHistoryCalendar({
                                       className="absolute left-1 right-1 rounded overflow-hidden hover:opacity-90 transition-opacity"
                                       style={{
                                         ...position,
-                                        backgroundColor: bgColor.startsWith('rgb')
-                                          ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.7)')
-                                          : bgColor + 'B3',
+                                        backgroundColor: withAlpha(bgColor, 0.7),
                                         cursor: 'pointer',
                                       }}
                                       onClick={(e) => {
@@ -593,10 +644,11 @@ export function YouTubeWatchHistoryCalendar({
                         </div>
                       </div>
                     </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 overflow-auto p-4">
+                <div ref={timelineScrollRef} className="flex-1 overflow-auto p-4">
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-muted-foreground">Loading videos...</div>
@@ -606,8 +658,15 @@ export function YouTubeWatchHistoryCalendar({
                       <div className="text-muted-foreground">No videos found for this week</div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {sortedVideos.map((video) => {
+                    <div
+                      style={{
+                        height: `${timelineVirtualizer.getTotalSize()}px`,
+                        width: '100%',
+                        position: 'relative',
+                      }}
+                    >
+                      {timelineVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const video = sortedVideos[virtualRow.index];
                         const watchedDate = new Date(video.watched_at);
                         return (
                           <a
@@ -615,18 +674,18 @@ export function YouTubeWatchHistoryCalendar({
                             href={video.video_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block group"
+                            className="block group absolute left-0 w-full"
+                            style={{
+                              top: 0,
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
                           >
-                            <motion.div
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="flex gap-4 p-4 rounded-lg border hover:bg-accent transition-colors"
+                            <div
+                              className="flex gap-4 p-4 rounded-lg border hover:bg-accent transition-colors mb-4"
                               style={
                                 colorPalette
                                   ? {
-                                      borderColor: colorPalette.accent
-                                        .replace('rgb', 'rgba')
-                                        .replace(')', ', 0.2)'),
+                                      borderColor: withAlpha(colorPalette.accent, 0.2),
                                     }
                                   : undefined
                               }
@@ -657,7 +716,7 @@ export function YouTubeWatchHistoryCalendar({
                                   })}
                                 </p>
                               </div>
-                            </motion.div>
+                            </div>
                           </a>
                         );
                       })}
@@ -668,6 +727,7 @@ export function YouTubeWatchHistoryCalendar({
             </CardContent>
           </motion.div>
         </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Daily Modal */}
@@ -706,12 +766,8 @@ export function YouTubeWatchHistoryCalendar({
                           style={
                             bgColor
                               ? {
-                                  borderColor: bgColor.startsWith('rgb')
-                                    ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.3)')
-                                    : bgColor + '4D',
-                                  backgroundColor: bgColor.startsWith('rgb')
-                                    ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.1)')
-                                    : bgColor + '1A',
+                                  borderColor: withAlpha(bgColor, 0.3),
+                                  backgroundColor: withAlpha(bgColor, 0.1),
                                 }
                               : undefined
                           }
@@ -855,12 +911,8 @@ export function YouTubeWatchHistoryCalendar({
                         style={
                           bgColor
                             ? {
-                                borderColor: bgColor.startsWith('rgb')
-                                  ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.3)')
-                                  : bgColor + '4D',
-                                backgroundColor: bgColor.startsWith('rgb')
-                                  ? bgColor.replace('rgb', 'rgba').replace(')', ', 0.1)')
-                                  : bgColor + '1A',
+                                borderColor: withAlpha(bgColor, 0.3),
+                                backgroundColor: withAlpha(bgColor, 0.1),
                               }
                             : undefined
                         }
