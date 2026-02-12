@@ -21,3 +21,4 @@ COMMENT ON INDEX idx_event_people_user_person IS
 COMMENT ON INDEX idx_event_people_user_person_event IS 
 'Covering index for person events queries. Includes event_id to avoid table lookups. Covers: user_id + person_id + event_id';
 
+

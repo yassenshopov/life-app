@@ -109,6 +109,24 @@ export async function GET(req: Request) {
           deepSleep: props['Deep Sleep [h]']?.number ?? null,
           remSleep: props['REM Sleep [h]']?.number ?? null,
           sleepRange: props['Sleep range']?.rich_text?.[0]?.plain_text ?? null,
+          bfPercent:
+            typeof props['BF%']?.number === 'number'
+              ? props['BF%'].number
+              : typeof props['BF%']?.formula?.number === 'number'
+              ? props['BF%'].formula.number
+              : null,
+          boneMineralPercent:
+            typeof props['Bone Mineral %']?.number === 'number'
+              ? props['Bone Mineral %'].number
+              : typeof props['Bone Mineral %']?.formula?.number === 'number'
+              ? props['Bone Mineral %'].formula.number
+              : null,
+          musclePercent:
+            typeof props['Muscle %']?.number === 'number'
+              ? props['Muscle %'].number
+              : typeof props['Muscle %']?.formula?.number === 'number'
+              ? props['Muscle %'].formula.number
+              : null,
         };
       });
 

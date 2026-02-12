@@ -5,7 +5,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays, Wallet, CheckSquare } from 'lucide-react';
+import { Target, PanelLeftClose, PanelLeftOpen, Settings, Users, Music, Film, Calendar, CalendarDays, Wallet, CheckSquare, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Outfit } from 'next/font/google';
@@ -212,6 +212,7 @@ export default function HQSidebar({ colorPalette: propColorPalette }: HQSidebarP
   const isPeopleActive = pathname === '/people';
   const isSpotifyActive = pathname === '/spotify';
   const isMediaActive = pathname === '/media';
+  const isYouTubeActive = pathname === '/youtube';
   const isTrackingActive = pathname === '/tracking';
   const isCalendarActive = pathname === '/calendar';
   const isFinancesActive = pathname === '/finances';
@@ -384,6 +385,21 @@ export default function HQSidebar({ colorPalette: propColorPalette }: HQSidebarP
         >
           <Film className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Media</span>}
+        </Link>
+        <Link
+          href="/youtube"
+          className={cn(
+            'flex items-center space-x-2 px-3 py-2 rounded-md transition-colors w-full',
+            !colorPalette && 'hover:bg-accent hover:text-accent-foreground',
+            !colorPalette && isYouTubeActive && 'bg-accent text-accent-foreground',
+            isCollapsed && 'justify-center px-2'
+          )}
+          style={getLinkStyle(isYouTubeActive)}
+          onMouseEnter={(e) => handleLinkHover(e, isYouTubeActive)}
+          onMouseLeave={(e) => handleLinkLeave(e, isYouTubeActive)}
+        >
+          <Video className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">YouTube</span>}
         </Link>
         <Link
           href="/calendar"

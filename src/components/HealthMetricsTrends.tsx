@@ -8,6 +8,8 @@ import {
   Moon,
   LineChart as LineChartIcon,
   BarChart3,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -275,6 +277,14 @@ export function HealthMetricsTrends({
     }
     return 'line';
   });
+  const [showAdvancedBodyComposition, setShowAdvancedBodyComposition] = useState(false);
+  const [showWeightComposition, setShowWeightComposition] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = getCookie('tracking-weight-composition');
+      return saved === 'true';
+    }
+    return false;
+  });
 
   // Prepare chart data for the selected time period
   const chartData = useMemo(() => {
@@ -313,6 +323,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -341,6 +354,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -363,6 +379,20 @@ export function HealthMetricsTrends({
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') yearData.sleepValues.push(sleepValue);
 
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            yearData.bfPercentValues.push(bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue);
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            yearData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1 ? boneMineralPercentValue * 100 : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            yearData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
+
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
           const deepSleepHours = extractPropertyValue(entry.properties?.['Deep Sleep [h]']);
@@ -379,8 +409,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               yearData.deepSleepValues.push(deepPercent);
 
@@ -390,8 +420,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               yearData.remSleepValues.push(remPercent);
 
@@ -407,8 +437,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               yearData.lightSleepValues.push(lightPercent);
           }
@@ -480,6 +510,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            yearData.bfPercentValues.length > 0
+              ? Math.round(
+                  (yearData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    yearData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            yearData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (yearData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    yearData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            yearData.musclePercentValues.length > 0
+              ? Math.round(
+                  (yearData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    yearData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const displayDate = format(yearData.yearStart, 'yyyy');
 
           return {
@@ -493,6 +548,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else if (viewMode === 'quarterly') {
@@ -515,6 +573,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -545,6 +606,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -567,6 +631,24 @@ export function HealthMetricsTrends({
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') quarterData.sleepValues.push(sleepValue);
 
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            quarterData.bfPercentValues.push(
+              bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue
+            );
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            quarterData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1
+                ? boneMineralPercentValue * 100
+                : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            quarterData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
+
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
           const deepSleepHours = extractPropertyValue(entry.properties?.['Deep Sleep [h]']);
@@ -583,8 +665,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               quarterData.deepSleepValues.push(deepPercent);
 
@@ -594,8 +676,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               quarterData.remSleepValues.push(remPercent);
 
@@ -611,8 +693,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               quarterData.lightSleepValues.push(lightPercent);
           }
@@ -687,6 +769,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            quarterData.bfPercentValues.length > 0
+              ? Math.round(
+                  (quarterData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    quarterData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            quarterData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (quarterData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    quarterData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            quarterData.musclePercentValues.length > 0
+              ? Math.round(
+                  (quarterData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    quarterData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const quarter = getQuarter(quarterData.quarterStart);
           const year = format(quarterData.quarterStart, 'yyyy');
           const displayDate = `${year} Q${quarter}`;
@@ -702,6 +809,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else if (viewMode === 'monthly') {
@@ -724,6 +834,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -752,6 +865,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -774,6 +890,20 @@ export function HealthMetricsTrends({
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') monthData.sleepValues.push(sleepValue);
 
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            monthData.bfPercentValues.push(bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue);
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            monthData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1 ? boneMineralPercentValue * 100 : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            monthData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
+
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
           const deepSleepHours = extractPropertyValue(entry.properties?.['Deep Sleep [h]']);
@@ -790,8 +920,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               monthData.deepSleepValues.push(deepPercent);
 
@@ -801,8 +931,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               monthData.remSleepValues.push(remPercent);
 
@@ -818,8 +948,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               monthData.lightSleepValues.push(lightPercent);
           }
@@ -893,6 +1023,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            monthData.bfPercentValues.length > 0
+              ? Math.round(
+                  (monthData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    monthData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            monthData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (monthData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    monthData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            monthData.musclePercentValues.length > 0
+              ? Math.round(
+                  (monthData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    monthData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const displayDate = format(monthData.monthStart, 'MMM yyyy');
 
           return {
@@ -906,6 +1061,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else if (viewMode === 'weekly') {
@@ -928,6 +1086,9 @@ export function HealthMetricsTrends({
           lightSleepValues: number[];
           remSleepValues: number[];
           awakeValues: number[];
+          bfPercentValues: number[];
+          boneMineralPercentValues: number[];
+          musclePercentValues: number[];
         }
       >();
 
@@ -956,6 +1117,9 @@ export function HealthMetricsTrends({
               lightSleepValues: [],
               remSleepValues: [],
               awakeValues: [],
+              bfPercentValues: [],
+              boneMineralPercentValues: [],
+              musclePercentValues: [],
             });
           }
 
@@ -978,6 +1142,20 @@ export function HealthMetricsTrends({
           const sleepValue = extractPropertyValue(sleepProp);
           if (typeof sleepValue === 'number') weekData.sleepValues.push(sleepValue);
 
+          const bfPercentValue = extractPropertyValue(entry.properties?.['BF%']);
+          if (typeof bfPercentValue === 'number')
+            weekData.bfPercentValues.push(bfPercentValue < 1 ? bfPercentValue * 100 : bfPercentValue);
+          const boneMineralPercentValue = extractPropertyValue(entry.properties?.['Bone Mineral %']);
+          if (typeof boneMineralPercentValue === 'number')
+            weekData.boneMineralPercentValues.push(
+              boneMineralPercentValue < 1 ? boneMineralPercentValue * 100 : boneMineralPercentValue
+            );
+          const musclePercentValue = extractPropertyValue(entry.properties?.['Muscle %']);
+          if (typeof musclePercentValue === 'number')
+            weekData.musclePercentValues.push(
+              musclePercentValue < 1 ? musclePercentValue * 100 : musclePercentValue
+            );
+
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(entry.properties?.['Deep Sleep %']);
           const deepSleepHours = extractPropertyValue(entry.properties?.['Deep Sleep [h]']);
@@ -994,8 +1172,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleepValue) * 100
-                : null;
+                  ? (deepSleepHours / sleepValue) * 100
+                  : null;
             if (deepPercent !== null && typeof deepPercent === 'number')
               weekData.deepSleepValues.push(deepPercent);
 
@@ -1005,8 +1183,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleepValue) * 100
-                : null;
+                  ? (remSleepHours / sleepValue) * 100
+                  : null;
             if (remPercent !== null && typeof remPercent === 'number')
               weekData.remSleepValues.push(remPercent);
 
@@ -1022,8 +1200,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepPercent !== null && remPercent !== null && awakePercent !== null
-                ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
-                : null;
+                  ? Math.max(0, 100 - deepPercent - remPercent - (awakePercent || 0))
+                  : null;
             if (lightPercent !== null && typeof lightPercent === 'number')
               weekData.lightSleepValues.push(lightPercent);
           }
@@ -1095,6 +1273,31 @@ export function HealthMetricsTrends({
                 ) / 100
               : null;
 
+          const bfPercent =
+            weekData.bfPercentValues.length > 0
+              ? Math.round(
+                  (weekData.bfPercentValues.reduce((a, b) => a + b, 0) /
+                    weekData.bfPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const boneMineralPercent =
+            weekData.boneMineralPercentValues.length > 0
+              ? Math.round(
+                  (weekData.boneMineralPercentValues.reduce((a, b) => a + b, 0) /
+                    weekData.boneMineralPercentValues.length) *
+                    100
+                ) / 100
+              : null;
+          const musclePercent =
+            weekData.musclePercentValues.length > 0
+              ? Math.round(
+                  (weekData.musclePercentValues.reduce((a, b) => a + b, 0) /
+                    weekData.musclePercentValues.length) *
+                    100
+                ) / 100
+              : null;
+
           const displayDate = format(weekData.weekStart, 'MMM d');
 
           return {
@@ -1108,6 +1311,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         });
     } else {
@@ -1158,6 +1364,19 @@ export function HealthMetricsTrends({
           const sleepValue = extractPropertyValue(sleepProp);
           const sleep = typeof sleepValue === 'number' ? sleepValue : null;
 
+          const bfPercentProp = e.properties?.['BF%'];
+          const bfPercentValue = extractPropertyValue(bfPercentProp);
+          const bfPercent = typeof bfPercentValue === 'number' ? bfPercentValue : null;
+
+          const boneMineralPercentProp = e.properties?.['Bone Mineral %'];
+          const boneMineralPercentValue = extractPropertyValue(boneMineralPercentProp);
+          const boneMineralPercent =
+            typeof boneMineralPercentValue === 'number' ? boneMineralPercentValue : null;
+
+          const musclePercentProp = e.properties?.['Muscle %'];
+          const musclePercentValue = extractPropertyValue(musclePercentProp);
+          const musclePercent = typeof musclePercentValue === 'number' ? musclePercentValue : null;
+
           // Extract sleep stage percentages
           const deepSleepPercent = extractPropertyValue(e.properties?.['Deep Sleep %']);
           const deepSleepHours = extractPropertyValue(e.properties?.['Deep Sleep [h]']);
@@ -1179,8 +1398,8 @@ export function HealthMetricsTrends({
                   ? deepSleepPercent * 100
                   : deepSleepPercent
                 : deepSleepHours !== null && typeof deepSleepHours === 'number'
-                ? (deepSleepHours / sleep) * 100
-                : null;
+                  ? (deepSleepHours / sleep) * 100
+                  : null;
 
             remSleep =
               remSleepPercent !== null
@@ -1188,8 +1407,8 @@ export function HealthMetricsTrends({
                   ? remSleepPercent * 100
                   : remSleepPercent
                 : remSleepHours !== null && typeof remSleepHours === 'number'
-                ? (remSleepHours / sleep) * 100
-                : null;
+                  ? (remSleepHours / sleep) * 100
+                  : null;
 
             awake =
               awakeTime !== null && typeof awakeTime === 'number'
@@ -1202,8 +1421,8 @@ export function HealthMetricsTrends({
                   ? lightSleepPercent * 100
                   : lightSleepPercent
                 : deepSleep !== null && remSleep !== null && awake !== null
-                ? Math.max(0, 100 - deepSleep - remSleep - (awake || 0))
-                : null;
+                  ? Math.max(0, 100 - deepSleep - remSleep - (awake || 0))
+                  : null;
           }
 
           let displayDate = '';
@@ -1229,6 +1448,9 @@ export function HealthMetricsTrends({
             lightSleep,
             remSleep,
             awake,
+            bfPercent,
+            boneMineralPercent,
+            musclePercent,
           };
         })
         .filter((d) => d.fullDate); // Only include entries with valid dates
@@ -1250,11 +1472,86 @@ export function HealthMetricsTrends({
   const hasSleepStages = chartData.some(
     (d) => d.deepSleep !== null || d.lightSleep !== null || d.remSleep !== null || d.awake !== null
   );
-  const hasAnyData = hasRHR || hasWeight || hasSteps || hasSleep || hasSleepStages;
+  const hasBFPercent = chartData.some((d) => d.bfPercent !== null);
+  const hasBoneMineralPercent = chartData.some((d) => d.boneMineralPercent !== null);
+  const hasMusclePercent = chartData.some((d) => d.musclePercent !== null);
+  const hasBodyComposition = hasBFPercent || hasBoneMineralPercent || hasMusclePercent;
+  const hasAnyData =
+    hasRHR || hasWeight || hasSteps || hasSleep || hasSleepStages || hasBodyComposition;
+
+  // Calculate weight domain to ensure it doesn't start from 0
+  const weightDomain = useMemo(() => {
+    if (!hasWeight) return ['dataMin', 'dataMax'];
+    const weightValues = chartData.map((d) => d.weight).filter((w): w is number => w !== null);
+    if (weightValues.length === 0) return ['dataMin', 'dataMax'];
+    const minWeight = Math.min(...weightValues);
+    const maxWeight = Math.max(...weightValues);
+    const range = maxWeight - minWeight;
+    // Calculate margin: use 5% of range or at least 2kg, whichever is larger
+    const margin = Math.max(range * 0.05, 2);
+    // Don't force minimum to 0 - allow it to go below if needed
+    const minDomain = minWeight - margin;
+    const maxDomain = maxWeight + margin;
+    // Return as array of numbers, not strings, to prevent Recharts from starting at 0
+    return [minDomain, maxDomain];
+  }, [chartData, hasWeight]);
+
+  // Normalize percent to fraction [0,1] (input may be 0-100 or 0-1)
+  const toFraction = (p: number) => (p > 1 ? p / 100 : p);
+
+  // Calculate body composition domain to ensure it doesn't start from 0
+  const bodyCompositionDomain = useMemo(() => {
+    if (!hasBodyComposition) return ['dataMin', 'dataMax'];
+    // Get all weight values (both regular weight and composition totals)
+    const allValues: number[] = [];
+    chartData.forEach((d) => {
+      if (d.weight !== null) {
+        // Check if this entry has composition data
+        const hasAllValues =
+          d.bfPercent !== null &&
+          d.boneMineralPercent !== null &&
+          d.musclePercent !== null &&
+          (d.musclePercent < 100 || d.musclePercent <= 1);
+
+        if (hasAllValues && d.bfPercent !== null && d.boneMineralPercent !== null && d.musclePercent !== null) {
+          const bfFrac = toFraction(d.bfPercent);
+          const boneFrac = toFraction(d.boneMineralPercent);
+          const muscleFrac = toFraction(d.musclePercent);
+          const total =
+            (bfFrac + boneFrac + muscleFrac) * d.weight;
+          allValues.push(total);
+        } else {
+          // Just use weight
+          allValues.push(d.weight);
+        }
+      }
+    });
+    if (allValues.length === 0) return ['dataMin', 'dataMax'];
+    const minValue = Math.min(...allValues);
+    const maxValue = Math.max(...allValues);
+    const range = maxValue - minValue;
+    const margin = Math.max(range * 0.05, 2);
+    // Don't force minimum to 0 - allow it to go below if needed
+    const minDomain = minValue - margin;
+    const maxDomain = maxValue + margin;
+    return [minDomain, maxDomain];
+  }, [chartData, hasBodyComposition]);
 
   // Get latest values from entries for the metric cards
   const latestValues = useMemo(() => {
-    if (entries.length === 0) return { rhr: null, weight: null, steps: null, sleep: null };
+    if (entries.length === 0)
+      return {
+        rhr: null,
+        weight: null,
+        steps: null,
+        sleep: null,
+        deepSleep: null,
+        remSleep: null,
+        lightSleep: null,
+        bfPercent: null,
+        boneMineralPercent: null,
+        musclePercent: null,
+      };
 
     // Sort entries by date (most recent first)
     const sortedEntries = [...entries].sort((a, b) => {
@@ -1269,6 +1566,12 @@ export function HealthMetricsTrends({
     let weight: number | null = null;
     let steps: number | null = null;
     let sleep: number | null = null;
+    let deepSleep: number | null = null;
+    let remSleep: number | null = null;
+    let lightSleep: number | null = null;
+    let bfPercent: number | null = null;
+    let boneMineralPercent: number | null = null;
+    let musclePercent: number | null = null;
 
     for (const entry of sortedEntries) {
       if (rhr === null) {
@@ -1291,10 +1594,72 @@ export function HealthMetricsTrends({
         const sleepValue = extractPropertyValue(sleepProp);
         if (typeof sleepValue === 'number') sleep = sleepValue;
       }
-      if (rhr !== null && weight !== null && steps !== null && sleep !== null) break;
+      if (deepSleep === null) {
+        const deepSleepPercentProp = entry.properties?.['Deep Sleep %'];
+        const deepSleepPercentValue = extractPropertyValue(deepSleepPercentProp);
+        if (typeof deepSleepPercentValue === 'number') {
+          deepSleep =
+            deepSleepPercentValue < 1 ? deepSleepPercentValue * 100 : deepSleepPercentValue;
+        }
+      }
+      if (remSleep === null) {
+        const remSleepPercentProp = entry.properties?.['REM Sleep %'];
+        const remSleepPercentValue = extractPropertyValue(remSleepPercentProp);
+        if (typeof remSleepPercentValue === 'number') {
+          remSleep = remSleepPercentValue < 1 ? remSleepPercentValue * 100 : remSleepPercentValue;
+        }
+      }
+      if (lightSleep === null) {
+        const lightSleepPercentProp = entry.properties?.['Light Sleep %'];
+        const lightSleepPercentValue = extractPropertyValue(lightSleepPercentProp);
+        if (typeof lightSleepPercentValue === 'number') {
+          lightSleep =
+            lightSleepPercentValue < 1 ? lightSleepPercentValue * 100 : lightSleepPercentValue;
+        }
+      }
+      if (bfPercent === null) {
+        const bfPercentProp = entry.properties?.['BF%'];
+        const bfPercentValue = extractPropertyValue(bfPercentProp);
+        if (typeof bfPercentValue === 'number') bfPercent = bfPercentValue;
+      }
+      if (boneMineralPercent === null) {
+        const boneMineralPercentProp = entry.properties?.['Bone Mineral %'];
+        const boneMineralPercentValue = extractPropertyValue(boneMineralPercentProp);
+        if (typeof boneMineralPercentValue === 'number')
+          boneMineralPercent = boneMineralPercentValue;
+      }
+      if (musclePercent === null) {
+        const musclePercentProp = entry.properties?.['Muscle %'];
+        const musclePercentValue = extractPropertyValue(musclePercentProp);
+        if (typeof musclePercentValue === 'number') musclePercent = musclePercentValue;
+      }
+      if (
+        rhr !== null &&
+        weight !== null &&
+        steps !== null &&
+        sleep !== null &&
+        bfPercent !== null &&
+        boneMineralPercent !== null &&
+        musclePercent !== null &&
+        deepSleep !== null &&
+        remSleep !== null &&
+        lightSleep !== null
+      )
+        break;
     }
 
-    return { rhr, weight, steps, sleep };
+    return {
+      rhr,
+      weight,
+      steps,
+      sleep,
+      deepSleep,
+      remSleep,
+      lightSleep,
+      bfPercent,
+      boneMineralPercent,
+      musclePercent,
+    };
   }, [entries]);
 
   // Apply color palette to card if available
@@ -1354,64 +1719,64 @@ export function HealthMetricsTrends({
                   </Button>
                 ))
               : viewMode === 'quarterly'
-              ? QUARTERLY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.quarters}
-                    variant={selectedQuartersPeriod === period.quarters ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedQuartersPeriod(period.quarters);
-                      setCookie('tracking-quarters-period', period.quarters.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))
-              : viewMode === 'monthly'
-              ? MONTHLY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.months}
-                    variant={selectedMonthsPeriod === period.months ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedMonthsPeriod(period.months);
-                      setCookie('tracking-months-period', period.months.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))
-              : viewMode === 'weekly'
-              ? WEEKLY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.weeks}
-                    variant={selectedWeeksPeriod === period.weeks ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedWeeksPeriod(period.weeks);
-                      setCookie('tracking-weeks-period', period.weeks.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))
-              : DAILY_TIME_PERIODS.map((period) => (
-                  <Button
-                    key={period.days}
-                    variant={selectedDaysPeriod === period.days ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedDaysPeriod(period.days);
-                      setCookie('tracking-days-period', period.days.toString());
-                    }}
-                    className="h-8 px-3"
-                  >
-                    {period.label}
-                  </Button>
-                ))}
+                ? QUARTERLY_TIME_PERIODS.map((period) => (
+                    <Button
+                      key={period.quarters}
+                      variant={selectedQuartersPeriod === period.quarters ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedQuartersPeriod(period.quarters);
+                        setCookie('tracking-quarters-period', period.quarters.toString());
+                      }}
+                      className="h-8 px-3"
+                    >
+                      {period.label}
+                    </Button>
+                  ))
+                : viewMode === 'monthly'
+                  ? MONTHLY_TIME_PERIODS.map((period) => (
+                      <Button
+                        key={period.months}
+                        variant={selectedMonthsPeriod === period.months ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setSelectedMonthsPeriod(period.months);
+                          setCookie('tracking-months-period', period.months.toString());
+                        }}
+                        className="h-8 px-3"
+                      >
+                        {period.label}
+                      </Button>
+                    ))
+                  : viewMode === 'weekly'
+                    ? WEEKLY_TIME_PERIODS.map((period) => (
+                        <Button
+                          key={period.weeks}
+                          variant={selectedWeeksPeriod === period.weeks ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setSelectedWeeksPeriod(period.weeks);
+                            setCookie('tracking-weeks-period', period.weeks.toString());
+                          }}
+                          className="h-8 px-3"
+                        >
+                          {period.label}
+                        </Button>
+                      ))
+                    : DAILY_TIME_PERIODS.map((period) => (
+                        <Button
+                          key={period.days}
+                          variant={selectedDaysPeriod === period.days ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setSelectedDaysPeriod(period.days);
+                            setCookie('tracking-days-period', period.days.toString());
+                          }}
+                          className="h-8 px-3"
+                        >
+                          {period.label}
+                        </Button>
+                      ))}
           </div>
         </div>
 
@@ -1419,7 +1784,13 @@ export function HealthMetricsTrends({
         {(latestValues.rhr !== null ||
           latestValues.weight !== null ||
           latestValues.steps !== null ||
-          latestValues.sleep !== null) && (
+          latestValues.sleep !== null ||
+          latestValues.deepSleep !== null ||
+          latestValues.remSleep !== null ||
+          latestValues.lightSleep !== null ||
+          latestValues.bfPercent !== null ||
+          latestValues.boneMineralPercent !== null ||
+          latestValues.musclePercent !== null) && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {latestValues.rhr !== null && (
               <div className="bg-red-100 dark:bg-red-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
@@ -1473,6 +1844,108 @@ export function HealthMetricsTrends({
                 </div>
               </div>
             )}
+            {latestValues.deepSleep !== null && (
+              <div className="bg-purple-100 dark:bg-purple-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Moon className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-purple-700 dark:text-purple-300 font-medium">
+                    Deep Sleep %
+                  </div>
+                  <div className="text-xl font-bold text-purple-900 dark:text-purple-100">
+                    {latestValues.deepSleep.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.remSleep !== null && (
+              <div className="bg-cyan-100 dark:bg-cyan-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Moon className="w-5 h-5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">
+                    REM Sleep %
+                  </div>
+                  <div className="text-xl font-bold text-cyan-900 dark:text-cyan-100">
+                    {latestValues.remSleep.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.lightSleep !== null && (
+              <div className="bg-blue-100 dark:bg-blue-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Moon className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                    Light Sleep %
+                  </div>
+                  <div className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                    {latestValues.lightSleep.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.bfPercent !== null && (
+              <div className="bg-amber-100 dark:bg-amber-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                    Body Fat %
+                  </div>
+                  <div className="text-xl font-bold text-amber-900 dark:text-amber-100">
+                    {(latestValues.bfPercent < 1
+                      ? latestValues.bfPercent * 100
+                      : latestValues.bfPercent
+                    ).toFixed(1)}
+                    %
+                  </div>
+                </div>
+              </div>
+            )}
+            {latestValues.boneMineralPercent !== null && (
+              <div className="bg-stone-100 dark:bg-stone-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-stone-600 dark:text-stone-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-stone-700 dark:text-stone-300 font-medium">
+                    Bone Mineral %
+                  </div>
+                  <div className="text-xl font-bold text-stone-900 dark:text-stone-100">
+                    {(latestValues.boneMineralPercent < 1
+                      ? latestValues.boneMineralPercent * 100
+                      : latestValues.boneMineralPercent
+                    ).toFixed(1)}
+                    %
+                  </div>
+                </div>
+              </div>
+            )}
+            {(latestValues.musclePercent !== null && latestValues.musclePercent !== undefined) ||
+            (latestValues.bfPercent !== null && latestValues.boneMineralPercent !== null) ? (
+              <div className="bg-red-100 dark:bg-red-900/40 px-5 py-4 rounded-2xl flex items-center gap-3">
+                <Scale className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-red-700 dark:text-red-300 font-medium">Muscle %</div>
+                  <div className="text-xl font-bold text-red-900 dark:text-red-100">
+                    {(() => {
+                      if (latestValues.musclePercent !== null && latestValues.musclePercent !== undefined) {
+                        const raw = latestValues.musclePercent;
+                        const display = raw > 1 ? raw : raw * 100;
+                        return display.toFixed(1);
+                      }
+                      const bf =
+                        latestValues.bfPercent! < 1
+                          ? latestValues.bfPercent! * 100
+                          : latestValues.bfPercent!;
+                      const bone =
+                        latestValues.boneMineralPercent! < 1
+                          ? latestValues.boneMineralPercent! * 100
+                          : latestValues.boneMineralPercent!;
+                      const muscle = Math.max(0, 100 - bf - bone);
+                      return muscle.toFixed(1);
+                    })()}
+                    %
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -1538,9 +2011,10 @@ export function HealthMetricsTrends({
                         strokeWidth={2.5}
                         fill="url(#rhrAreaGradient)"
                         dot={(props: any) => {
-                          const { cx, cy } = props;
+                          const { cx, cy, index } = props;
                           return (
                             <circle
+                              key={`rhr-dot-${index}`}
                               cx={cx}
                               cy={cy}
                               r={2}
@@ -1603,106 +2077,337 @@ export function HealthMetricsTrends({
             {/* Weight Chart */}
             {hasWeight && (
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-yellow-500" />
-                  <span className="text-sm font-semibold text-foreground">Weight</span>
-                </div>
-                <ResponsiveContainer width="100%" height={200}>
-                  {chartType === 'line' ? (
-                    <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                      <defs>
-                        <linearGradient id="weightAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#eab308" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                      <YAxis
-                        domain={['dataMin - 1', 'dataMax + 1']}
-                        tick={{ fontSize: 10 }}
-                        label={{
-                          value: 'kg',
-                          angle: -90,
-                          position: 'insideLeft',
-                          style: { fontSize: 10 },
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-yellow-500" />
+                    <span className="text-sm font-semibold text-foreground">Weight</span>
+                  </div>
+                  {hasBodyComposition && (
+                    <div className="flex items-center gap-1 border rounded-md p-1">
+                      <Button
+                        variant={!showWeightComposition ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => {
+                          setShowWeightComposition(false);
+                          setCookie('tracking-weight-composition', 'false');
                         }}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
-                            return (
-                              <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">
-                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
-                                </p>
-                                <p className="text-sm font-bold text-yellow-500">
-                                  {data.weight?.toFixed(2)} kg
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
+                        className="h-7 px-2 text-xs"
+                      >
+                        Weight
+                      </Button>
+                      <Button
+                        variant={showWeightComposition ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => {
+                          setShowWeightComposition(true);
+                          setCookie('tracking-weight-composition', 'true');
                         }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="weight"
-                        stroke="#eab308"
-                        strokeWidth={2.5}
-                        fill="url(#weightAreaGradient)"
-                        dot={(props: any) => {
-                          const { cx, cy } = props;
-                          return <circle cx={cx} cy={cy} r={2} fill="#eab308" opacity={0.6} />;
-                        }}
-                        activeDot={{ r: 4 }}
-                      />
-                    </AreaChart>
-                  ) : (
-                    <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                      <defs>
-                        <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#eab308" stopOpacity={0.8} />
-                          <stop offset="100%" stopColor="#eab308" stopOpacity={0.3} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                      <YAxis
-                        domain={['dataMin - 1', 'dataMax + 1']}
-                        tick={{ fontSize: 10 }}
-                        label={{
-                          value: 'kg',
-                          angle: -90,
-                          position: 'insideLeft',
-                          style: { fontSize: 10 },
-                        }}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
-                            return (
-                              <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs font-medium">
-                                  {data.date} {year && !data.date.includes(year) && `(${year})`}
-                                </p>
-                                <p className="text-sm font-bold text-yellow-500">
-                                  {data.weight?.toFixed(2)} kg
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="weight" fill="url(#weightGradient)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
+                        className="h-7 px-2 text-xs"
+                      >
+                        Composition
+                      </Button>
+                    </div>
                   )}
-                </ResponsiveContainer>
+                </div>
+                {showWeightComposition &&
+                hasBodyComposition &&
+                chartData.some((d) => {
+                  // Only show stacked chart if ALL three composition values are present and muscle % is not 100
+                  return (
+                    d.bfPercent !== null &&
+                    d.boneMineralPercent !== null &&
+                    d.musclePercent !== null &&
+                    d.musclePercent < 100
+                  );
+                }) ? (
+                  // Body Composition Stacked Chart
+                  (() => {
+                    // Transform chartData to show actual kg values instead of percentages
+                    // Percentages already come as percentages (not decimals), so no need to divide by 100
+                    // Include ALL entries - show weight bar when composition is missing
+                    // Normalize percent to fraction [0,1] (input may be 0-100 or 0-1)
+                    const toFrac = (p: number) => (p > 1 ? p / 100 : p);
+                    const bodyCompositionData = chartData.map((d) => {
+                      const totalWeight = d.weight || 0;
+                      // Check if this entry has all three values and muscle % is not 100
+                      const hasAllValues =
+                        d.bfPercent !== null &&
+                        d.boneMineralPercent !== null &&
+                        d.musclePercent !== null &&
+                        (d.musclePercent < 100 || d.musclePercent <= 1);
+
+                      if (!hasAllValues) {
+                        // Missing composition data - show weight bar if weight is available
+                        return {
+                          ...d,
+                          bfKg: null,
+                          boneMineralKg: null,
+                          muscleKg: null,
+                          weightKg: d.weight !== null ? d.weight : null, // Show weight as a separate bar
+                        };
+                      }
+
+                      const bfFrac = d.bfPercent !== null ? toFrac(d.bfPercent) : 0;
+                      const boneFrac = d.boneMineralPercent !== null ? toFrac(d.boneMineralPercent) : 0;
+                      const muscleFrac = d.musclePercent !== null ? toFrac(d.musclePercent) : 0;
+                      return {
+                        ...d,
+                        bfKg: totalWeight > 0 ? bfFrac * totalWeight : null,
+                        boneMineralKg: totalWeight > 0 ? boneFrac * totalWeight : null,
+                        muscleKg: totalWeight > 0 ? muscleFrac * totalWeight : null,
+                        weightKg: null, // Don't show weight bar when we have composition data
+                      };
+                    });
+                    // Don't filter - keep all entries
+
+                    // Add a calculated total field for Y-axis scaling
+                    // This ensures Recharts can properly calculate dataMin/dataMax ignoring null values
+                    const bodyCompositionDataWithTotal = bodyCompositionData.map((d) => {
+                      let total = null;
+                      // If we have composition data, calculate total
+                      if (d.bfKg !== null || d.boneMineralKg !== null || d.muscleKg !== null) {
+                        total = (d.bfKg || 0) + (d.boneMineralKg || 0) + (d.muscleKg || 0);
+                      } else if (d.weightKg !== null) {
+                        // Otherwise use weight
+                        total = d.weightKg;
+                      }
+                      return {
+                        ...d,
+                        total, // This will be used for Y-axis domain calculation
+                      };
+                    });
+
+                    return (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart
+                          data={bodyCompositionDataWithTotal}
+                          margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                        >
+                          <defs>
+                            <linearGradient id="bfKgGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8b4513" stopOpacity={0.8} />
+                              <stop offset="100%" stopColor="#8b4513" stopOpacity={0.3} />
+                            </linearGradient>
+                            <linearGradient id="boneMineralKgGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#f5f5dc" stopOpacity={0.8} />
+                              <stop offset="100%" stopColor="#f5f5dc" stopOpacity={0.3} />
+                            </linearGradient>
+                            <linearGradient id="muscleKgGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#dc2626" stopOpacity={0.8} />
+                              <stop offset="100%" stopColor="#dc2626" stopOpacity={0.3} />
+                            </linearGradient>
+                            <linearGradient id="weightKgGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#eab308" stopOpacity={0.8} />
+                              <stop offset="100%" stopColor="#eab308" stopOpacity={0.3} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                          <XAxis
+                            dataKey="date"
+                            tick={{ fontSize: 10 }}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis
+                            domain={bodyCompositionDomain}
+                            tick={{ fontSize: 10 }}
+                            tickFormatter={(value) => `${value.toFixed(1)}kg`}
+                            label={{
+                              value: 'kg',
+                              angle: -90,
+                              position: 'insideLeft',
+                              style: { fontSize: 10 },
+                            }}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
+                                return (
+                                  <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                    <p className="text-xs font-medium mb-2">
+                                      {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                    </p>
+                                    {data.bfKg !== null && (
+                                      <p className="text-xs text-amber-800">
+                                        Body Fat: {Number(data.bfKg).toFixed(2)}kg (
+                                        {data.bfPercent !== null
+                                          ? (data.bfPercent < 1 ? data.bfPercent * 100 : data.bfPercent).toFixed(1)
+                                          : '-'}
+                                        %)
+                                      </p>
+                                    )}
+                                    {data.boneMineralKg !== null && (
+                                      <p className="text-xs text-amber-700">
+                                        Bone Mineral: {Number(data.boneMineralKg).toFixed(2)}kg (
+                                        {data.boneMineralPercent !== null
+                                          ? (data.boneMineralPercent < 1 ? data.boneMineralPercent * 100 : data.boneMineralPercent).toFixed(1)
+                                          : '-'}
+                                        %)
+                                      </p>
+                                    )}
+                                    {data.muscleKg !== null && (
+                                      <p className="text-xs text-red-600">
+                                        Muscle: {Number(data.muscleKg).toFixed(2)}kg (
+                                        {data.musclePercent !== null
+                                          ? (data.musclePercent < 1 ? data.musclePercent * 100 : data.musclePercent).toFixed(1)
+                                          : '-'}
+                                        %)
+                                      </p>
+                                    )}
+                                    {data.weightKg !== null && (
+                                      <p className="text-xs text-yellow-600">
+                                        Weight: {Number(data.weightKg).toFixed(2)}kg
+                                      </p>
+                                    )}
+                                    {data.weight !== null && (
+                                      <p className="text-xs font-semibold mt-1 text-foreground">
+                                        Total: {data.weight?.toFixed(2)}kg
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar
+                            dataKey="bfKg"
+                            stackId="body"
+                            fill="url(#bfKgGradient)"
+                            radius={[0, 0, 0, 0]}
+                          />
+                          <Bar
+                            dataKey="boneMineralKg"
+                            stackId="body"
+                            fill="url(#boneMineralKgGradient)"
+                            radius={[0, 0, 0, 0]}
+                          />
+                          <Bar
+                            dataKey="muscleKg"
+                            stackId="body"
+                            fill="url(#muscleKgGradient)"
+                            radius={[0, 0, 0, 0]}
+                          />
+                          {/* Weight bar for entries missing composition data */}
+                          <Bar
+                            dataKey="weightKg"
+                            stackId="body"
+                            fill="url(#weightKgGradient)"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  })()
+                ) : (
+                  // Regular Weight Chart
+                  <ResponsiveContainer width="100%" height={200}>
+                    {chartType === 'line' ? (
+                      <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <defs>
+                          <linearGradient id="weightAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#eab308" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                        <YAxis
+                          domain={weightDomain}
+                          tick={{ fontSize: 10 }}
+                          label={{
+                            value: 'kg',
+                            angle: -90,
+                            position: 'insideLeft',
+                            style: { fontSize: 10 },
+                          }}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
+                              return (
+                                <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                  <p className="text-xs font-medium">
+                                    {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                  </p>
+                                  <p className="text-sm font-bold text-yellow-500">
+                                    {data.weight?.toFixed(2)} kg
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="weight"
+                          stroke="#eab308"
+                          strokeWidth={2.5}
+                          fill="url(#weightAreaGradient)"
+                          dot={(props: any) => {
+                            const { cx, cy, index } = props;
+                            return (
+                              <circle
+                                key={`weight-dot-${index}`}
+                                cx={cx}
+                                cy={cy}
+                                r={2}
+                                fill="#eab308"
+                                opacity={0.6}
+                              />
+                            );
+                          }}
+                          activeDot={{ r: 4 }}
+                        />
+                      </AreaChart>
+                    ) : (
+                      <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <defs>
+                          <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#eab308" stopOpacity={0.8} />
+                            <stop offset="100%" stopColor="#eab308" stopOpacity={0.3} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                        <YAxis
+                          domain={weightDomain}
+                          tick={{ fontSize: 10 }}
+                          label={{
+                            value: 'kg',
+                            angle: -90,
+                            position: 'insideLeft',
+                            style: { fontSize: 10 },
+                          }}
+                        />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const year = data.fullDate ? data.fullDate.substring(0, 4) : null;
+                              return (
+                                <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                  <p className="text-xs font-medium">
+                                    {data.date} {year && !data.date.includes(year) && `(${year})`}
+                                  </p>
+                                  <p className="text-sm font-bold text-yellow-500">
+                                    {data.weight?.toFixed(2)} kg
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="weight" fill="url(#weightGradient)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                )}
               </div>
             )}
 
@@ -1760,8 +2465,17 @@ export function HealthMetricsTrends({
                         strokeWidth={2.5}
                         fill="url(#stepsAreaGradient)"
                         dot={(props: any) => {
-                          const { cx, cy } = props;
-                          return <circle cx={cx} cy={cy} r={2} fill="#22c55e" opacity={0.6} />;
+                          const { cx, cy, index } = props;
+                          return (
+                            <circle
+                              key={`steps-dot-${index}`}
+                              cx={cx}
+                              cy={cy}
+                              r={2}
+                              fill="#22c55e"
+                              opacity={0.6}
+                            />
+                          );
                         }}
                         activeDot={{ r: 4 }}
                       />
@@ -1866,8 +2580,17 @@ export function HealthMetricsTrends({
                         strokeWidth={2.5}
                         fill="url(#sleepAreaGradient)"
                         dot={(props: any) => {
-                          const { cx, cy } = props;
-                          return <circle cx={cx} cy={cy} r={2} fill="#a855f7" opacity={0.6} />;
+                          const { cx, cy, index } = props;
+                          return (
+                            <circle
+                              key={`sleep-dot-${index}`}
+                              cx={cx}
+                              cy={cy}
+                              r={2}
+                              fill="#a855f7"
+                              opacity={0.6}
+                            />
+                          );
                         }}
                         activeDot={{ r: 4 }}
                       />
@@ -1915,6 +2638,561 @@ export function HealthMetricsTrends({
                     </BarChart>
                   )}
                 </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Advanced Body Composition Section */}
+            {hasBodyComposition && (
+              <div className="md:col-span-3 space-y-3">
+                <button
+                  onClick={() => setShowAdvancedBodyComposition(!showAdvancedBodyComposition)}
+                  className="w-full flex items-center justify-between text-sm font-semibold text-foreground focus:outline-none"
+                >
+                  <span>Advanced Body Composition</span>
+                  {showAdvancedBodyComposition ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+                {showAdvancedBodyComposition && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* BF% Chart */}
+                    {hasBFPercent && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Scale className="w-4 h-4 text-amber-800" />
+                          <span className="text-sm font-semibold text-foreground">Body Fat %</span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={200}>
+                          {chartType === 'line' ? (
+                            <AreaChart
+                              data={chartData
+                                .filter(
+                                  (d): d is typeof d & { bfPercent: number } =>
+                                    'bfPercent' in d && d.bfPercent !== null && d.bfPercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  bfPercentDisplay:
+                                    d.bfPercent !== null
+                                      ? d.bfPercent < 1
+                                        ? d.bfPercent * 100
+                                        : d.bfPercent
+                                      : null,
+                                }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="bfPercentAreaGradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop offset="5%" stopColor="#92400e" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#92400e" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                domain={[0, 'auto']}
+                                tick={{ fontSize: 10 }}
+                                label={{
+                                  value: '%',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                  style: { fontSize: 10 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const year = data.fullDate
+                                      ? data.fullDate.substring(0, 4)
+                                      : null;
+                                    return (
+                                      <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                        <p className="text-xs font-medium">
+                                          {data.date}{' '}
+                                          {year && !data.date.includes(year) && `(${year})`}
+                                        </p>
+                                        <p className="text-sm font-bold text-amber-800">
+                                          {data.bfPercentDisplay?.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="bfPercentDisplay"
+                                stroke="#92400e"
+                                strokeWidth={2.5}
+                                fill="url(#bfPercentAreaGradient)"
+                                dot={(props: any) => {
+                                  const { cx, cy, index } = props;
+                                  return (
+                                    <circle
+                                      key={`bf-dot-${index}`}
+                                      cx={cx}
+                                      cy={cy}
+                                      r={2}
+                                      fill="#92400e"
+                                      opacity={0.6}
+                                    />
+                                  );
+                                }}
+                                activeDot={{ r: 4 }}
+                              />
+                            </AreaChart>
+                          ) : (
+                            <BarChart
+                              data={chartData
+                                .filter(
+                                  (d): d is typeof d & { bfPercent: number } =>
+                                    'bfPercent' in d && d.bfPercent !== null && d.bfPercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  bfPercentDisplay:
+                                    d.bfPercent !== null
+                                      ? d.bfPercent < 1
+                                        ? d.bfPercent * 100
+                                        : d.bfPercent
+                                      : null,
+                                }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient id="bfPercentGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#92400e" stopOpacity={0.8} />
+                                  <stop offset="100%" stopColor="#92400e" stopOpacity={0.3} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                domain={[0, 'auto']}
+                                tick={{ fontSize: 10 }}
+                                label={{
+                                  value: '%',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                  style: { fontSize: 10 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const year = data.fullDate
+                                      ? data.fullDate.substring(0, 4)
+                                      : null;
+                                    return (
+                                      <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                        <p className="text-xs font-medium">
+                                          {data.date}{' '}
+                                          {year && !data.date.includes(year) && `(${year})`}
+                                        </p>
+                                        <p className="text-sm font-bold text-amber-800">
+                                          {data.bfPercentDisplay?.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar
+                                dataKey="bfPercentDisplay"
+                                fill="url(#bfPercentGradient)"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Bone Mineral % Chart */}
+                    {hasBoneMineralPercent && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Scale className="w-4 h-4 text-amber-700" />
+                          <span className="text-sm font-semibold text-foreground">
+                            Bone Mineral %
+                          </span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={200}>
+                          {chartType === 'line' ? (
+                            <AreaChart
+                              data={chartData
+                                .filter(
+                                  (d): d is typeof d & { boneMineralPercent: number } =>
+                                    'boneMineralPercent' in d &&
+                                    d.boneMineralPercent !== null &&
+                                    d.boneMineralPercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  boneMineralPercentDisplay:
+                                    d.boneMineralPercent !== null
+                                      ? d.boneMineralPercent < 1
+                                        ? d.boneMineralPercent * 100
+                                        : d.boneMineralPercent
+                                      : null,
+                                }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="boneMineralPercentAreaGradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop offset="5%" stopColor="#78716c" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#78716c" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                domain={[0, 'auto']}
+                                tick={{ fontSize: 10 }}
+                                label={{
+                                  value: '%',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                  style: { fontSize: 10 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const year = data.fullDate
+                                      ? data.fullDate.substring(0, 4)
+                                      : null;
+                                    return (
+                                      <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                        <p className="text-xs font-medium">
+                                          {data.date}{' '}
+                                          {year && !data.date.includes(year) && `(${year})`}
+                                        </p>
+                                        <p className="text-sm font-bold text-stone-700">
+                                          {data.boneMineralPercentDisplay?.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="boneMineralPercentDisplay"
+                                stroke="#78716c"
+                                strokeWidth={2.5}
+                                fill="url(#boneMineralPercentAreaGradient)"
+                                dot={(props: any) => {
+                                  const { cx, cy, index } = props;
+                                  return (
+                                    <circle
+                                      key={`bone-dot-${index}`}
+                                      cx={cx}
+                                      cy={cy}
+                                      r={2}
+                                      fill="#78716c"
+                                      opacity={0.6}
+                                    />
+                                  );
+                                }}
+                                activeDot={{ r: 4 }}
+                              />
+                            </AreaChart>
+                          ) : (
+                            <BarChart
+                              data={chartData
+                                .filter(
+                                  (d): d is typeof d & { boneMineralPercent: number } =>
+                                    'boneMineralPercent' in d &&
+                                    d.boneMineralPercent !== null &&
+                                    d.boneMineralPercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  boneMineralPercentDisplay:
+                                    d.boneMineralPercent !== null
+                                      ? d.boneMineralPercent < 1
+                                        ? d.boneMineralPercent * 100
+                                        : d.boneMineralPercent
+                                      : null,
+                                }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="boneMineralPercentGradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop offset="0%" stopColor="#78716c" stopOpacity={0.8} />
+                                  <stop offset="100%" stopColor="#78716c" stopOpacity={0.3} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                domain={[0, 'auto']}
+                                tick={{ fontSize: 10 }}
+                                label={{
+                                  value: '%',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                  style: { fontSize: 10 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const year = data.fullDate
+                                      ? data.fullDate.substring(0, 4)
+                                      : null;
+                                    return (
+                                      <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                        <p className="text-xs font-medium">
+                                          {data.date}{' '}
+                                          {year && !data.date.includes(year) && `(${year})`}
+                                        </p>
+                                        <p className="text-sm font-bold text-stone-700">
+                                          {data.boneMineralPercentDisplay?.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar
+                                dataKey="boneMineralPercentDisplay"
+                                fill="url(#boneMineralPercentGradient)"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Muscle % Chart */}
+                    {hasMusclePercent && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Scale className="w-4 h-4 text-red-600" />
+                          <span className="text-sm font-semibold text-foreground">Muscle %</span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={200}>
+                          {chartType === 'line' ? (
+                            <AreaChart
+                              data={chartData
+                                .filter(
+                                  (d): d is typeof d & { musclePercent: number } =>
+                                    'musclePercent' in d &&
+                                    d.musclePercent !== null &&
+                                    d.musclePercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  musclePercentDisplay:
+                                    d.musclePercent !== null
+                                      ? d.musclePercent < 1
+                                        ? d.musclePercent * 100
+                                        : d.musclePercent
+                                      : null,
+                                }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="musclePercentAreaGradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#dc2626" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                domain={[0, 'auto']}
+                                tick={{ fontSize: 10 }}
+                                label={{
+                                  value: '%',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                  style: { fontSize: 10 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const year = data.fullDate
+                                      ? data.fullDate.substring(0, 4)
+                                      : null;
+                                    return (
+                                      <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                        <p className="text-xs font-medium">
+                                          {data.date}{' '}
+                                          {year && !data.date.includes(year) && `(${year})`}
+                                        </p>
+                                        <p className="text-sm font-bold text-red-600">
+                                          {data.musclePercentDisplay?.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="musclePercentDisplay"
+                                stroke="#dc2626"
+                                strokeWidth={2.5}
+                                fill="url(#musclePercentAreaGradient)"
+                                dot={(props: any) => {
+                                  const { cx, cy, index } = props;
+                                  return (
+                                    <circle
+                                      key={`muscle-dot-${index}`}
+                                      cx={cx}
+                                      cy={cy}
+                                      r={2}
+                                      fill="#dc2626"
+                                      opacity={0.6}
+                                    />
+                                  );
+                                }}
+                                activeDot={{ r: 4 }}
+                              />
+                            </AreaChart>
+                          ) : (
+                            <BarChart
+                              data={chartData
+                                .filter(
+                                  (d): d is typeof d & { musclePercent: number } =>
+                                    'musclePercent' in d &&
+                                    d.musclePercent !== null &&
+                                    d.musclePercent < 100
+                                )
+                                .map((d) => ({
+                                  ...d,
+                                  musclePercentDisplay:
+                                    d.musclePercent !== null
+                                      ? d.musclePercent < 1
+                                        ? d.musclePercent * 100
+                                        : d.musclePercent
+                                      : null,
+                                }))}
+                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="musclePercentGradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop offset="0%" stopColor="#dc2626" stopOpacity={0.8} />
+                                  <stop offset="100%" stopColor="#dc2626" stopOpacity={0.3} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                domain={[0, 'auto']}
+                                tick={{ fontSize: 10 }}
+                                label={{
+                                  value: '%',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                  style: { fontSize: 10 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const year = data.fullDate
+                                      ? data.fullDate.substring(0, 4)
+                                      : null;
+                                    return (
+                                      <div className="bg-background border border-border rounded-lg p-2 shadow-lg">
+                                        <p className="text-xs font-medium">
+                                          {data.date}{' '}
+                                          {year && !data.date.includes(year) && `(${year})`}
+                                        </p>
+                                        <p className="text-sm font-bold text-red-600">
+                                          {data.musclePercentDisplay?.toFixed(2)}%
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar
+                                dataKey="musclePercentDisplay"
+                                fill="url(#musclePercentGradient)"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

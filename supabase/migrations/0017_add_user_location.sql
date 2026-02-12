@@ -11,3 +11,4 @@ CREATE INDEX IF NOT EXISTS idx_users_weather_location ON users(id) WHERE weather
 
 
 
+

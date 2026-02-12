@@ -14,6 +14,7 @@ interface TrackingQuarterlyViewProps {
   currentYear: Date;
   onNavigate: (date: Date) => void;
   onQuarterClick?: (quarterStart: Date, quarterEnd: Date) => void;
+  colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
 // Helper to extract property value
@@ -70,6 +71,7 @@ export function TrackingQuarterlyView({
   currentYear,
   onNavigate,
   onQuarterClick,
+  colorPalette,
 }: TrackingQuarterlyViewProps) {
   // Group entries by quarter
   const quartersData = useMemo(() => {
@@ -236,9 +238,13 @@ export function TrackingQuarterlyView({
             <Card
               key={`${year}-Q${quarterNum}`}
               className={cn(
-                'p-4 cursor-pointer transition-all hover:shadow-md',
+                'p-4 cursor-pointer transition-all duration-1000 hover:shadow-md',
                 !hasData && 'opacity-60'
               )}
+              style={colorPalette ? {
+                backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                borderColor: colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+              } : undefined}
               onClick={() => onQuarterClick?.(quarter.quarterStart, quarter.quarterEnd)}
             >
               <div className="flex items-center justify-between mb-3">
