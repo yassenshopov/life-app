@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 const supabase = getSupabaseServiceRoleClient();
 
@@ -10,6 +11,8 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Get current user's HQ section preferences
     const { data: user, error: fetchError } = await supabase
@@ -50,6 +53,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Update user preferences
     const { error: updateError } = await supabase

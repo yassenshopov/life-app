@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 interface NotionDatabase {
   database_id: string;
@@ -19,6 +20,8 @@ export async function GET() {
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+
+    await ensureUserExists(supabase, userId);
 
     const { data: user, error } = await supabase
       .from('users')
@@ -51,6 +54,8 @@ export async function POST(req: Request) {
     if (!database_id) {
       return new NextResponse('Database ID is required', { status: 400 });
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Get current user's notion_databases
     const { data: user, error: fetchError } = await supabase
@@ -118,6 +123,8 @@ export async function DELETE(req: Request) {
     if (!database_id) {
       return new NextResponse('Database ID is required', { status: 400 });
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Get current user's notion_databases
     const { data: user, error: fetchError } = await supabase

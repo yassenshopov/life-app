@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 import { getMatchedPeopleFromEvent } from '@/lib/people-matching';
 
 const supabase = getSupabaseServiceRoleClient();
@@ -63,6 +64,8 @@ export async function POST(request: NextRequest) {
         message: 'No people found to link',
       });
     }
+
+    await ensureUserExists(supabase, userId);
 
     // Fetch user's Google Calendar credentials and preferences from Supabase
     const { data: user, error: userError } = await supabase

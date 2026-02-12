@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
 
 // Dynamic import for googleapis
 let google: any;
@@ -59,6 +60,8 @@ export async function GET(req: Request) {
     const timeMax = searchParams.get('timeMax');
     const calendarIds = searchParams.get('calendarIds')?.split(',') || [];
     const forceRefresh = searchParams.get('forceRefresh') === 'true';
+
+    await ensureUserExists(supabase, userId);
 
     // Fetch user's Google Calendar credentials and preferences from Supabase
     const { data: user, error: userError } = await supabase
