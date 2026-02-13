@@ -58,8 +58,8 @@ export async function POST(req: Request) {
       first_name: first_name ?? null,
       last_name: last_name ?? null,
       image_url: image_url ?? null,
-      created_at: new Date(Number(created_at)).toISOString(),
-      updated_at: new Date(Number(updated_at)).toISOString(),
+      created_at: created_at ? new Date(Number(created_at)).toISOString() : undefined,
+      updated_at: updated_at ? new Date(Number(updated_at)).toISOString() : undefined,
       notion_databases: [],
       isdeleted: false,
     };
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
   if (eventType === 'user.deleted') {
     const { id } = evt.data;
     try {
-      const { error } = await supabase.from('users').update({ isDeleted: true }).eq('id', id);
+      const { error } = await supabase.from('users').update({ isdeleted: true }).eq('id', id);
       if (error) {
         console.error('Error updating user as deleted in Supabase:', error);
         return new Response('Error updating user as deleted in Supabase', {
