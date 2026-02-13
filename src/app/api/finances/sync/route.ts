@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/ensure-user';
+import { secureCompareSecrets } from '@/lib/secure-compare';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
@@ -760,8 +761,22 @@ async function retryLookup<T>(
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authenticated user ID from Clerk
-    const { userId } = await auth();
+    const internalSecret = request.headers.get('x-internal-sync');
+    const syncSecret = process.env.NOTION_WEBHOOK_SECRET || process.env.INTERNAL_SYNC_SECRET;
+    let userId: string | null = null;
+    let bodyDbType: 'finances_assets' | 'finances_places' | 'finances_investments' | undefined;
+    if (secureCompareSecrets(internalSecret, syncSecret)) {
+      const body = await request.json().catch(() => ({}));
+      userId = body?.userId ?? null;
+      const t = body?.dbType;
+      if (t === 'finances_assets' || t === 'finances_places' || t === 'finances_investments') {
+        bodyDbType = t;
+      }
+    }
+    if (!userId) {
+      const authResult = await auth();
+      userId = authResult.userId;
+    }
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -771,6 +786,31 @@ export async function POST(request: NextRequest) {
     // Get database IDs from user's connected databases
     const dbIds = await getFinancesDatabaseIds(userId);
 
+    if (bodyDbType) {
+      // Webhook dispatch: sync only the triggered finance type
+      const config = {
+        finances_assets: { id: dbIds.assets, table: 'finances_assets' as const, label: 'Assets' },
+        finances_places: { id: dbIds.places, table: 'finances_places' as const, label: 'Places' },
+        finances_investments: {
+          id: dbIds.investments,
+          table: 'finances_individual_investments' as const,
+          label: 'Individual Investments',
+        },
+      }[bodyDbType];
+      if (!config.id) {
+        return NextResponse.json(
+          { error: `Finances database (${bodyDbType}) not connected. Please connect it first.` },
+          { status: 400 }
+        );
+      }
+      const result = await syncDatabase(userId, config.id, config.table, config.label);
+      return NextResponse.json({
+        success: true,
+        results: { [bodyDbType]: result },
+      });
+    }
+
+    // No dbType: full sync (e.g. manual or legacy call) — require all three
     if (!dbIds.assets || !dbIds.investments || !dbIds.places) {
       return NextResponse.json(
         { error: 'Finances databases not connected. Please connect them first.' },
@@ -781,9 +821,9 @@ export async function POST(request: NextRequest) {
     // Sync in order: Assets first, then Places (so investments can reference them), then Investments
     // The syncDatabase calls are awaited sequentially, and retry logic inside syncDatabase handles replication lag
     const assetsResult = await syncDatabase(userId, dbIds.assets, 'finances_assets', 'Assets');
-    
+
     const placesResult = await syncDatabase(userId, dbIds.places, 'finances_places', 'Places');
-    
+
     const investmentsResult = await syncDatabase(
       userId,
       dbIds.investments,

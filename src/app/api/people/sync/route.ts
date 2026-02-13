@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/ensure-user';
+import { secureCompareSecrets } from '@/lib/secure-compare';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
@@ -27,10 +28,12 @@ function getPropertyValue(property: any, propertyType: string, propertyName?: st
       // For Tier property, return objects with name and color
       // For other multi_select properties, return just names (strings)
       if (propertyName === 'Tier') {
-        return property.multi_select?.map((item: any) => ({
-          name: item.name,
-          color: item.color || 'default',
-        })) || [];
+        return (
+          property.multi_select?.map((item: any) => ({
+            name: item.name,
+            color: item.color || 'default',
+          })) || []
+        );
       }
       return property.multi_select?.map((item: any) => item.name) || [];
     case 'date':
@@ -96,25 +99,31 @@ async function uploadImageToStorage(
 
     // Get file extension from URL or content-type
     const urlPath = new URL(imageUrl).pathname;
-    const extension = urlPath.match(/\.(jpg|jpeg|png|gif|webp)$/i)?.[1]?.toLowerCase() || 
-                     (contentType.includes('jpeg') ? 'jpg' : 
-                      contentType.includes('png') ? 'png' : 
-                      contentType.includes('gif') ? 'gif' : 
-                      contentType.includes('webp') ? 'webp' : 'jpg');
+    const extension =
+      urlPath.match(/\.(jpg|jpeg|png|gif|webp)$/i)?.[1]?.toLowerCase() ||
+      (contentType.includes('jpeg')
+        ? 'jpg'
+        : contentType.includes('png')
+          ? 'png'
+          : contentType.includes('gif')
+            ? 'gif'
+            : contentType.includes('webp')
+              ? 'webp'
+              : 'jpg');
 
     // Upload to Supabase Storage
     const fileName = `${userId}/${personId}.${extension}`;
-    const { data, error } = await supabase.storage
-      .from('people-images')
-      .upload(fileName, buffer, {
-        contentType: imageResponse.headers.get('content-type') || `image/${extension}`,
-        upsert: true, // Overwrite if exists
-      });
+    const { data, error } = await supabase.storage.from('people-images').upload(fileName, buffer, {
+      contentType: imageResponse.headers.get('content-type') || `image/${extension}`,
+      upsert: true, // Overwrite if exists
+    });
 
     if (error) {
       // If bucket doesn't exist, log it but don't fail the sync
       if (error.message?.includes('Bucket not found') || error.message?.includes('not found')) {
-        console.warn('Storage bucket "people-images" not found. Please create it in Supabase dashboard.');
+        console.warn(
+          'Storage bucket "people-images" not found. Please create it in Supabase dashboard.'
+        );
       } else {
         console.error(`Error uploading image to storage:`, error);
       }
@@ -122,9 +131,7 @@ async function uploadImageToStorage(
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('people-images')
-      .getPublicUrl(fileName);
+    const { data: urlData } = supabase.storage.from('people-images').getPublicUrl(fileName);
 
     return urlData.publicUrl;
   } catch (error) {
@@ -135,8 +142,17 @@ async function uploadImageToStorage(
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authenticated user ID from Clerk
-    const { userId } = await auth();
+    const internalSecret = request.headers.get('x-internal-sync');
+    const syncSecret = process.env.NOTION_WEBHOOK_SECRET || process.env.INTERNAL_SYNC_SECRET;
+    let userId: string | null = null;
+    if (secureCompareSecrets(internalSecret, syncSecret)) {
+      const body = await request.json().catch(() => ({}));
+      userId = body?.userId ?? null;
+    }
+    if (!userId) {
+      const authResult = await auth();
+      userId = authResult.userId;
+    }
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -159,24 +175,18 @@ export async function POST(request: NextRequest) {
       : JSON.parse(user.notion_databases || '[]');
 
     // Find People database by checking database name (case-insensitive)
-    const peopleDb = databases.find(
-      (db: any) => {
-        const dbName = typeof db.database_name === 'string' 
-          ? db.database_name 
-          : String(db.database_name || '');
-        return dbName.toLowerCase().includes('people');
-      }
-    );
+    const peopleDb = databases.find((db: any) => {
+      const dbName =
+        typeof db.database_name === 'string' ? db.database_name : String(db.database_name || '');
+      return dbName.toLowerCase().includes('people');
+    });
 
     if (!peopleDb) {
-      return NextResponse.json(
-        { error: 'People database not connected' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'People database not connected' }, { status: 404 });
     }
 
     const databaseId = peopleDb.database_id;
-    
+
     // Fetch current database schema from Notion to get all properties (including newly added ones)
     let currentProperties: Record<string, any> = {};
     try {
@@ -185,24 +195,33 @@ export async function POST(request: NextRequest) {
       });
       // Extract property types from current database schema
       const dbProperties = (currentDatabase as any).properties || {};
-      currentProperties = Object.entries(dbProperties).reduce((acc, [key, prop]: [string, any]) => {
-        acc[key] = { type: prop.type };
-        return acc;
-      }, {} as Record<string, any>);
-      
+      currentProperties = Object.entries(dbProperties).reduce(
+        (acc, [key, prop]: [string, any]) => {
+          acc[key] = { type: prop.type };
+          return acc;
+        },
+        {} as Record<string, any>
+      );
+
       // Log available properties for debugging
       console.log('Available properties in Notion:', Object.keys(currentProperties));
       if (currentProperties['Nicknames'] || currentProperties['Nickname']) {
-        console.log('Nicknames property found:', currentProperties['Nicknames'] || currentProperties['Nickname']);
+        console.log(
+          'Nicknames property found:',
+          currentProperties['Nicknames'] || currentProperties['Nickname']
+        );
       } else {
-        console.log('⚠️ Nicknames property not found in Notion schema. Available properties:', Object.keys(currentProperties));
+        console.log(
+          '⚠️ Nicknames property not found in Notion schema. Available properties:',
+          Object.keys(currentProperties)
+        );
       }
     } catch (error) {
       console.error('Error fetching current database schema:', error);
       // Fallback to stored properties if fetch fails
       currentProperties = peopleDb.properties || {};
     }
-    
+
     const properties = currentProperties;
 
     // Fetch all pages from Notion
@@ -231,22 +250,15 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching existing people:', fetchError);
-      return NextResponse.json(
-        { error: 'Failed to fetch existing people' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch existing people' }, { status: 500 });
     }
 
-    const existingPageIds = new Set(
-      existingPeople?.map((p) => p.notion_page_id) || []
-    );
+    const existingPageIds = new Set(existingPeople?.map((p) => p.notion_page_id) || []);
     const newPageIds = new Set(allPages.map((p) => p.id));
 
     // Find added, removed, and modified pages
     const added = allPages.filter((p) => !existingPageIds.has(p.id));
-    const removed = Array.from(existingPageIds).filter(
-      (id) => !newPageIds.has(id)
-    );
+    const removed = Array.from(existingPageIds).filter((id) => !newPageIds.has(id));
 
     // Process and insert/update people
     const peopleToUpsert = allPages.map((page: any) => {
@@ -254,9 +266,7 @@ export async function POST(request: NextRequest) {
       const nameProp = Object.entries(properties).find(
         ([_, p]: [string, any]) => p.type === 'title'
       );
-      const name = nameProp
-        ? getPropertyValue(pageProperties[nameProp[0]], 'title')
-        : 'Untitled';
+      const name = nameProp ? getPropertyValue(pageProperties[nameProp[0]], 'title') : 'Untitled';
 
       // Map all properties
       // IMPORTANT: user_id comes from authenticated Clerk user - ensures data isolation per user
@@ -278,7 +288,7 @@ export async function POST(request: NextRequest) {
         if (!propertyValue) return;
 
         const value = getPropertyValue(propertyValue, prop.type, key);
-        
+
         // Map to database column names
         switch (key) {
           case 'Name':
@@ -288,7 +298,10 @@ export async function POST(request: NextRequest) {
             const normalized = Array.isArray(value)
               ? value
               : typeof value === 'string'
-                ? value.split(',').map((s: string) => s.trim()).filter(Boolean)
+                ? value
+                    .split(',')
+                    .map((s: string) => s.trim())
+                    .filter(Boolean)
                 : [];
             personData.origin_of_connection = normalized;
             break;
@@ -330,7 +343,7 @@ export async function POST(request: NextRequest) {
           case 'nicknames':
           case 'nickname':
             // Ensure it's an array for multi_select
-            personData.nicknames = Array.isArray(value) ? value : (value ? [value] : []);
+            personData.nicknames = Array.isArray(value) ? value : value ? [value] : [];
             if (personData.nicknames && personData.nicknames.length > 0) {
               console.log(`✓ Synced nicknames for ${personData.name}:`, personData.nicknames);
             }
@@ -365,9 +378,7 @@ export async function POST(request: NextRequest) {
             try {
               const urlParts = person.image_url.split('/');
               const fileName = urlParts.slice(-2).join('/'); // Get userId/personId.ext
-              await supabase.storage
-                .from('people-images')
-                .remove([fileName]);
+              await supabase.storage.from('people-images').remove([fileName]);
             } catch (error) {
               console.warn(`Failed to delete image for person ${person.id}:`, error);
             }
@@ -389,18 +400,16 @@ export async function POST(request: NextRequest) {
 
     // Upsert people first to get IDs
     if (peopleToUpsert.length > 0) {
-      const { error: upsertError } = await supabase
-        .from('people')
-        .upsert(peopleToUpsert.map(({ _imageUrl, ...data }) => data), {
+      const { error: upsertError } = await supabase.from('people').upsert(
+        peopleToUpsert.map(({ _imageUrl, ...data }) => data),
+        {
           onConflict: 'user_id,notion_page_id',
-        });
+        }
+      );
 
       if (upsertError) {
         console.error('Error upserting people:', upsertError);
-        return NextResponse.json(
-          { error: 'Failed to sync people' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to sync people' }, { status: 500 });
       }
     }
 
@@ -435,15 +444,10 @@ export async function POST(request: NextRequest) {
 
     // Update last_sync in user's notion_databases
     const updatedDatabases = databases.map((db: any) =>
-      db.database_id === databaseId
-        ? { ...db, last_sync: new Date().toISOString() }
-        : db
+      db.database_id === databaseId ? { ...db, last_sync: new Date().toISOString() } : db
     );
 
-    await supabase
-      .from('users')
-      .update({ notion_databases: updatedDatabases })
-      .eq('id', userId);
+    await supabase.from('users').update({ notion_databases: updatedDatabases }).eq('id', userId);
 
     return NextResponse.json({
       success: true,
@@ -463,4 +467,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
