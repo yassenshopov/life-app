@@ -14,9 +14,31 @@ const notion = new Client({
 
 const supabase = getSupabaseServiceRoleClient();
 
+/** Notion IDs can have dashes (API) or not (URLs). Normalize to no-dashes for consistent DB lookups. */
+function normalizeNotionId(id: string): string {
+  return id.replace(/-/g, '');
+}
+
+/** Extract a single string from database_name (string or Notion title array). */
+function getDatabaseNameString(databaseName: unknown): string {
+  if (typeof databaseName === 'string') return databaseName;
+  if (databaseName && typeof databaseName === 'object' && !Array.isArray(databaseName)) {
+    const obj = databaseName as { plain_text?: string };
+    if (typeof obj.plain_text === 'string') return obj.plain_text;
+  }
+  if (Array.isArray(databaseName)) {
+    return (databaseName as Array<{ plain_text?: string }>)
+      .map((seg) => (seg?.plain_text ?? ''))
+      .join('')
+      .trim();
+  }
+  return '';
+}
+
 /**
- * Get the Media database ID for a user from their notion_databases (by name containing "media").
- * Same pattern as People sync (database_name includes 'people').
+ * Get the Media database ID for a user from their notion_databases.
+ * 1) Prefer a DB whose database_name contains "media" (e.g. "Media", "Media Ground").
+ * 2) Fallback: find a relation property named like "Media this month" and use its database_id.
  */
 export async function getMediaDatabaseIdForUser(
   supabaseClient: SupabaseClient,
@@ -34,12 +56,27 @@ export async function getMediaDatabaseIdForUser(
     ? user.notion_databases
     : JSON.parse(user.notion_databases || '[]');
 
-  const mediaDb = databases.find((db: any) => {
-    const name = typeof db.database_name === 'string' ? db.database_name : String(db.database_name ?? '');
+  // 1) Direct: a database whose name contains "media"
+  const byName = databases.find((db: any) => {
+    const name = getDatabaseNameString(db.database_name);
     return name.toLowerCase().includes('media');
   });
+  if (byName?.database_id) return byName.database_id;
 
-  return mediaDb?.database_id ?? null;
+  // 2) Fallback: a relation property that points to the Media DB (e.g. "Media this month" in Monthly Tracking)
+  for (const db of databases) {
+    const props = db.properties as Record<string, any> | undefined;
+    if (!props) continue;
+    for (const [key, prop] of Object.entries(props)) {
+      if (!prop || prop.type !== 'relation') continue;
+      const propName = (prop.name || key || '').toLowerCase();
+      if (!propName.includes('media')) continue;
+      const targetId = prop.relation?.database_id ?? prop.relation?.data_source_id;
+      if (targetId) return targetId;
+    }
+  }
+
+  return null;
 }
 
 export function getPropertyValue(property: any, propertyType: string): any {
@@ -212,12 +249,15 @@ async function buildMediaRowFromPage(
 
 /**
  * Find all user_ids that have at least one media row for this database (they've synced from it).
+ * Matches both dashed and non-dashed ID forms (Notion API uses dashes; URLs often don't).
  */
 async function getUserIdsForMediaDatabase(databaseId: string): Promise<string[]> {
+  const normalized = normalizeNotionId(databaseId);
+  const idsToMatch = normalized === databaseId ? [databaseId] : [databaseId, normalized];
   const { data, error } = await supabase
     .from('media')
     .select('user_id')
-    .eq('notion_database_id', databaseId);
+    .in('notion_database_id', idsToMatch);
 
   if (error) return [];
   const ids = (data || []).map((r) => r.user_id);
@@ -231,6 +271,9 @@ async function getUserIdsForMediaDatabase(databaseId: string): Promise<string[]>
 export async function syncSinglePageToMedia(pageId: string, databaseId: string): Promise<void> {
   const userIds = await getUserIdsForMediaDatabase(databaseId);
   if (userIds.length === 0) return;
+
+  // Notion API accepts IDs with or without dashes; use normalized for storage so it matches existing rows
+  const databaseIdForStorage = normalizeNotionId(databaseId);
 
   let currentProperties: Record<string, any> = {};
   try {
@@ -258,7 +301,7 @@ export async function syncSinglePageToMedia(pageId: string, databaseId: string):
 
   const rowsToUpsert: Array<Record<string, any>> = [];
   for (const userId of userIds) {
-    const row = await buildMediaRowFromPage(page, databaseId, currentProperties, userId);
+    const row = await buildMediaRowFromPage(page, databaseIdForStorage, currentProperties, userId);
     rowsToUpsert.push(row);
   }
 
@@ -299,10 +342,12 @@ export async function syncSinglePageToMedia(pageId: string, databaseId: string):
  * Remove a media page for all users (e.g. when the page is deleted in Notion).
  */
 export async function deleteMediaPageFromAllUsers(pageId: string, databaseId: string): Promise<void> {
+  const normalized = normalizeNotionId(databaseId);
+  const idsToMatch = normalized === databaseId ? [databaseId] : [databaseId, normalized];
   const { data: removedMedia } = await supabase
     .from('media')
     .select('id, user_id, thumbnail_url')
-    .eq('notion_database_id', databaseId)
+    .in('notion_database_id', idsToMatch)
     .eq('notion_page_id', pageId);
 
   if (!removedMedia?.length) return;
@@ -319,7 +364,7 @@ export async function deleteMediaPageFromAllUsers(pageId: string, databaseId: st
   await supabase
     .from('media')
     .delete()
-    .eq('notion_database_id', databaseId)
+    .in('notion_database_id', idsToMatch)
     .eq('notion_page_id', pageId);
 }
 
