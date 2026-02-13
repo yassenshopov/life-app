@@ -7,9 +7,6 @@ import { getNotionClient } from '@/lib/notion-api';
 
 const supabase = getSupabaseServiceRoleClient();
 
-// Media Ground database ID
-const MEDIA_DATABASE_ID = '32638dcb058e4ebeaf325136ce8f3ec4';
-
 // Validate Google Books API key at startup (enforce in production)
 const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 if (process.env.NODE_ENV === 'production' && !GOOGLE_BOOKS_API_KEY) {
@@ -286,7 +283,7 @@ export async function POST(
     // Get the media entry from Supabase
     const { data: mediaEntry, error: fetchError } = await supabase
       .from('media')
-      .select('id, notion_page_id, url, category, ai_synopsis, name')
+      .select('id, notion_page_id, notion_database_id, url, category, ai_synopsis, name')
       .eq('id', mediaId)
       .eq('user_id', userId)
       .single();
@@ -347,21 +344,24 @@ export async function POST(
       );
     }
 
-    // Fetch database schema to get correct property names
+    // Fetch database schema to get correct property names (use this entry's Notion database)
     let propertyMap: Record<string, string> = {};
     let existingProperties: Set<string> = new Set();
     const notion = getNotionClient();
-    
+    const mediaDatabaseId = mediaEntry.notion_database_id;
+
     try {
-      const database = await notion.databases.retrieve({
-        database_id: MEDIA_DATABASE_ID,
-      });
-      const properties = (database as any).properties || {};
-      Object.entries(properties).forEach(([key, prop]: [string, any]) => {
-        const propName = prop.name || key;
-        propertyMap[propName] = key;
-        existingProperties.add(propName);
-      });
+      if (mediaDatabaseId) {
+        const database = await notion.databases.retrieve({
+          database_id: mediaDatabaseId,
+        });
+        const properties = (database as any).properties || {};
+        Object.entries(properties).forEach(([key, prop]: [string, any]) => {
+          const propName = prop.name || key;
+          propertyMap[propName] = key;
+          existingProperties.add(propName);
+        });
+      }
     } catch (error) {
       console.warn('Failed to fetch database schema, using defaults:', error);
       propertyMap = {

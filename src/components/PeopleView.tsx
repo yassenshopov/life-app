@@ -39,6 +39,7 @@ import { BirthdayMonthlyView } from '@/app/people/BirthdayMonthlyView';
 import { PeopleActivitySummary } from '@/components/PeopleActivitySummary';
 import { FlagImage, countryCodeToEmoji } from '@/lib/flag-utils';
 import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
+import { OriginOfConnectionBadges } from '@/components/OriginOfConnectionBadge';
 
 // Zodiac sign symbols mapping
 const zodiacSymbols: Record<string, string> = {
@@ -56,11 +57,11 @@ const zodiacSymbols: Record<string, string> = {
   Pisces: '♓',
 };
 
-// Helper to extract zodiac sign from emoji-prefixed string
+// Helper to extract zodiac sign from emoji/symbol-prefixed string
+// Strips both emoji (🦀) and misc symbols (♈♎⚖) so "♎ Libra" / "⚖ Libra" -> "Libra"
 function extractZodiacSign(starSign: string | null): string {
   if (!starSign) return '';
-  // Remove emoji and get sign name (e.g., "🦀 Cancer" -> "Cancer")
-  return starSign.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/u, '').trim() || starSign;
+  return starSign.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\s\uFE0F]*/u, '').trim() || starSign;
 }
 
 // Helper to extract flag from location string
@@ -856,9 +857,11 @@ export function PeopleView() {
                             <TableCell>
                               {person.origin_of_connection &&
                                 person.origin_of_connection.length > 0 && (
-                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                                    {person.origin_of_connection.join(', ')}
-                                  </Badge>
+                                  <OriginOfConnectionBadges
+                                    origins={person.origin_of_connection}
+                                    people={people}
+                                    size="sm"
+                                  />
                                 )}
                             </TableCell>
                             <TableCell className="text-sm">
@@ -962,6 +965,7 @@ export function PeopleView() {
       {/* Person Details Modal */}
       <PersonDetailsModal
         person={selectedPerson}
+        allPeople={people}
         isOpen={isPersonModalOpen}
         onClose={() => {
           setIsPersonModalOpen(false);

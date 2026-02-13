@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { OriginOfConnectionBadges } from '@/components/OriginOfConnectionBadge';
 import { cn } from '@/lib/utils';
 import { MapPin, Calendar, Briefcase, Star, Users, Phone, List, User, Globe, Gift, Clock, Award, Tag, Hash } from 'lucide-react';
 
@@ -52,10 +53,11 @@ function getImageUrl(person: PersonWithDetails): string | null {
   return null;
 }
 
-// Helper to extract zodiac sign from emoji-prefixed string
+// Helper to extract zodiac sign from emoji/symbol-prefixed string
+// Strips both emoji (🦀) and misc symbols (♈♎⚖) so "♎ Libra" / "⚖ Libra" -> "Libra"
 function extractZodiacSign(starSign: string | null): string {
   if (!starSign) return '';
-  return starSign.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/u, '').trim() || starSign;
+  return starSign.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\s\uFE0F]*/u, '').trim() || starSign;
 }
 
 // Helper to extract flag from location string
@@ -94,6 +96,8 @@ interface PersonDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   person: PersonWithDetails | null;
+  /** Full people list for resolving origin-of-connection to person avatars */
+  allPeople?: PersonWithDetails[] | Person[];
 }
 
 // Helper to format age from JSONB
@@ -113,7 +117,7 @@ function formatBirthday(birthday: any): string {
   return '';
 }
 
-export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModalProps) {
+export function PersonDetailModal({ isOpen, onClose, person, allPeople = [] }: PersonDetailModalProps) {
   if (!person) return null;
 
   const imageUrl = getImageUrl(person);
@@ -284,13 +288,7 @@ export function PersonDetailModal({ isOpen, onClose, person }: PersonDetailModal
 
             {person.origin_of_connection && person.origin_of_connection.length > 0 && (
               <Field label="Origin of connection" icon={Users}>
-                <div className="flex flex-wrap gap-1">
-                  {person.origin_of_connection.map((origin, idx) => (
-                    <Badge key={idx} variant="secondary" className="bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-100">
-                      {origin}
-                    </Badge>
-                  ))}
-                </div>
+                <OriginOfConnectionBadges origins={person.origin_of_connection} people={allPeople} />
               </Field>
             )}
 

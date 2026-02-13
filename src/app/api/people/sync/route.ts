@@ -39,6 +39,8 @@ function getPropertyValue(property: any, propertyType: string, propertyName?: st
       return property.number;
     case 'checkbox':
       return property.checkbox || false;
+    case 'last_edited_time':
+      return property.last_edited_time || null;
     case 'files':
       return property.files || [];
     case 'formula':
@@ -282,9 +284,15 @@ export async function POST(request: NextRequest) {
           case 'Name':
             personData.name = value;
             break;
-          case 'Origin of connection':
-            personData.origin_of_connection = value;
+          case 'Origin of connection': {
+            const normalized = Array.isArray(value)
+              ? value
+              : typeof value === 'string'
+                ? value.split(',').map((s: string) => s.trim()).filter(Boolean)
+                : [];
+            personData.origin_of_connection = normalized;
             break;
+          }
           case 'Star sign':
             personData.star_sign = value;
             break;

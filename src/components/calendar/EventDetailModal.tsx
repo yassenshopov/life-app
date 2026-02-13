@@ -32,7 +32,7 @@ import { PersonAvatar } from './PersonAvatar';
 import { PersonSelectorPopover } from './PersonSelectorPopover';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
 import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
 
@@ -96,6 +96,7 @@ export function EventDetailModal({
   const [startTime, setStartTime] = React.useState<string>('');
   const [endDate, setEndDate] = React.useState<string>('');
   const [endTime, setEndTime] = React.useState<string>('');
+  const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
 
   // Initialize date/time inputs when event changes or editing starts
   React.useEffect(() => {
@@ -114,6 +115,11 @@ export function EventDetailModal({
       setEndTime(formatTimeForInput(end));
     }
   }, [displayEvent, isEditing]);
+
+  // Reset description expanded when opening a different event
+  React.useEffect(() => {
+    setDescriptionExpanded(false);
+  }, [displayEvent?.id]);
 
   // Helper to get image URL from person
   const getImageUrl = React.useCallback((person: Person): string | null => {
@@ -1045,30 +1051,72 @@ export function EventDetailModal({
             )}
 
             {/* Description */}
-            {displayEvent.description && displayEvent.description.trim() && (
-              <div className="flex items-start gap-4">
-                <div className="w-full">
-                  <div className="text-sm font-medium text-muted-foreground mb-2">Description</div>
-                  <div
-                    className="text-sm leading-relaxed [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2
-                      [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2
-                      [&_li]:my-1 [&_li]:leading-relaxed
-                      [&_strong]:font-semibold [&_b]:font-semibold
-                      [&_em]:italic [&_i]:italic
-                      [&_p]:my-2 [&_p]:leading-relaxed
-                      [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
-                      [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2
-                      [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2
-                      [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:hover:text-blue-800 [&_a]:dark:hover:text-blue-300
-                      [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono
-                      [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2
-                      [&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2
-                      [&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border"
-                    dangerouslySetInnerHTML={{ __html: displayEvent.description }}
-                  />
+            {displayEvent.description && displayEvent.description.trim() && (() => {
+              const desc = displayEvent.description!;
+              const plainLength = desc.replace(/<[^>]*>/g, '').trim().length;
+              const COLLAPSE_THRESHOLD = 500;
+              const isLong = plainLength > COLLAPSE_THRESHOLD;
+              const isCollapsed = isLong && !descriptionExpanded;
+              return (
+                <div className="flex items-start gap-4">
+                  <div className="w-full">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Description</div>
+                    <div
+                      className={cn(
+                        'relative text-sm leading-relaxed overflow-x-auto',
+                        isCollapsed && 'max-h-[10rem] overflow-y-hidden'
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'text-sm leading-relaxed [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2',
+                          '[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2',
+                          '[&_li]:my-1 [&_li]:leading-relaxed',
+                          '[&_strong]:font-semibold [&_b]:font-semibold',
+                          '[&_em]:italic [&_i]:italic',
+                          '[&_p]:my-2 [&_p]:leading-relaxed',
+                          '[&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2',
+                          '[&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2',
+                          '[&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2',
+                          '[&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:hover:text-blue-800 [&_a]:dark:hover:text-blue-300',
+                          '[&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono',
+                          '[&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2',
+                          '[&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2',
+                          '[&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border'
+                        )}
+                        dangerouslySetInnerHTML={{ __html: desc }}
+                      />
+                      {isCollapsed && (
+                        <div
+                          className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent pointer-events-none"
+                          aria-hidden
+                        />
+                      )}
+                    </div>
+                    {isLong && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 h-8 text-muted-foreground hover:text-foreground"
+                        onClick={() => setDescriptionExpanded((e) => !e)}
+                      >
+                        {descriptionExpanded ? (
+                          <>
+                            <ChevronUp className="h-4 w-4 mr-1" />
+                            Show less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4 mr-1" />
+                            Show more
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* People and Location */}
             <div className="flex items-start gap-4">

@@ -4,13 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { getNotionClient, uploadImageUrlToNotion, createNotionFileProperty } from '@/lib/notion-api';
+import { getMediaDatabaseIdForUser } from '@/lib/notion-media-sync';
 
 const notion = getNotionClient();
 
 const supabase = getSupabaseServiceRoleClient();
-
-// Media Ground database ID
-const MEDIA_DATABASE_ID = '32638dcb058e4ebeaf325136ce8f3ec4';
 
 // Extract IMDb ID from URL
 function extractIMDbId(url: string): string | null {
@@ -241,12 +239,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to extract media data' }, { status: 500 });
     }
 
+    const mediaDatabaseId = await getMediaDatabaseIdForUser(supabase, userId);
+    if (!mediaDatabaseId) {
+      return NextResponse.json(
+        { error: 'Media database not connected. Add a Notion database whose name contains "Media" in Settings.' },
+        { status: 404 }
+      );
+    }
+
     // Fetch database schema to get correct property names and types
     let propertyMap: Record<string, string> = {};
     let existingProperties: Set<string> = new Set();
     try {
       const database = await notion.databases.retrieve({
-        database_id: MEDIA_DATABASE_ID,
+        database_id: mediaDatabaseId,
       });
       const properties = (database as any).properties || {};
       Object.entries(properties).forEach(([key, prop]: [string, any]) => {
@@ -401,7 +407,7 @@ export async function POST(request: NextRequest) {
     try {
       const pageData: any = {
         parent: {
-          database_id: MEDIA_DATABASE_ID,
+          database_id: mediaDatabaseId,
         },
         properties: notionProperties,
       };
@@ -428,7 +434,7 @@ export async function POST(request: NextRequest) {
         }
         const retryPageData: any = {
           parent: {
-            database_id: MEDIA_DATABASE_ID,
+            database_id: mediaDatabaseId,
           },
           properties: retryProperties,
         };
@@ -497,7 +503,7 @@ export async function POST(request: NextRequest) {
     const supabaseEntry = {
       user_id: userId,
       notion_page_id: notionPage.id,
-      notion_database_id: MEDIA_DATABASE_ID,
+      notion_database_id: mediaDatabaseId,
       name: mediaData.name,
       category: mediaData.category || null,
       status: 'Not started',

@@ -127,25 +127,17 @@ export function PeopleActivitySummary({ people, onPersonClick }: PeopleActivityS
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const nextMonthKey = format(nextMonth, 'yyyy-MM');
 
-  // Generate all months for the currently selected year
+  // Generate all months for the currently selected year in chronological order (Jan → Dec)
   const generateAllMonths = (): string[] => {
     const selectedYear = currentYear.getFullYear();
     const allMonths: string[] = [];
 
-    // Always generate all 12 months for the selected year
     for (let month = 1; month <= 12; month++) {
       const monthKey = `${selectedYear}-${String(month).padStart(2, '0')}`;
       allMonths.push(monthKey);
     }
 
-    // Sort: current month first, next month second, then reverse chronological (newest first)
-    return allMonths.sort((a, b) => {
-      if (a === currentMonthKey) return -1;
-      if (b === currentMonthKey) return 1;
-      if (a === nextMonthKey) return -1;
-      if (b === nextMonthKey) return 1;
-      return b.localeCompare(a); // Reverse chronological
-    });
+    return allMonths; // Already chronological (Jan, Feb, ..., Dec)
   };
 
   const allMonths = generateAllMonths();
