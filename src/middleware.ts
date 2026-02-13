@@ -4,6 +4,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 const isPublicRoute = createRouteMatcher([
   '/',
   '/api/webhook/clerk',
+  '/api/webhooks/notion', // Notion webhook (no auth; verified via NOTION_WEBHOOK_SECRET)
   '/api/notion/daily-tracking',
   '/api/spotify/callback',
   '/api/google-calendar/callback',
