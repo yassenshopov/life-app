@@ -760,8 +760,17 @@ async function retryLookup<T>(
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authenticated user ID from Clerk
-    const { userId } = await auth();
+    const internalSecret = request.headers.get('x-internal-sync');
+    const syncSecret = process.env.NOTION_WEBHOOK_SECRET || process.env.INTERNAL_SYNC_SECRET;
+    let userId: string | null = null;
+    if (internalSecret && syncSecret && internalSecret === syncSecret) {
+      const body = await request.json().catch(() => ({}));
+      userId = body?.userId ?? null;
+    }
+    if (!userId) {
+      const authResult = await auth();
+      userId = authResult.userId;
+    }
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

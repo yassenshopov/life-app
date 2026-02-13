@@ -1,5 +1,5 @@
 /**
- * Notion webhook: when a media item's properties change in Notion, we sync that change to our app.
+ * Notion webhook: sync page changes to our app (Media, People, Finances, Tracking, To-Do).
  *
  * Setup in Notion:
  * 1. Integration settings → Webhooks → Create subscription
@@ -16,11 +16,31 @@ import {
   deleteMediaPageFromAllUsers,
   verifyNotionWebhookSignature,
 } from '@/lib/notion-media-sync';
+import {
+  getUsersAndTypesForDatabase,
+  deletePageForType,
+  triggerSyncForType,
+  type NotionDbType,
+} from '@/lib/notion-webhook-dispatch';
 
 export const runtime = 'nodejs';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY! });
 const supabase = getSupabaseServiceRoleClient();
+
+const TABLES_FOR_DELETE_LOOKUP: Array<{ table: string; dbType: NotionDbType }> = [
+  { table: 'people', dbType: 'people' },
+  { table: 'media', dbType: 'media' },
+  { table: 'finances_assets', dbType: 'finances_assets' },
+  { table: 'finances_places', dbType: 'finances_places' },
+  { table: 'finances_individual_investments', dbType: 'finances_investments' },
+  { table: 'tracking_daily', dbType: 'tracking_daily' },
+  { table: 'tracking_weekly', dbType: 'tracking_weekly' },
+  { table: 'tracking_monthly', dbType: 'tracking_monthly' },
+  { table: 'tracking_quarterly', dbType: 'tracking_quarterly' },
+  { table: 'tracking_yearly', dbType: 'tracking_yearly' },
+  { table: 'todos', dbType: 'todos' },
+];
 
 /** Notion sends POST to this URL for verification and for events. */
 export async function POST(request: NextRequest) {
@@ -59,9 +79,12 @@ export async function POST(request: NextRequest) {
     let databaseId: string | null = null;
     if (data?.parent?.type === 'database') {
       databaseId = data.parent.id;
-    } else if (entity.type === 'page' && (type === 'page.properties_updated' || type === 'page.created' || type === 'page.content_updated')) {
+    } else if (
+      entity.type === 'page' &&
+      (type === 'page.properties_updated' || type === 'page.created' || type === 'page.content_updated')
+    ) {
       try {
-        const page = await notion.pages.retrieve({ page_id: entity.id }) as any;
+        const page = (await notion.pages.retrieve({ page_id: entity.id })) as any;
         const parent = page?.parent;
         if (parent?.database_id) {
           databaseId = parent.database_id;
@@ -70,38 +93,68 @@ export async function POST(request: NextRequest) {
         // Page may be deleted or inaccessible
       }
     }
-    // For page.deleted we can't fetch the page; use parent.id if type is database, else look up in our DB
     if (!databaseId && data?.parent?.type === 'database') {
       databaseId = data.parent.id;
     }
-    if (!databaseId && type === 'page.deleted') {
-      const { data: row } = await supabase
-        .from('media')
-        .select('notion_database_id')
-        .eq('notion_page_id', entity.id)
-        .limit(1)
-        .single();
-      if (row?.notion_database_id) databaseId = row.notion_database_id;
+
+    const pageId = entity.id;
+    const isDelete = type === 'page.deleted';
+    const isCreateOrUpdate =
+      type === 'page.properties_updated' || type === 'page.created' || type === 'page.content_updated';
+
+    // For page.deleted without databaseId: find affected rows in our tables and delete them
+    if (isDelete && !databaseId) {
+      for (const { table, dbType } of TABLES_FOR_DELETE_LOOKUP) {
+        const { data: rows } = await supabase
+          .from(table)
+          .select('user_id, notion_database_id')
+          .eq('notion_page_id', pageId);
+        if (!rows?.length) continue;
+        if (dbType === 'media') {
+          await deleteMediaPageFromAllUsers(pageId, rows[0].notion_database_id);
+        } else {
+          for (const row of rows) {
+            await deletePageForType(
+              supabase,
+              dbType,
+              row.user_id,
+              pageId,
+              row.notion_database_id
+            );
+          }
+        }
+      }
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // Only process if we resolved a database (sync/delete only affect users who have this DB in media table)
     if (!databaseId) {
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    const pageId = entity.id;
+    const usersAndTypes = await getUsersAndTypesForDatabase(supabase, databaseId);
 
-    switch (type) {
-      case 'page.properties_updated':
-      case 'page.created':
-      case 'page.content_updated':
-        await syncSinglePageToMedia(pageId, databaseId);
-        break;
-      case 'page.deleted':
+    if (usersAndTypes.length === 0) {
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
+
+    if (isDelete) {
+      const hasMedia = usersAndTypes.some((u) => u.dbType === 'media');
+      if (hasMedia) {
         await deleteMediaPageFromAllUsers(pageId, databaseId);
-        break;
-      default:
-        break;
+      }
+      for (const { userId, dbType } of usersAndTypes) {
+        if (dbType === 'media') continue;
+        await deletePageForType(supabase, dbType, userId, pageId, databaseId);
+      }
+    } else if (isCreateOrUpdate) {
+      const hasMedia = usersAndTypes.some((u) => u.dbType === 'media');
+      if (hasMedia) {
+        await syncSinglePageToMedia(pageId, databaseId);
+      }
+      for (const { userId, dbType } of usersAndTypes) {
+        if (dbType === 'media') continue;
+        await triggerSyncForType(dbType, userId, pageId, databaseId);
+      }
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });

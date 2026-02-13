@@ -65,14 +65,24 @@ export async function POST(
 ) {
   let period: string | undefined;
   try {
-    const { userId } = await auth();
+    const resolvedParams = await params;
+    period = resolvedParams.period;
+
+    const internalSecret = request.headers.get('x-internal-sync');
+    const syncSecret = process.env.NOTION_WEBHOOK_SECRET || process.env.INTERNAL_SYNC_SECRET;
+    let userId: string | null = null;
+    if (internalSecret && syncSecret && internalSecret === syncSecret) {
+      const body = await request.json().catch(() => ({}));
+      userId = body?.userId ?? null;
+    }
+    if (!userId) {
+      const authResult = await auth();
+      userId = authResult.userId;
+    }
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const resolvedParams = await params;
-    period = resolvedParams.period;
-    
     if (!['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(period)) {
       return NextResponse.json(
         { error: 'Invalid period' },
