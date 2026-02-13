@@ -112,8 +112,22 @@ export async function getUsersAndTypesForDatabase(
   const results: Array<{ userId: string; dbType: NotionDbType }> = [];
 
   for (const user of users) {
-    const raw = user.notion_databases;
-    const databases = Array.isArray(raw) ? raw : raw ? JSON.parse(raw || '[]') : [];
+    let databases: any[] = [];
+    try {
+      const raw = user.notion_databases;
+      if (Array.isArray(raw)) {
+        databases = raw;
+      } else if (raw != null && typeof raw === 'string') {
+        const parsed = JSON.parse(raw || '[]');
+        databases = Array.isArray(parsed) ? parsed : [];
+        if (!Array.isArray(parsed)) {
+          console.warn(`Notion webhook: user ${user.id} notion_databases is not an array, treating as empty`);
+        }
+      }
+    } catch (e) {
+      console.warn(`Notion webhook: failed to parse notion_databases for user ${user.id}`, (e as Error).message, user.notion_databases);
+      databases = [];
+    }
     let added = false;
     for (const db of databases) {
       if (entryMatchesDatabaseId(db, databaseId)) {
@@ -216,13 +230,17 @@ export async function triggerSyncForType(
   if (!path) return;
 
   try {
+    const body: { userId: string; dbType?: NotionDbType } = { userId };
+    if (path === '/api/finances/sync') {
+      body.dbType = dbType;
+    }
     const res = await fetch(`${base}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(secret ? { 'x-internal-sync': secret } : {}),
       },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       console.warn(`Notion webhook: sync ${dbType} for user ${userId} failed: ${res.status}`);
