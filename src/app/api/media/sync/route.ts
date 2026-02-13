@@ -4,61 +4,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
+import { ensureUserExists } from '@/lib/ensure-user';
+import {
+  getMediaDatabaseIdForUser,
+  getPropertyValue,
+  getThumbnailUrl,
+} from '@/lib/notion-media-sync';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
 });
 
 const supabase = getSupabaseServiceRoleClient();
-
-// Media Ground database ID
-const MEDIA_DATABASE_ID = '32638dcb058e4ebeaf325136ce8f3ec4';
-
-// Helper function to extract property value
-function getPropertyValue(property: any, propertyType: string): any {
-  if (!property) return null;
-
-  switch (propertyType) {
-    case 'title':
-      return property.title?.[0]?.plain_text || '';
-    case 'rich_text':
-      return property.rich_text?.[0]?.plain_text || '';
-    case 'select':
-      return property.select?.name || null;
-    case 'multi_select':
-      return property.multi_select?.map((item: any) => item.name) || [];
-    case 'date':
-      return property.date?.start || null;
-    case 'created_time':
-      return property.created_time || null;
-    case 'status':
-      return property.status?.name || null;
-    case 'url':
-      return property.url || null;
-    case 'files':
-      return property.files || [];
-    case 'relation':
-      // Return array of page IDs from the relation
-      return property.relation?.map((rel: any) => rel.id) || [];
-    default:
-      return null;
-  }
-}
-
-// Helper function to get thumbnail URL from Notion files
-function getThumbnailUrl(thumbnail: any): string | null {
-  if (!thumbnail || !Array.isArray(thumbnail) || thumbnail.length === 0) {
-    return null;
-  }
-  const firstFile = thumbnail[0];
-  if (firstFile.type === 'external' && firstFile.external?.url) {
-    return firstFile.external.url;
-  }
-  if (firstFile.type === 'file' && firstFile.file?.url) {
-    return firstFile.file.url;
-  }
-  return null;
-}
 
 // Helper function to upload image to Supabase Storage
 async function uploadThumbnailToStorage(
@@ -134,6 +91,16 @@ export async function POST(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await ensureUserExists(supabase, userId);
+
+    const MEDIA_DATABASE_ID = await getMediaDatabaseIdForUser(supabase, userId);
+    if (!MEDIA_DATABASE_ID) {
+      return NextResponse.json(
+        { error: 'Media database not connected. Add a Notion database whose name contains "Media" in Settings.' },
+        { status: 404 }
+      );
     }
 
     // Fetch current database schema from Notion
