@@ -30,8 +30,6 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Subscription verification — Notion sends a one-time payload with verification_token
     if (body.verification_token != null && Object.keys(body).length <= 2) {
-      const token = body.verification_token as string;
-      console.log('[Notion webhook] Paste this into .env as NOTION_WEBHOOK_SECRET:', token);
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 
