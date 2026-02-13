@@ -4,13 +4,10 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import {
   syncSinglePageToMedia,
   deleteMediaPageFromAllUsers,
 } from '@/lib/notion-media-sync';
-
-const supabase = getSupabaseServiceRoleClient();
 
 export type NotionDbType =
   | 'people'
@@ -67,7 +64,7 @@ export function getDbTypeFromEntry(db: any): NotionDbType | null {
   if (name.includes('daily') && name.includes('tracking')) return 'tracking_daily';
   if (name.includes('weekly') && name.includes('tracking')) return 'tracking_weekly';
   if (name.includes('monthly') && name.includes('tracking')) return 'tracking_monthly';
-  if (name.includes('quarterly')) return 'tracking_quarterly';
+  if (name.includes('quarterly') && name.includes('tracking')) return 'tracking_quarterly';
   if (name.includes('yearly') && name.includes('tracking')) return 'tracking_yearly';
   if (name.includes('asset')) return 'finances_assets';
   if (name.includes('place') || name.includes('net worth')) return 'finances_places';

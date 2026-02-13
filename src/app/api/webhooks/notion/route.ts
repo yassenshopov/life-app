@@ -93,9 +93,6 @@ export async function POST(request: NextRequest) {
         // Page may be deleted or inaccessible
       }
     }
-    if (!databaseId && data?.parent?.type === 'database') {
-      databaseId = data.parent.id;
-    }
 
     const pageId = entity.id;
     const isDelete = type === 'page.deleted';

@@ -6,6 +6,7 @@ import { Client } from '@notionhq/client';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/ensure-user';
 import { getPropertyValue } from '@/lib/notion-helpers';
+import { secureCompareSecrets } from '@/lib/secure-compare';
 
 const notion = new Client({
   auth: process.env.NOTION_API_KEY!,
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     const internalSecret = request.headers.get('x-internal-sync');
     const syncSecret = process.env.NOTION_WEBHOOK_SECRET || process.env.INTERNAL_SYNC_SECRET;
     let userId: string | null = null;
-    if (internalSecret && syncSecret && internalSecret === syncSecret) {
+    if (secureCompareSecrets(internalSecret, syncSecret)) {
       const body = await request.json().catch(() => ({}));
       userId = body?.userId ?? null;
     }
