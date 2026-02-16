@@ -788,7 +788,7 @@ export function EventDetailModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
         className={cn(
-          "max-w-2xl max-h-[90vh] overflow-y-auto p-0 shadow-2xl transition-all duration-1000 border-0",
+          "max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-0 shadow-2xl transition-all duration-1000 border-0",
           !colorPalette && "bg-background"
         )}
         style={dialogStyle}
@@ -796,7 +796,7 @@ export function EventDetailModal({
         {/* Notion-style header with color accent */}
         <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
 
-        <div className="px-6 py-8 pb-16 relative">
+        <div className="px-6 py-8 pb-16 relative min-w-0 overflow-x-hidden">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
               {/* Person avatars - to the left of the title, overlapping */}
@@ -1058,18 +1058,18 @@ export function EventDetailModal({
               const isLong = plainLength > COLLAPSE_THRESHOLD;
               const isCollapsed = isLong && !descriptionExpanded;
               return (
-                <div className="flex items-start gap-4">
-                  <div className="w-full">
+                <div className="flex items-start gap-4 min-w-0 w-full overflow-hidden">
+                  <div className="min-w-0 w-full overflow-hidden">
                     <div className="text-sm font-medium text-muted-foreground mb-2">Description</div>
                     <div
                       className={cn(
-                        'relative text-sm leading-relaxed overflow-x-auto',
+                        'relative text-sm leading-relaxed min-w-0 w-full overflow-x-hidden',
                         isCollapsed && 'max-h-[10rem] overflow-y-hidden'
                       )}
                     >
                       <div
                         className={cn(
-                          'text-sm leading-relaxed [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2',
+                          'text-sm leading-relaxed break-words [&_*]:break-words [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2',
                           '[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2',
                           '[&_li]:my-1 [&_li]:leading-relaxed',
                           '[&_strong]:font-semibold [&_b]:font-semibold',
@@ -1084,6 +1084,7 @@ export function EventDetailModal({
                           '[&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2',
                           '[&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border'
                         )}
+                        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
                         dangerouslySetInnerHTML={{ __html: desc }}
                       />
                       {isCollapsed && (
@@ -1265,15 +1266,15 @@ export function EventDetailModal({
                       </div>
                     ) : displayEvent.location && String(displayEvent.location).trim() !== '' ? (
                       <a
-                        href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(
+                        href={displayEvent.location.startsWith('http') ? displayEvent.location : `https://www.openstreetmap.org/search?query=${encodeURIComponent(
                           displayEvent.location
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                        className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group min-w-0"
                       >
-                        <MapPin className="h-4 w-4" />
-                        <span className="truncate">{displayEvent.location}</span>
+                        <MapPin className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-words min-w-0">{displayEvent.location}</span>
                         <svg
                           className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                           fill="none"
@@ -1445,16 +1446,6 @@ export function EventDetailModal({
           </div>
         </div>
 
-        {/* Open event button in bottom left */}
-        {displayEvent.htmlLink && (
-          <div className="absolute bottom-4 left-4">
-            <Button variant="outline" size="sm" asChild>
-              <a href={displayEvent.htmlLink} target="_blank" rel="noopener noreferrer">
-                Open event
-              </a>
-            </Button>
-          </div>
-        )}
       </DialogContent>
 
       {/* Create Person Dialog */}
