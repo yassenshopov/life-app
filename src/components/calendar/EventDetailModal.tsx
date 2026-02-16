@@ -36,6 +36,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
 import { getContrastTextColorHex } from '@/lib/color-utils';
 import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
+import DOMPurify from 'dompurify';
 
 // Cache for dominant colors keyed by imageUrl to avoid repeated network requests
 const colorCache = new Map<string, string>();
@@ -1065,8 +1066,9 @@ export function EventDetailModal({
 
             {/* Description */}
             {displayEvent.description && displayEvent.description.trim() && (() => {
-              const desc = displayEvent.description!;
-              const plainLength = desc.replace(/<[^>]*>/g, '').trim().length;
+              const rawDesc = displayEvent.description ?? '';
+              const sanitizedDesc = DOMPurify.sanitize(rawDesc);
+              const plainLength = rawDesc.replace(/<[^>]*>/g, '').trim().length;
               const COLLAPSE_THRESHOLD = 500;
               const isLong = plainLength > COLLAPSE_THRESHOLD;
               const isCollapsed = isLong && !descriptionExpanded;
@@ -1097,8 +1099,8 @@ export function EventDetailModal({
                           '[&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2',
                           '[&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border'
                         )}
-                        style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
-                        dangerouslySetInnerHTML={{ __html: desc }}
+                        style={{ overflowWrap: 'anywhere' }}
+                        dangerouslySetInnerHTML={{ __html: sanitizedDesc }}
                       />
                       {isCollapsed && (
                         <div

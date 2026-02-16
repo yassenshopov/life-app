@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/ensure-user';
 import { google } from 'googleapis';
+import pLimit from 'p-limit';
 
 const supabase = getSupabaseServiceRoleClient();
 
@@ -148,6 +149,10 @@ export async function GET(
 
     if (eventIds.length <= MAX_DIRECT_FETCH_EVENTS && calendarsToFetch.length <= MAX_CALENDARS_FOR_DIRECT) {
       // Direct fetch: when we have calendar_id in event_people, one get per event; else one per (calendar, eventId).
+      // Use a concurrency limiter to avoid hitting Google rate limits.
+      const CONCURRENCY = 8;
+      const limit = pLimit(CONCURRENCY);
+
       type Task = { calendarId: string; eventId: string };
       const tasks: Task[] = [];
       for (const eventId of eventIds) {
@@ -163,22 +168,25 @@ export async function GET(
 
       const eventById = new Map<string, any>();
       const promises: Promise<void>[] = tasks.map(({ calendarId, eventId }) =>
-        calendarApi.events
-          .get({ calendarId, eventId })
-          .then((response) => {
-            const event = response.data;
-            if (event?.id && eventIdSet.has(event.id) && !eventById.has(event.id)) {
-              eventById.set(event.id, event);
-              linkedEvents.push(event);
-              foundEventIds.add(event.id);
-              eventCalendarMap.set(event.id, calendarId);
-            }
-          })
-          .catch((error: any) => {
-            if (error?.code !== 404) {
-              console.error(`Error fetching event ${eventId} from calendar ${calendarId}:`, error?.message);
-            }
-          })
+        limit(async () => {
+          if (foundEventIds.has(eventId)) return;
+          return calendarApi.events
+            .get({ calendarId, eventId })
+            .then((response) => {
+              const event = response.data;
+              if (event?.id && eventIdSet.has(event.id) && !eventById.has(event.id)) {
+                eventById.set(event.id, event);
+                linkedEvents.push(event);
+                foundEventIds.add(event.id);
+                eventCalendarMap.set(event.id, calendarId);
+              }
+            })
+            .catch((error: any) => {
+              if (error?.code !== 404) {
+                console.error(`Error fetching event ${eventId} from calendar ${calendarId}:`, error?.message);
+              }
+            });
+        })
       );
 
       // Run calendar list (for colors) and all event gets in parallel when we already have calendar ids

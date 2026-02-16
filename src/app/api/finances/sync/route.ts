@@ -789,12 +789,23 @@ export async function POST(request: NextRequest) {
     if (bodyDbType) {
       // Webhook dispatch: sync only the triggered finance type
       const config = {
-        finances_assets: { id: dbIds.assets, table: 'finances_assets' as const, label: 'Assets' },
-        finances_places: { id: dbIds.places, table: 'finances_places' as const, label: 'Places' },
+        finances_assets: {
+          id: dbIds.assets,
+          table: 'finances_assets' as const,
+          label: 'Assets',
+          responseKey: 'assets' as const,
+        },
+        finances_places: {
+          id: dbIds.places,
+          table: 'finances_places' as const,
+          label: 'Places',
+          responseKey: 'places' as const,
+        },
         finances_investments: {
           id: dbIds.investments,
           table: 'finances_individual_investments' as const,
           label: 'Individual Investments',
+          responseKey: 'individual_investments' as const,
         },
       }[bodyDbType];
       if (!config.id) {
@@ -808,7 +819,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: result.success,
-          results: { [bodyDbType]: result },
+          results: { [config.responseKey]: result },
           ...(result.success ? {} : { error: 'error' in result ? result.error : 'Sync failed' }),
         },
         { status }
