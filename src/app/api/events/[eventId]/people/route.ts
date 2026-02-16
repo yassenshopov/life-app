@@ -79,7 +79,7 @@ export async function POST(
     const { eventId } = await params;
     const decodedEventId = decodeURIComponent(eventId);
     const body = await request.json();
-    const { personId } = body;
+    const { personId, calendarId } = body;
 
     if (!personId) {
       return NextResponse.json(
@@ -103,14 +103,19 @@ export async function POST(
       );
     }
 
-    // Insert the relationship (unique constraint will prevent duplicates)
+    // Insert the relationship (unique constraint will prevent duplicates).
+    // calendarId when provided speeds up person-events fetch (one API call per event).
+    const insertPayload: Record<string, unknown> = {
+      user_id: userId,
+      event_id: decodedEventId,
+      person_id: personId,
+    };
+    if (calendarId && typeof calendarId === 'string' && calendarId.trim()) {
+      insertPayload.calendar_id = calendarId.trim();
+    }
     const { data, error } = await supabase
       .from('event_people')
-      .insert({
-        user_id: userId,
-        event_id: decodedEventId,
-        person_id: personId,
-      })
+      .insert(insertPayload)
       .select(`
         id,
         people (

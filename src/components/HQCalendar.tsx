@@ -33,7 +33,7 @@ import { AnimatedCalendarView } from '@/components/calendar/AnimatedCalendarView
 import { EventDetailModal } from '@/components/calendar/EventDetailModal';
 import { NewEventModal } from '@/components/calendar/NewEventModal';
 import { KeyboardShortcutsDialog } from '@/components/calendar/KeyboardShortcutsDialog';
-import { PersonDetailModal } from '@/components/calendar/PersonDetailModal';
+import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 import { EventColorMenu } from '@/components/calendar/EventColorMenu';
 import { motion } from 'framer-motion';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
@@ -116,6 +116,8 @@ export function HQCalendar({
   const [people, setPeople] = React.useState<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = React.useState<Person | null>(null);
   const [isPersonModalOpen, setIsPersonModalOpen] = React.useState(false);
+  const [personEvents, setPersonEvents] = React.useState<Record<string, any[]>>({});
+  const [loadingPersonEvents, setLoadingPersonEvents] = React.useState<string | null>(null);
   const [contextMenuEvent, setContextMenuEvent] = React.useState<{
     event: CalendarEvent;
     x: number;
@@ -124,8 +126,28 @@ export function HQCalendar({
   } | null>(null);
   const scheduleViewRef = React.useRef<ScheduleCalendarViewRef>(null);
 
+  const fetchPersonEvents = React.useCallback(async (personId: string) => {
+    setLoadingPersonEvents(personId);
+    try {
+      const response = await fetch(`/api/people/${personId}/events`);
+      const data = await response.json();
+      if (response.ok) {
+        setPersonEvents((prev) => ({
+          ...prev,
+          [personId]: data.events || [],
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching person events:', error);
+    } finally {
+      setLoadingPersonEvents(null);
+    }
+  }, []);
+
   const handlePersonClick = (person: Person) => {
-    setSelectedPerson(person);
+    // Use full person from people list when available so the modal has all details (tier, location, etc.)
+    const fullPerson = people.find((p) => p.id === person.id) ?? person;
+    setSelectedPerson(fullPerson);
     setIsPersonModalOpen(true);
   };
 
@@ -1508,14 +1530,17 @@ export function HQCalendar({
           setPreviewEvent(calendarEvent);
         }}
       />
-      <PersonDetailModal
+      <PersonDetailsModal
+        person={selectedPerson}
+        allPeople={people}
         isOpen={isPersonModalOpen}
         onClose={() => {
           setIsPersonModalOpen(false);
           setSelectedPerson(null);
         }}
-        person={selectedPerson}
-        allPeople={people}
+        onFetchEvents={fetchPersonEvents}
+        events={selectedPerson ? personEvents[selectedPerson.id] || [] : []}
+        isLoadingEvents={selectedPerson ? loadingPersonEvents === selectedPerson.id : false}
       />
 
       {/* Event Color Context Menu */}

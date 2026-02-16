@@ -349,7 +349,10 @@ export function NewEventModal({
                       const response = await fetch(`/api/events/${encodeURIComponent(createdEvent.id)}/people`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ personId }),
+                        body: JSON.stringify({
+                          personId,
+                          calendarId: createdEvent.calendarId || createdEvent.calendar,
+                        }),
                       });
                       if (!response.ok) {
                         // Revert optimistic update on error

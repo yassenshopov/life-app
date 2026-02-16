@@ -804,10 +804,15 @@ export async function POST(request: NextRequest) {
         );
       }
       const result = await syncDatabase(userId, config.id, config.table, config.label);
-      return NextResponse.json({
-        success: true,
-        results: { [bodyDbType]: result },
-      });
+      const status = result.success ? 200 : 500;
+      return NextResponse.json(
+        {
+          success: result.success,
+          results: { [bodyDbType]: result },
+          ...(result.success ? {} : { error: 'error' in result ? result.error : 'Sync failed' }),
+        },
+        { status }
+      );
     }
 
     // No dbType: full sync (e.g. manual or legacy call) — require all three

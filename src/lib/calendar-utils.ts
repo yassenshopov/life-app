@@ -381,3 +381,51 @@ export function formatDateHeader(date: Date): string {
   return days[date.getDay()];
 }
 
+const RRULE_DAY_MAP: Record<string, string> = {
+  MO: 'Mon',
+  TU: 'Tue',
+  WE: 'Wed',
+  TH: 'Thu',
+  FR: 'Fri',
+  SA: 'Sat',
+  SU: 'Sun',
+};
+
+/**
+ * Parse an RRULE string (e.g. from Google Calendar) into a short human-readable summary.
+ * Handles FREQ=DAILY|WEEKLY|MONTHLY|YEARLY and common BYDAY/BYMONTHDAY/INTERVAL.
+ */
+export function formatRecurrenceSummary(rrule: string): string {
+  if (!rrule || typeof rrule !== 'string') return 'Recurring';
+  const upper = rrule.toUpperCase();
+  const freqMatch = upper.match(/FREQ=(\w+)/);
+  const freq = freqMatch ? freqMatch[1] : '';
+  const intervalMatch = upper.match(/INTERVAL=(\d+)/);
+  const interval = intervalMatch ? parseInt(intervalMatch[1], 10) : 1;
+  const bydayMatch = upper.match(/BYDAY=([\w,]+)/);
+  const byday = bydayMatch ? bydayMatch[1].split(',').map((d) => RRULE_DAY_MAP[d.trim()] || d.trim()) : null;
+  const bymonthdayMatch = upper.match(/BYMONTHDAY=(\d+)/);
+  const bymonthday = bymonthdayMatch ? parseInt(bymonthdayMatch[1], 10) : null;
+
+  switch (freq) {
+    case 'DAILY':
+      return interval > 1 ? `Every ${interval} days` : 'Daily';
+    case 'WEEKLY':
+      if (byday && byday.length > 0) {
+        const dayStr = byday.length === 1 ? byday[0] : `${byday.slice(0, -1).join(', ')} and ${byday[byday.length - 1]}`;
+        return interval > 1 ? `Every ${interval} weeks on ${dayStr}` : `Weekly on ${dayStr}`;
+      }
+      return interval > 1 ? `Every ${interval} weeks` : 'Weekly';
+    case 'MONTHLY':
+      if (bymonthday != null) {
+        const suffix = bymonthday === 1 || bymonthday === 21 || bymonthday === 31 ? 'st' : bymonthday === 2 || bymonthday === 22 ? 'nd' : bymonthday === 3 || bymonthday === 23 ? 'rd' : 'th';
+        return interval > 1 ? `Every ${interval} months on the ${bymonthday}${suffix}` : `Monthly on the ${bymonthday}${suffix}`;
+      }
+      return interval > 1 ? `Every ${interval} months` : 'Monthly';
+    case 'YEARLY':
+      return interval > 1 ? `Every ${interval} years` : 'Yearly';
+    default:
+      return 'Recurring';
+  }
+}
+
