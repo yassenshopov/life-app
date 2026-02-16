@@ -43,7 +43,7 @@ function calculateAge(birthDate: string | null): number | null {
   return age;
 }
 
-function getImageUrl(person: Person): string | null {
+function getImageUrl(person: PersonDetailsModalPerson): string | null {
   if (person.image_url) {
     return person.image_url;
   }
@@ -64,27 +64,28 @@ function getImageUrl(person: Person): string | null {
   return null;
 }
 
-interface Person {
+/** Person type accepted by the modal; extra fields optional so it works with minimal Person from people-matching or full person from API */
+export interface PersonDetailsModalPerson {
   id: string;
   name: string;
-  tier: string[] | Array<{ name: string; color?: string }> | null;
-  origin_of_connection: string[] | null;
-  star_sign: string | null;
-  currently_at: string | null;
-  from_location: string | null;
-  birth_date: string | null;
-  occupation: string | null;
-  contact_freq: string | null;
-  image: any;
+  tier?: string[] | Array<{ name: string; color?: string }> | null;
+  origin_of_connection?: string[] | null;
+  star_sign?: string | null;
+  currently_at?: string | null;
+  from_location?: string | null;
+  birth_date?: string | null;
+  occupation?: string | null;
+  contact_freq?: string | null;
+  image?: any;
   image_url?: string | null;
-  age: any;
-  birthday: any;
+  age?: any;
+  birthday?: any;
 }
 
 interface PersonDetailsModalProps {
-  person: Person | null;
+  person: PersonDetailsModalPerson | null;
   /** Full people list for resolving origin-of-connection to person avatars */
-  allPeople?: Person[];
+  allPeople?: PersonDetailsModalPerson[];
   isOpen: boolean;
   onClose: () => void;
   onFetchEvents: (personId: string) => Promise<void>;

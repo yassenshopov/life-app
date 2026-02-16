@@ -28,7 +28,7 @@ function getDatabaseNameString(databaseName: unknown): string {
   }
   if (Array.isArray(databaseName)) {
     return (databaseName as Array<{ plain_text?: string }>)
-      .map((seg) => (seg?.plain_text ?? ''))
+      .map((seg) => seg?.plain_text ?? '')
       .join('')
       .trim();
   }
@@ -170,12 +170,8 @@ async function buildMediaRowFromPage(
   userId: string
 ): Promise<Record<string, any>> {
   const pageProperties = page.properties || {};
-  const nameProp = Object.entries(currentProperties).find(
-    ([_, p]) => (p as any).type === 'title'
-  );
-  const name = nameProp
-    ? getPropertyValue(pageProperties[nameProp[0]], 'title')
-    : 'Untitled';
+  const nameProp = Object.entries(currentProperties).find(([_, p]) => (p as any).type === 'title');
+  const name = nameProp ? getPropertyValue(pageProperties[nameProp[0]], 'title') : 'Untitled';
 
   const mediaData: any = {
     user_id: userId,
@@ -341,7 +337,10 @@ export async function syncSinglePageToMedia(pageId: string, databaseId: string):
 /**
  * Remove a media page for all users (e.g. when the page is deleted in Notion).
  */
-export async function deleteMediaPageFromAllUsers(pageId: string, databaseId: string): Promise<void> {
+export async function deleteMediaPageFromAllUsers(
+  pageId: string,
+  databaseId: string
+): Promise<void> {
   const normalized = normalizeNotionId(databaseId);
   const idsToMatch = normalized === databaseId ? [databaseId] : [databaseId, normalized];
   const { data: removedMedia } = await supabase

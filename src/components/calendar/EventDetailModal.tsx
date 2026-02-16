@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEvent } from '@/components/HQCalendar';
-import { formatEventTime, isAllDayEvent } from '@/lib/calendar-utils';
+import { formatEventTime, isAllDayEvent, formatRecurrenceSummary } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import {
   MapPin,
@@ -34,7 +34,9 @@ import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { getDominantColor } from '@/lib/spotify-color';
+import { getContrastTextColorHex } from '@/lib/color-utils';
 import { CreatePersonDialog } from '@/components/dialogs/CreatePersonDialog';
+import DOMPurify from 'dompurify';
 
 // Cache for dominant colors keyed by imageUrl to avoid repeated network requests
 const colorCache = new Map<string, string>();
@@ -322,7 +324,10 @@ export function EventDetailModal({
       const response = await fetch(`/api/events/${encodeURIComponent(displayEvent.id)}/people`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ personId }),
+        body: JSON.stringify({
+          personId,
+          calendarId: displayEvent.calendarId || displayEvent.calendar,
+        }),
       });
 
       const data = await response.json();
@@ -788,7 +793,7 @@ export function EventDetailModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
         className={cn(
-          "max-w-2xl max-h-[90vh] overflow-y-auto p-0 shadow-2xl transition-all duration-1000 border-0",
+          "max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-0 shadow-2xl transition-all duration-1000 border-0",
           !colorPalette && "bg-background"
         )}
         style={dialogStyle}
@@ -796,7 +801,7 @@ export function EventDetailModal({
         {/* Notion-style header with color accent */}
         <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
 
-        <div className="px-6 py-8 pb-16 relative">
+        <div className="px-6 py-8 pb-16 relative min-w-0 overflow-x-hidden">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
               {/* Person avatars - to the left of the title, overlapping */}
@@ -989,17 +994,26 @@ export function EventDetailModal({
                     <PopoverTrigger asChild>
                       <button
                         className="inline-flex items-center px-2.5 py-1 rounded-full hover:opacity-90 transition-opacity cursor-pointer"
-                        style={{ backgroundColor: displayEvent.color || '#4285f4' }}
+                        style={{
+                          backgroundColor: displayEvent.color || '#4285f4',
+                          color: getContrastTextColorHex(displayEvent.color || '#4285f4'),
+                        }}
                         disabled={isUpdatingCalendar || isLoadingCalendars}
                       >
-                        <span className="text-xs font-medium text-white">
+                        <span className="text-xs font-medium">
                           {displayEvent.calendar}
                         </span>
                         {!isUpdatingCalendar && (
-                          <ChevronDown className="h-3 w-3 text-white ml-1.5" />
+                          <ChevronDown className="h-3 w-3 ml-1.5" style={{ color: 'inherit' }} />
                         )}
                         {isUpdatingCalendar && (
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin ml-1.5" />
+                          <div
+                            className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin ml-1.5"
+                            style={{
+                              borderColor: `currentColor`,
+                              borderTopColor: 'transparent',
+                            }}
+                          />
                         )}
                       </button>
                     </PopoverTrigger>
@@ -1052,24 +1066,25 @@ export function EventDetailModal({
 
             {/* Description */}
             {displayEvent.description && displayEvent.description.trim() && (() => {
-              const desc = displayEvent.description!;
-              const plainLength = desc.replace(/<[^>]*>/g, '').trim().length;
+              const rawDesc = displayEvent.description ?? '';
+              const sanitizedDesc = DOMPurify.sanitize(rawDesc);
+              const plainLength = rawDesc.replace(/<[^>]*>/g, '').trim().length;
               const COLLAPSE_THRESHOLD = 500;
               const isLong = plainLength > COLLAPSE_THRESHOLD;
               const isCollapsed = isLong && !descriptionExpanded;
               return (
-                <div className="flex items-start gap-4">
-                  <div className="w-full">
+                <div className="flex items-start gap-4 min-w-0 w-full overflow-hidden">
+                  <div className="min-w-0 w-full overflow-hidden">
                     <div className="text-sm font-medium text-muted-foreground mb-2">Description</div>
                     <div
                       className={cn(
-                        'relative text-sm leading-relaxed overflow-x-auto',
+                        'relative text-sm leading-relaxed min-w-0 w-full overflow-x-hidden',
                         isCollapsed && 'max-h-[10rem] overflow-y-hidden'
                       )}
                     >
                       <div
                         className={cn(
-                          'text-sm leading-relaxed [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2',
+                          'text-sm leading-relaxed break-words [&_*]:break-words [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2',
                           '[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2',
                           '[&_li]:my-1 [&_li]:leading-relaxed',
                           '[&_strong]:font-semibold [&_b]:font-semibold',
@@ -1084,7 +1099,8 @@ export function EventDetailModal({
                           '[&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-2',
                           '[&_hr]:my-4 [&_hr]:border-t [&_hr]:border-border'
                         )}
-                        dangerouslySetInnerHTML={{ __html: desc }}
+                        style={{ overflowWrap: 'anywhere' }}
+                        dangerouslySetInnerHTML={{ __html: sanitizedDesc }}
                       />
                       {isCollapsed && (
                         <div
@@ -1265,15 +1281,17 @@ export function EventDetailModal({
                       </div>
                     ) : displayEvent.location && String(displayEvent.location).trim() !== '' ? (
                       <a
-                        href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(
-                          displayEvent.location
-                        )}`}
+                        href={
+                          displayEvent.location.startsWith('http://') || displayEvent.location.startsWith('https://')
+                            ? displayEvent.location
+                            : `https://www.openstreetmap.org/search?query=${encodeURIComponent(displayEvent.location)}`
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                        className="text-base text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group min-w-0"
                       >
-                        <MapPin className="h-4 w-4" />
-                        <span className="truncate">{displayEvent.location}</span>
+                        <MapPin className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-words min-w-0">{displayEvent.location}</span>
                         <svg
                           className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                           fill="none"
@@ -1349,24 +1367,28 @@ export function EventDetailModal({
             )}
 
             {/* Recurrence */}
-            {displayEvent.recurrence && displayEvent.recurrence.length > 0 && (
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <Repeat className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Recurrence</div>
-                  <div className="text-base">
-                    Recurring event
-                    {displayEvent.recurrence[0] && (
-                      <div className="text-sm text-muted-foreground mt-1 font-mono">
-                        {displayEvent.recurrence[0]}
-                      </div>
-                    )}
+            {displayEvent.recurrence && displayEvent.recurrence.length > 0 && (() => {
+              const rrule = displayEvent.recurrence.find((r) => r.toUpperCase().startsWith('RRULE:')) || displayEvent.recurrence[0];
+              const summary = rrule ? formatRecurrenceSummary(rrule.replace(/^RRULE:/i, '')) : 'Recurring event';
+              return (
+                <div className="flex items-start gap-4">
+                  <div className="mt-1">
+                    <Repeat className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Recurrence</div>
+                    <div className="text-base">
+                      {summary}
+                      {displayEvent.recurrence[0] && (
+                        <div className="text-xs text-muted-foreground mt-1.5 font-mono truncate max-w-full" title={displayEvent.recurrence[0]}>
+                          {displayEvent.recurrence[0]}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Video Conference */}
             {(displayEvent.hangoutLink ||
@@ -1445,16 +1467,6 @@ export function EventDetailModal({
           </div>
         </div>
 
-        {/* Open event button in bottom left */}
-        {displayEvent.htmlLink && (
-          <div className="absolute bottom-4 left-4">
-            <Button variant="outline" size="sm" asChild>
-              <a href={displayEvent.htmlLink} target="_blank" rel="noopener noreferrer">
-                Open event
-              </a>
-            </Button>
-          </div>
-        )}
       </DialogContent>
 
       {/* Create Person Dialog */}

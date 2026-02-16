@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/ensure-user';
 import { google } from 'googleapis';
+import pLimit from 'p-limit';
 
 const supabase = getSupabaseServiceRoleClient();
 
@@ -29,10 +30,10 @@ export async function GET(
 
     const { personId } = await params;
 
-    // Fetch event IDs linked to this person
+    // Fetch event IDs (and calendar_id when stored) linked to this person
     const { data: eventPeople, error } = await supabase
       .from('event_people')
-      .select('event_id')
+      .select('event_id, calendar_id')
       .eq('user_id', userId)
       .eq('person_id', personId);
 
@@ -45,6 +46,10 @@ export async function GET(
     }
 
     const eventIds = (eventPeople || []).map((ep: any) => ep.event_id);
+    const eventToCalendar = new Map<string, string>();
+    for (const ep of eventPeople || []) {
+      if (ep.calendar_id) eventToCalendar.set(ep.event_id, ep.calendar_id);
+    }
 
     if (eventIds.length === 0) {
       return NextResponse.json({ events: [] });
@@ -117,78 +122,79 @@ export async function GET(
     // Create calendar API client (reused throughout)
     const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
 
-    // Get calendar preferences and fetch calendar list
     const preferences = user.calendar_preferences || {};
-    const calendarListResponse = await calendarApi.calendarList.list();
-    const calendarList = calendarListResponse.data.items || [];
-    
-    let calendarsToFetch: string[] = [];
-    if (preferences.selectedCalendars && Array.isArray(preferences.selectedCalendars)) {
-      calendarsToFetch = preferences.selectedCalendars;
-    } else {
-      // Fetch all calendars
-      calendarsToFetch = calendarList.map((cal: any) => cal.id);
-    }
-
-    // OPTIMIZATION: Instead of fetching ALL events and filtering,
-    // try to fetch each event directly by ID from each calendar in parallel
-    // This is much faster when a person has only a few linked events
-    
-    // If we have too many events, use a more efficient strategy
-    const MAX_DIRECT_FETCH_EVENTS = 50; // Threshold for direct fetch vs list approach
     const eventIdSet = new Set(eventIds);
     const linkedEvents: any[] = [];
     const foundEventIds = new Set<string>();
     const eventCalendarMap = new Map<string, string>();
 
-    // Strategy: If few events, fetch directly by ID. If many events, use optimized list approach.
-    if (eventIds.length <= MAX_DIRECT_FETCH_EVENTS && calendarsToFetch.length <= 10) {
-      // Direct fetch approach: Try each event ID in each calendar
-      // Batch requests to avoid overwhelming the API (max 20 concurrent)
-      const BATCH_SIZE = 20;
-      const fetchPromises: Promise<void>[] = [];
-      const eventById = new Map<string, any>();
-      
-      for (const calendarId of calendarsToFetch) {
-        for (const eventId of eventIds) {
-          fetchPromises.push(
-            calendarApi.events
-              .get({
-                calendarId,
-                eventId,
-              })
-              .then((response) => {
-                const event = response.data;
-                if (event && event.id && eventIdSet.has(event.id)) {
-                  // Atomically check and add - only process if this is the first time we see this event.id
-                  if (!eventById.has(event.id)) {
-                    eventById.set(event.id, event);
-                    linkedEvents.push(event);
-                    foundEventIds.add(event.id);
-                    eventCalendarMap.set(event.id, calendarId);
-                  }
-                }
-              })
-              .catch((error: any) => {
-                // Event not found in this calendar - this is expected and fine
-                // Only log if it's not a 404
-                if (error.code !== 404) {
-                  console.error(`Error fetching event ${eventId} from calendar ${calendarId}:`, error.message);
-                }
-              })
-          );
+    // Start calendar list fetch immediately (needed for colors; and for calendar ids if no preferences)
+    const calendarListPromise = calendarApi.calendarList.list();
 
-          // Process in batches to avoid overwhelming the API
-          if (fetchPromises.length >= BATCH_SIZE) {
-            await Promise.allSettled(fetchPromises);
-            fetchPromises.length = 0; // Clear array
+    let calendarsToFetch: string[] = [];
+    let calendarList: any[] = [];
+    const hasSelectedCalendars =
+      preferences.selectedCalendars && Array.isArray(preferences.selectedCalendars);
+
+    if (hasSelectedCalendars) {
+      calendarsToFetch = preferences.selectedCalendars!;
+    } else {
+      const calendarListResponse = await calendarListPromise;
+      calendarList = calendarListResponse.data.items || [];
+      calendarsToFetch = calendarList.map((cal: any) => cal.id);
+    }
+
+    const MAX_DIRECT_FETCH_EVENTS = 50;
+    const MAX_CALENDARS_FOR_DIRECT = 15;
+
+    if (eventIds.length <= MAX_DIRECT_FETCH_EVENTS && calendarsToFetch.length <= MAX_CALENDARS_FOR_DIRECT) {
+      // Direct fetch: when we have calendar_id in event_people, one get per event; else one per (calendar, eventId).
+      // Use a concurrency limiter to avoid hitting Google rate limits.
+      const CONCURRENCY = 8;
+      const limit = pLimit(CONCURRENCY);
+
+      type Task = { calendarId: string; eventId: string };
+      const tasks: Task[] = [];
+      for (const eventId of eventIds) {
+        const knownCal = eventToCalendar.get(eventId);
+        if (knownCal) {
+          tasks.push({ calendarId: knownCal, eventId });
+        } else {
+          for (const calendarId of calendarsToFetch) {
+            tasks.push({ calendarId, eventId });
           }
         }
       }
 
-      // Wait for remaining fetch attempts
-      if (fetchPromises.length > 0) {
-        await Promise.allSettled(fetchPromises);
+      const eventById = new Map<string, any>();
+      const promises: Promise<void>[] = tasks.map(({ calendarId, eventId }) =>
+        limit(async () => {
+          if (foundEventIds.has(eventId)) return;
+          return calendarApi.events
+            .get({ calendarId, eventId })
+            .then((response) => {
+              const event = response.data;
+              if (event?.id && eventIdSet.has(event.id) && !eventById.has(event.id)) {
+                eventById.set(event.id, event);
+                linkedEvents.push(event);
+                foundEventIds.add(event.id);
+                eventCalendarMap.set(event.id, calendarId);
+              }
+            })
+            .catch((error: any) => {
+              if (error?.code !== 404) {
+                console.error(`Error fetching event ${eventId} from calendar ${calendarId}:`, error?.message);
+              }
+            });
+        })
+      );
+
+      // Run calendar list (for colors) and all event gets in parallel when we already have calendar ids
+      if (hasSelectedCalendars) {
+        const [listRes] = await Promise.all([calendarListPromise, ...promises]);
+        calendarList = listRes?.data?.items || [];
+      } else {
+        await Promise.all(promises);
       }
     } else {
       // For many events, use optimized list approach with early exit
@@ -234,6 +240,11 @@ export async function GET(
         } catch (error: any) {
           console.error(`Error fetching events from calendar ${calendarId}:`, error);
         }
+      }
+      // Ensure we have calendar list for colors (if we used list path with selectedCalendars we didn't await yet)
+      if (hasSelectedCalendars && calendarList.length === 0) {
+        const listRes = await calendarListPromise;
+        calendarList = listRes?.data?.items || [];
       }
     }
 
