@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ConnectedCalendarEvents } from './ConnectedCalendarEvents';
+import { ConnectedCalendarEvents, type EventPeopleMap } from './ConnectedCalendarEvents';
 import { Badge } from '@/components/ui/badge';
 import { OriginOfConnectionBadges } from '@/components/OriginOfConnectionBadge';
 import { Calendar } from 'lucide-react';
@@ -107,6 +107,7 @@ export function PersonDetailsModal({
 }: PersonDetailsModalProps) {
   const [hasFetchedEvents, setHasFetchedEvents] = useState(false);
   const [borderColor, setBorderColor] = useState('#8b5cf6');
+  const [eventPeopleMap, setEventPeopleMap] = useState<EventPeopleMap>({});
 
   // Fetch events when modal opens
   useEffect(() => {
@@ -122,6 +123,27 @@ export function PersonDetailsModal({
       setHasFetchedEvents(false);
     }
   }, [isOpen]);
+
+  // Fetch people linked to each event (for tooltip "People" row when > 1)
+  useEffect(() => {
+    if (!events?.length) {
+      setEventPeopleMap({});
+      return;
+    }
+    const eventIds = events.map((e: { id?: string }) => e.id).filter(Boolean);
+    if (eventIds.length === 0) {
+      setEventPeopleMap({});
+      return;
+    }
+    fetch('/api/events/people/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds }),
+    })
+      .then((res) => res.json())
+      .then((data) => setEventPeopleMap(data.eventPeopleMap ?? {}))
+      .catch(() => setEventPeopleMap({}));
+  }, [events]);
 
   // Extract color from person's image
   useEffect(() => {
@@ -278,6 +300,7 @@ export function PersonDetailsModal({
               <ConnectedCalendarEvents 
                 events={events} 
                 isLoading={isLoadingEvents}
+                eventPeopleMap={eventPeopleMap}
               />
             </div>
           </div>
