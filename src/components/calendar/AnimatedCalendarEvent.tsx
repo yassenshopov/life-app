@@ -483,9 +483,10 @@ export function AnimatedCalendarEvent({
           opacity: 0.98,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
+          justifyContent: 'flex-start',
           paddingLeft: '0.5rem',
           paddingRight: '0.5rem',
+          paddingTop: showExtraInfo ? '0.25rem' : '0.125rem',
         }}
       >
         <div className="font-medium truncate" style={{ color: textColorValue }}>

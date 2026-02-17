@@ -7,6 +7,7 @@ import {
   MoreVertical,
   HelpCircle,
   RefreshCw,
+  Undo2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,9 +34,12 @@ import { NewEventModal } from '@/components/calendar/NewEventModal';
 import { KeyboardShortcutsDialog } from '@/components/calendar/KeyboardShortcutsDialog';
 import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
 import { EventQuickActionsMenu } from '@/components/calendar/EventQuickActionsMenu';
+import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { motion } from 'framer-motion';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { fetchEventPeople } from '@/lib/fetch-event-people';
+import { getContrastTextColorHex } from '@/lib/color-utils';
 
 // Calendar event interface
 export interface CalendarEvent {
@@ -485,6 +489,7 @@ export function HQCalendar({
   }, []);
 
   const previousEventForRevertRef = React.useRef<Map<string, CalendarEvent>>(new Map());
+  const { toast: toastFn } = useToast();
 
   const handleEventUpdate = async (
     eventId: string,
@@ -495,6 +500,15 @@ export function HQCalendar({
   ) => {
     const start = startTime instanceof Date ? startTime : new Date(startTime);
     const end = endTime instanceof Date ? endTime : new Date(endTime);
+
+    // Skip update and PATCH if datetime did not change (e.g. drag-and-drop back to same slot)
+    const current = allCachedEventsRef.current.find((e) => e.id === eventId);
+    if (current) {
+      const sameStart = current.start.getTime() === start.getTime();
+      const sameEnd = current.end.getTime() === end.getTime();
+      const sameAllDay = (current.isAllDay ?? false) === (isAllDay ?? false);
+      if (sameStart && sameEnd && sameAllDay) return;
+    }
 
     // Optimistic update: use functional setState so we always read latest state
     setEvents((prevEvents) => {
@@ -512,6 +526,75 @@ export function HQCalendar({
     allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
       e.id === eventId ? { ...e, start, end, isAllDay: isAllDay ?? e.isAllDay } : e
     );
+
+    // Capture for Undo toast: color from currently playing track (Spotify) when on calendar page, else event color
+    const previousEvent = previousEventForRevertRef.current.get(eventId);
+    const eventColor = allCachedEventsRef.current.find((e) => e.id === eventId)?.color ?? '#4285f4';
+    const toastBgColor = colorPalette?.primary ?? eventColor;
+    const rgbToHex = (rgb: string) => {
+      const m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (!m) return eventColor;
+      const [_, r, g, b] = m;
+      return '#' + [r, g, b].map((x) => Math.min(255, Math.max(0, parseInt(x, 10))).toString(16).padStart(2, '0')).join('');
+    };
+    const toastTextColor = getContrastTextColorHex(colorPalette?.primary ? rgbToHex(colorPalette.primary) : eventColor);
+
+    const toastResult = toastFn({
+      title: '',
+      description: '',
+      className:
+        'fixed left-1/2 bottom-6 -translate-x-1/2 z-[100] w-auto max-w-[min(90vw,20rem)] min-w-0 shadow-lg border-0 !p-0',
+      style: {
+        backgroundColor: toastBgColor,
+        color: toastTextColor,
+      } as React.CSSProperties,
+      action: (
+        <ToastAction
+          altText="Undo"
+          className="gap-1.5 border-0 bg-white/20 hover:bg-white/30 text-inherit focus:ring-white/40"
+          style={{ color: toastTextColor } as React.CSSProperties}
+          onClick={async () => {
+            if (!previousEvent?.calendarId) return;
+            try {
+              const res = await fetch(`/api/google-calendar/events/${eventId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  calendarId: previousEvent.calendarId,
+                  startTime: previousEvent.start.toISOString(),
+                  endTime: previousEvent.end.toISOString(),
+                  isAllDay: previousEvent.isAllDay,
+                }),
+              });
+              if (!res.ok) throw new Error('Failed to revert');
+              const revertData = await res.json();
+              const revertedEvent = mapApiEventToCalendarEvent({
+                ...revertData.event,
+                id: revertData.event?.id ?? eventId,
+              });
+              allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+                e.id === eventId ? revertedEvent : e
+              );
+              setEvents((prev) =>
+                prev.map((e) => (e.id === eventId ? revertedEvent : e))
+              );
+              previousEventForRevertRef.current.delete(eventId);
+              toastResult.dismiss();
+            } catch (err) {
+              console.error('Revert failed:', err);
+              toastFn({
+                title: 'Could not undo',
+                description: 'The change could not be reverted.',
+                variant: 'destructive',
+              });
+            }
+          }}
+        >
+          <Undo2 className="h-4 w-4 shrink-0" />
+          Undo
+        </ToastAction>
+      ),
+    });
 
     try {
       const response = await fetch(`/api/google-calendar/events/${eventId}`, {
@@ -534,23 +617,19 @@ export function HQCalendar({
 
       const data = await response.json();
 
-      // Update the event in cache
+      // Update the event in cache from server response (optimistic already applied)
       const updatedEvent = mapApiEventToCalendarEvent({
         ...data.event,
         id: data.event.id ?? eventId,
       });
 
-      // Update cache
       allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
         e.id === eventId ? updatedEvent : e
       );
-
-      // Update the event in the local state from server response
       setEvents((prevEvents) =>
         prevEvents.map((e) => (e.id === eventId ? updatedEvent : e))
       );
-      previousEventForRevertRef.current.delete(eventId);
-      // Do not dispatch calendar-refresh here; it triggers a full refetch that overwrites state
+      // Keep previousEventForRevertRef so Undo still works until toast is dismissed
     } catch (error) {
       console.error('Error updating event:', error);
       const previousEvent = previousEventForRevertRef.current.get(eventId);
@@ -563,7 +642,12 @@ export function HQCalendar({
         );
       }
       previousEventForRevertRef.current.delete(eventId);
-      throw error; // Re-throw to let the component handle it
+      toastFn({
+        title: 'Update failed',
+        description: 'The change could not be saved. You can try again.',
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
 
