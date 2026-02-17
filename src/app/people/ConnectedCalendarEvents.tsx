@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { Outfit } from 'next/font/google';
 import {
   format,
@@ -254,16 +255,19 @@ function MonthGrid({
                                   <div
                                     key={p.id}
                                     className={cn(
-                                      'h-6 w-6 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center text-[10px] font-medium',
+                                      'relative h-6 w-6 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center text-[10px] font-medium',
                                       i > 0 && '-ml-2'
                                     )}
                                     title={p.name}
                                   >
                                     {src ? (
-                                      <img
+                                      <Image
                                         src={src}
                                         alt={p.name}
                                         className="h-full w-full object-cover"
+                                        unoptimized
+                                        fill
+                                        sizes="24px"
                                       />
                                     ) : (
                                       <span className="text-muted-foreground">{initials}</span>

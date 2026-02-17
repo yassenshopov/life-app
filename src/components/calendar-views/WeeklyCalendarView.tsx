@@ -196,16 +196,17 @@ export function WeeklyCalendarView({
       const grid = gridRef.current;
       const scrollContainer = scrollContainerRef.current;
       if (!grid || !scrollContainer) return null;
-      const rect = grid.getBoundingClientRect();
+      const gridRect = grid.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
       const scrollTop = scrollContainer.scrollTop;
-      const yInContent = clientY - rect.top + scrollTop;
+      const yInContent = clientY - containerRect.top + scrollTop;
       const minutes = Math.max(
         0,
         Math.min(24 * 60 - 1, Math.round(yInContent / PIXELS_PER_MINUTE / 15) * 15)
       );
-      const x = clientX - rect.left;
+      const x = clientX - gridRect.left;
       const timeColWidth = 60;
-      const dayColWidth = (rect.width - timeColWidth) / 7;
+      const dayColWidth = (gridRect.width - timeColWidth) / 7;
       const dayIndex = Math.floor((x - timeColWidth) / dayColWidth);
       if (dayIndex < 0 || dayIndex > 6) return null;
       const day = weekDays[dayIndex];
@@ -225,12 +226,11 @@ export function WeeklyCalendarView({
       const dayIndex = weekDays.findIndex((d) => isSameDay(d, date));
       if (dayIndex < 0) return null;
       const rect = grid.getBoundingClientRect();
-      const scrollTop = scrollContainer.scrollTop;
       const timeColWidth = 60;
       const dayColWidth = (rect.width - timeColWidth) / 7;
       const left = rect.left + timeColWidth + dayIndex * dayColWidth + 4;
       const width = dayColWidth - 8;
-      const top = rect.top + minutes * PIXELS_PER_MINUTE - scrollTop;
+      const top = rect.top + minutes * PIXELS_PER_MINUTE;
       return { left, top, width };
     },
     [weekDays]

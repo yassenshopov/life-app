@@ -106,6 +106,9 @@ export function AnimatedCalendarEvent({
     startEventEnd: Date;
   }>(null);
 
+  const justResizedRef = React.useRef(false);
+  const justMovedRef = React.useRef(false);
+
   const handleResizeStart = React.useCallback(
     (edge: 'top' | 'bottom', e: React.MouseEvent) => {
       e.preventDefault();
@@ -243,7 +246,7 @@ export function AnimatedCalendarEvent({
 
       justMovedRef.current = true;
       onMoveEnd?.();
-      onMove(event, newStart, newEnd);
+      onMove?.(event, newStart, newEnd);
       setMoveState(null);
     };
 
@@ -309,7 +312,7 @@ export function AnimatedCalendarEvent({
       }
 
       justResizedRef.current = true;
-      onResize(event, newStart, newEnd);
+      onResize?.(event, newStart, newEnd);
       setResizeState(null);
     };
 
@@ -323,8 +326,6 @@ export function AnimatedCalendarEvent({
 
   const canResize = Boolean(onResize && !isPreview && !event.isAllDay);
   const canMove = Boolean(onMove && !isPreview && !event.isAllDay);
-  const justResizedRef = React.useRef(false);
-  const justMovedRef = React.useRef(false);
   const textColor = getContrastTextColor(bgColor);
   const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff'; // gray-900 or white
 

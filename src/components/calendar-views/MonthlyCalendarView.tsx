@@ -9,6 +9,109 @@ import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
 import { Cake } from 'lucide-react';
 
+interface MonthlyEventChipProps {
+  event: CalendarEvent;
+  people: Person[];
+  draggingEvent: CalendarEvent | null;
+  onEventClick?: (event: CalendarEvent) => void;
+  onEventUpdate?: (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date,
+    isAllDay?: boolean
+  ) => Promise<void>;
+  handleEventDragStart: (event: CalendarEvent, e: React.MouseEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
+  onPersonClick?: (person: Person) => void;
+  isAllDay?: boolean;
+}
+
+function MonthlyEventChip({
+  event,
+  people,
+  draggingEvent,
+  onEventClick,
+  onEventUpdate,
+  handleEventDragStart,
+  onEventRightClick,
+  onPersonClick,
+  isAllDay = false,
+}: MonthlyEventChipProps) {
+  const eventColor = event.color || '#4285f4';
+  const textColor = getContrastTextColor(eventColor);
+  const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
+  const matchedPeople =
+    event.linkedPeople && event.linkedPeople.length > 0
+      ? (event.linkedPeople as Person[])
+      : people.length > 0
+        ? getMatchedPeopleFromEvent(event.title, people)
+        : [];
+
+  const title = isAllDay
+    ? event.title
+    : `${event.title} - ${event.start.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      })}`;
+
+  return (
+    <div
+      className={cn(
+        'text-xs rounded flex items-center gap-1',
+        isAllDay ? 'px-1.5 py-0.5 min-w-0 max-w-full overflow-hidden' : 'px-2 py-0.5 truncate',
+        onEventUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+        'hover:opacity-90',
+        draggingEvent?.id === event.id && 'opacity-70 ring-2 ring-offset-1 ring-foreground/20'
+      )}
+      style={{
+        backgroundColor: eventColor,
+        color: textColorValue,
+      }}
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEventClick?.(event);
+      }}
+      onMouseDown={
+        onEventUpdate ? (e) => handleEventDragStart(event, e) : undefined
+      }
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onEventRightClick?.(event, e);
+      }}
+    >
+      {isCorrespondenceCalendar(event.calendar, event.calendarId) && (
+        <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
+      )}
+      {matchedPeople.length > 0 && (
+        <div className="flex items-center flex-shrink-0">
+          {matchedPeople.map((person: Person, index: number) => (
+            <div
+              key={person.id}
+              style={{
+                marginLeft: index > 0 ? '-8px' : '0',
+                zIndex: matchedPeople.length - index,
+              }}
+              className="relative"
+            >
+              <PersonAvatar
+                person={person}
+                size="sm"
+                onClick={() => onPersonClick?.(person)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <span className={cn('truncate', isAllDay ? 'min-w-0' : 'flex-1')}>
+        {event.title}
+      </span>
+    </div>
+  );
+}
+
 interface MonthlyCalendarViewProps {
   currentMonth: Date;
   events: CalendarEvent[];
@@ -231,146 +334,37 @@ export function MonthlyCalendarView({
                           {day ? day.getDate() : ''}
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-0.5 flex-1 min-w-0">
-                          {allDayEvents.map((event) => {
-                            const eventColor = event.color || '#4285f4';
-                            const textColor = getContrastTextColor(eventColor);
-                            const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
-                            const matchedPeople =
-                              event.linkedPeople && event.linkedPeople.length > 0
-                                ? event.linkedPeople
-                                : people.length > 0
-                                  ? getMatchedPeopleFromEvent(event.title, people)
-                                  : [];
-                            return (
-                              <div
-                                key={event.id}
-                                className={cn(
-                                  'text-xs px-1.5 py-0.5 rounded flex items-center gap-1 min-w-0 max-w-full overflow-hidden',
-                                  onEventUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-                                  'hover:opacity-90',
-                                  draggingEvent?.id === event.id && 'opacity-70 ring-2 ring-offset-1 ring-foreground/20'
-                                )}
-                                style={{
-                                  backgroundColor: eventColor,
-                                  color: textColorValue,
-                                }}
-                                title={event.title}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEventClick?.(event);
-                                }}
-                                onMouseDown={
-                                  onEventUpdate
-                                    ? (e) => handleEventDragStart(event, e)
-                                    : undefined
-                                }
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  onEventRightClick?.(event, e);
-                                }}
-                              >
-                                {isCorrespondenceCalendar(event.calendar, event.calendarId) && (
-                                  <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
-                                )}
-                                {matchedPeople.length > 0 && (
-                                  <div className="flex items-center flex-shrink-0">
-                                    {matchedPeople.map((person: Person, index: number) => (
-                                      <div
-                                        key={person.id}
-                                        style={{
-                                          marginLeft: index > 0 ? '-8px' : '0',
-                                          zIndex: matchedPeople.length - index,
-                                        }}
-                                        className="relative"
-                                      >
-                                        <PersonAvatar
-                                          person={person}
-                                          size="sm"
-                                          onClick={() => onPersonClick?.(person)}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                <span className="truncate min-w-0">{event.title}</span>
-                              </div>
-                            );
-                          })}
+                          {allDayEvents.map((event) => (
+                            <MonthlyEventChip
+                              key={event.id}
+                              event={event}
+                              people={people}
+                              draggingEvent={draggingEvent}
+                              onEventClick={onEventClick}
+                              onEventUpdate={onEventUpdate}
+                              handleEventDragStart={handleEventDragStart}
+                              onEventRightClick={onEventRightClick}
+                              onPersonClick={onPersonClick}
+                              isAllDay
+                            />
+                          ))}
                         </div>
                       </div>
                       {/* Timed events - all shown, no truncation */}
                       <div className="space-y-1">
-                        {timedEvents.map((event) => {
-                          const eventColor = event.color || '#4285f4';
-                          const textColor = getContrastTextColor(eventColor);
-                          const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
-                          const matchedPeople =
-                            event.linkedPeople && event.linkedPeople.length > 0
-                              ? event.linkedPeople
-                              : people.length > 0
-                                ? getMatchedPeopleFromEvent(event.title, people)
-                                : [];
-
-                          return (
-                            <div
-                              key={event.id}
-                              className={cn(
-                                'text-xs px-2 py-0.5 rounded truncate flex items-center gap-1',
-                                onEventUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-                                'hover:opacity-90',
-                                draggingEvent?.id === event.id && 'opacity-70 ring-2 ring-offset-1 ring-foreground/20'
-                              )}
-                              style={{
-                                backgroundColor: eventColor,
-                                color: textColorValue,
-                              }}
-                              title={`${event.title} - ${event.start.toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEventClick?.(event);
-                              }}
-                              onMouseDown={
-                                onEventUpdate
-                                  ? (e) => handleEventDragStart(event, e)
-                                  : undefined
-                              }
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onEventRightClick?.(event, e);
-                              }}
-                            >
-                              {isCorrespondenceCalendar(event.calendar, event.calendarId) && (
-                                <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
-                              )}
-                              {matchedPeople.length > 0 && (
-                                <div className="flex items-center flex-shrink-0">
-                                  {matchedPeople.map((person: Person, index: number) => (
-                                    <div
-                                      key={person.id}
-                                      style={{
-                                        marginLeft: index > 0 ? '-8px' : '0',
-                                        zIndex: matchedPeople.length - index,
-                                      }}
-                                      className="relative"
-                                    >
-                                      <PersonAvatar
-                                        person={person}
-                                        size="sm"
-                                        onClick={() => onPersonClick?.(person)}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <span className="truncate flex-1">{event.title}</span>
-                            </div>
-                          );
-                        })}
+                        {timedEvents.map((event) => (
+                          <MonthlyEventChip
+                            key={event.id}
+                            event={event}
+                            people={people}
+                            draggingEvent={draggingEvent}
+                            onEventClick={onEventClick}
+                            onEventUpdate={onEventUpdate}
+                            handleEventDragStart={handleEventDragStart}
+                            onEventRightClick={onEventRightClick}
+                            onPersonClick={onPersonClick}
+                          />
+                        ))}
                       </div>
                     </div>
                   );

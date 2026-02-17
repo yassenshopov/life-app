@@ -493,9 +493,6 @@ export function HQCalendar({
     endTime: Date,
     isAllDay?: boolean
   ) => {
-    if (!(previousEventForRevertRef.current instanceof Map)) {
-      previousEventForRevertRef.current = new Map();
-    }
     const start = startTime instanceof Date ? startTime : new Date(startTime);
     const end = endTime instanceof Date ? endTime : new Date(endTime);
 
@@ -538,30 +535,10 @@ export function HQCalendar({
       const data = await response.json();
 
       // Update the event in cache
-      const updatedEvent: CalendarEvent = {
-        id: eventId,
-        title: data.event.title || '',
-        start: new Date(data.event.start),
-        end: new Date(data.event.end),
-        color: data.event.color || '#4285f4',
-        calendar: data.event.calendar,
-        calendarId: data.event.calendarId || data.event.calendar,
-        description: data.event.description,
-        location: data.event.location,
-        htmlLink: data.event.htmlLink,
-        hangoutLink: data.event.hangoutLink,
-        isAllDay: data.event.isAllDay,
-        organizer: data.event.organizer,
-        attendees: data.event.attendees,
-        reminders: data.event.reminders,
-        recurrence: data.event.recurrence,
-        status: data.event.status,
-        transparency: data.event.transparency,
-        visibility: data.event.visibility,
-        conferenceData: data.event.conferenceData,
-        created: data.event.created ? new Date(data.event.created) : undefined,
-        updated: data.event.updated ? new Date(data.event.updated) : undefined,
-      };
+      const updatedEvent = mapApiEventToCalendarEvent({
+        ...data.event,
+        id: data.event.id ?? eventId,
+      });
 
       // Update cache
       allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
@@ -570,16 +547,7 @@ export function HQCalendar({
 
       // Update the event in the local state from server response
       setEvents((prevEvents) =>
-        prevEvents.map((e) =>
-          e.id === eventId
-            ? {
-                ...e,
-                start: new Date(data.event.start),
-                end: new Date(data.event.end),
-                isAllDay: data.event.isAllDay,
-              }
-            : e
-        )
+        prevEvents.map((e) => (e.id === eventId ? updatedEvent : e))
       );
       previousEventForRevertRef.current.delete(eventId);
       // Do not dispatch calendar-refresh here; it triggers a full refetch that overwrites state
@@ -973,44 +941,9 @@ export function HQCalendar({
           }
 
           // Convert event data to CalendarEvent format
-          return (data.events || []).map((event: any) => {
-            const startDate = event.start instanceof Date ? event.start : new Date(event.start);
-            const endDate = event.end instanceof Date ? event.end : new Date(event.end);
-            const hexColor = event.color || '#4285f4';
-
-            return {
-              id: event.id,
-              title: event.title,
-              start: startDate,
-              end: endDate,
-              color: hexColor,
-              calendar: event.calendar,
-              calendarId: event.calendarId || event.calendar,
-              description: event.description,
-              location: event.location,
-              htmlLink: event.htmlLink,
-              hangoutLink: event.hangoutLink,
-              isAllDay: event.isAllDay,
-              organizer: event.organizer,
-              attendees: event.attendees,
-              reminders: event.reminders,
-              recurrence: event.recurrence,
-              status: event.status,
-              transparency: event.transparency,
-              visibility: event.visibility,
-              conferenceData: event.conferenceData,
-              created: event.created
-                ? event.created instanceof Date
-                  ? event.created
-                  : new Date(event.created)
-                : undefined,
-              updated: event.updated
-                ? event.updated instanceof Date
-                  ? event.updated
-                  : new Date(event.updated)
-                : undefined,
-            };
-          });
+          return (data.events || []).map((event: any) =>
+            mapApiEventToCalendarEvent(event)
+          );
         });
 
         // Wait for all fetches to complete

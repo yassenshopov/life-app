@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
-import { isAllDayEvent, getEventsForDay } from '@/lib/calendar-utils';
+import { isAllDayEvent } from '@/lib/calendar-utils';
 
 interface AnnualCalendarViewProps {
   currentYear: Date;
@@ -80,6 +80,25 @@ export function AnnualCalendarView({
 
   const year = currentYear.getFullYear();
 
+  const eventsByDay = React.useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    const dateKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    for (const event of events) {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      while (day <= endDay) {
+        const k = dateKey(day);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k)!.push(event);
+        day.setDate(day.getDate() + 1);
+      }
+    }
+    return map;
+  }, [events]);
+
   return (
     <div className="flex flex-col h-full">
       <TooltipProvider delayDuration={300}>
@@ -110,7 +129,11 @@ export function AnnualCalendarView({
                       <div key={weekIndex} className="grid grid-cols-7 gap-0.5">
                         {week.map((day, dayIndex) => {
                           const dayDate = day != null ? new Date(year, monthIndex, day) : null;
-                          const dayEvents = dayDate ? getEventsForDay(events, dayDate) : [];
+                          const dayKey =
+                            dayDate
+                              ? `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                              : '';
+                          const dayEvents = dayKey ? eventsByDay.get(dayKey) ?? [] : [];
                           const dayButton = (
                             <button
                               key={dayIndex}
@@ -163,6 +186,13 @@ export function AnnualCalendarView({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           onEventClick?.(event);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            if (e.key === ' ') e.preventDefault(); // avoid page scroll
+                                            e.stopPropagation();
+                                            onEventClick?.(event);
+                                          }
                                         }}
                                         onContextMenu={(e) => {
                                           e.preventDefault();
