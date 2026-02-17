@@ -120,6 +120,122 @@ function findClosestColorId(hexColor: string): string | undefined {
   return closestId;
 }
 
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ eventId: string }> }
+) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { eventId } = await params;
+    const { searchParams } = new URL(req.url);
+    const calendarId = searchParams.get('calendarId');
+
+    if (!calendarId) {
+      return NextResponse.json(
+        { error: 'calendarId query parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    await ensureUserExists(supabase, userId);
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('google_calendar_credentials')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const credentials: GoogleCalendarCredentials | null = user.google_calendar_credentials;
+
+    if (!credentials || !credentials.access_token) {
+      return NextResponse.json(
+        { error: 'Google Calendar not connected' },
+        { status: 400 }
+      );
+    }
+
+    if (!google) {
+      return NextResponse.json(
+        { error: 'Google Calendar API not configured' },
+        { status: 503 }
+      );
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      return NextResponse.json(
+        { error: 'OAuth credentials not configured' },
+        { status: 500 }
+      );
+    }
+
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    oauth2Client.setCredentials({
+      access_token: credentials.access_token,
+      refresh_token: credentials.refresh_token,
+      expiry_date: credentials.expiry_date,
+    });
+
+    if (credentials.expiry_date && credentials.expiry_date <= Date.now()) {
+      try {
+        const { credentials: newCredentials } = await oauth2Client.refreshAccessToken();
+        oauth2Client.setCredentials(newCredentials);
+        await supabase
+          .from('users')
+          .update({
+            google_calendar_credentials: {
+              ...credentials,
+              access_token: newCredentials.access_token,
+              expiry_date: newCredentials.expiry_date,
+            },
+          })
+          .eq('id', userId);
+      } catch (refreshError) {
+        console.error('Error refreshing token:', refreshError);
+        return NextResponse.json(
+          { error: 'Failed to refresh access token' },
+          { status: 401 }
+        );
+      }
+    }
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    await calendar.events.delete({
+      calendarId,
+      eventId,
+    });
+
+    await supabase
+      .from('google_calendar_events')
+      .delete()
+      .eq('user_id', userId)
+      .eq('calendar_id', calendarId)
+      .eq('event_id', eventId);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error in DELETE /api/google-calendar/events/[eventId]:', error);
+    const code = error?.code ?? error?.response?.status;
+    const status = code === 404 || code === 410 ? 404 : 500;
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete event' },
+      { status }
+    );
+  }
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ eventId: string }> }

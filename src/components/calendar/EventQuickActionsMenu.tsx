@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { Check, Palette } from 'lucide-react';
+import { Check, Palette, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
@@ -25,14 +25,15 @@ const GOOGLE_CALENDAR_COLORS = [
   { id: '12', name: 'Blue', hex: '#4285f4' },          // Bottom row, 6th - Medium Blue (Google default)
 ];
 
-interface EventColorMenuProps {
+interface EventQuickActionsMenuProps {
   event: { id: string; color?: string };
   calendarColor?: string; // The default calendar color
   onColorChange: (color: string | null) => void; // null means use calendar default
+  onDelete?: () => void;
   children: React.ReactNode;
 }
 
-export function EventColorMenu({ event, calendarColor, onColorChange, children }: EventColorMenuProps) {
+export function EventQuickActionsMenu({ event, calendarColor, onColorChange, onDelete, children }: EventQuickActionsMenuProps) {
   const [open, setOpen] = React.useState(true);
   const [showCustomPicker, setShowCustomPicker] = React.useState(false);
   const [customColor, setCustomColor] = React.useState('#000000');
@@ -82,7 +83,10 @@ export function EventColorMenu({ event, calendarColor, onColorChange, children }
           sideOffset={5}
         >
           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-            Change Color
+            Quick actions
+          </div>
+          <div className="px-2 pt-0.5 pb-1 text-[11px] font-medium text-muted-foreground/80">
+            Change color
           </div>
           <div className="grid grid-cols-4 gap-1 p-1">
             {GOOGLE_CALENDAR_COLORS.map((color) => {
@@ -222,6 +226,28 @@ export function EventColorMenu({ event, calendarColor, onColorChange, children }
               )}
             </DropdownMenuPrimitive.Item>
           </div>
+
+          {/* Delete event */}
+          {onDelete && (
+            <div className="border-t mt-1">
+              <DropdownMenuPrimitive.Item
+                className={cn(
+                  'relative flex cursor-pointer items-center gap-2 rounded-sm outline-none px-2 py-1.5',
+                  'focus:bg-destructive/10 focus:text-destructive',
+                  'hover:bg-destructive/10 hover:text-destructive',
+                  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
+                )}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  onDelete();
+                  setOpen(false);
+                }}
+              >
+                <Trash2 className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs flex-1">Delete event</span>
+              </DropdownMenuPrimitive.Item>
+            </div>
+          )}
         </DropdownMenuPrimitive.Content>
       </DropdownMenuPrimitive.Portal>
     </DropdownMenuPrimitive.Root>

@@ -30,9 +30,7 @@ const shortcuts: Shortcut[] = [
   { keys: ['Y'], description: 'Switch to Year view', category: 'View Navigation' },
   { keys: ['S'], description: 'Switch to Schedule view', category: 'View Navigation' },
   { keys: ['T'], description: 'Go to today', category: 'View Navigation' },
-  { keys: ['F'], description: 'Toggle fullscreen', category: 'View Navigation' },
   { keys: ['?'], description: 'Show keyboard shortcuts', category: 'General' },
-  { keys: ['Esc'], description: 'Exit fullscreen', category: 'General' },
 ];
 
 export function KeyboardShortcutsDialog({

@@ -3,7 +3,6 @@
 import * as React from 'react';
 import HQSidebar from '@/components/HQSidebar';
 import { HQCalendar } from '@/components/HQCalendar';
-import { CalendarSidebar } from '@/components/CalendarSidebar';
 import { Outfit } from 'next/font/google';
 import { getColorPalette, getDefaultBgColor } from '@/lib/spotify-color';
 
@@ -25,7 +24,6 @@ interface CurrentlyPlaying {
 }
 
 export default function CalendarPage() {
-  const [navigateToDate, setNavigateToDate] = React.useState<Date | undefined>();
   const [colorPalette, setColorPalette] = React.useState<{
     primary: string;
     secondary: string;
@@ -219,17 +217,12 @@ export default function CalendarPage() {
     };
   }, [colorPalette]);
 
-  const handleDateSelect = (date: Date) => {
-    setNavigateToDate(date);
-  };
-
   const effectiveColorPalette = isConnected && gradientColors ? colorPalette : null;
 
   return (
     <div className={`flex h-screen bg-background ${outfit.className}`}>
       <HQSidebar colorPalette={effectiveColorPalette} />
       <div className="flex flex-1 overflow-hidden">
-        <CalendarSidebar onDateSelect={handleDateSelect} colorPalette={effectiveColorPalette} />
         <main className="flex-1 overflow-y-auto">
           <div
             className={`min-h-screen p-6 md:p-8 transition-all duration-1000 ease-in-out ${
@@ -244,7 +237,7 @@ export default function CalendarPage() {
             }}
           >
             <div className="max-w-7xl mx-auto">
-              <HQCalendar navigateToDate={navigateToDate} colorPalette={effectiveColorPalette} />
+              <HQCalendar colorPalette={effectiveColorPalette} />
             </div>
           </div>
         </main>

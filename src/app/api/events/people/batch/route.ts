@@ -4,8 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 
-const supabase = getSupabaseServiceRoleClient();
-
 /**
  * Batch fetch people linked to multiple events
  */
@@ -22,6 +20,8 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(eventIds) || eventIds.length === 0) {
       return NextResponse.json({ eventPeopleMap: {} });
     }
+
+    const supabase = getSupabaseServiceRoleClient();
 
     // Fetch all linked people for these events
     const { data: eventPeople, error } = await supabase
@@ -41,7 +41,12 @@ export async function POST(request: NextRequest) {
       .in('event_id', eventIds);
 
     if (error) {
-      console.error('Error fetching event people:', error);
+      const cause = error instanceof Error && 'cause' in error ? (error as Error & { cause?: unknown }).cause : undefined;
+      console.error('Error fetching event people:', {
+        message: error.message,
+        details: String(error),
+        cause: cause ?? null,
+      });
       return NextResponse.json(
         { error: 'Failed to fetch event people' },
         { status: 500 }
@@ -69,7 +74,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ eventPeopleMap });
   } catch (error) {
-    console.error('Error in POST /api/events/people/batch:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    const cause = 'cause' in err ? (err as Error & { cause?: unknown }).cause : undefined;
+    console.error('Error in POST /api/events/people/batch:', {
+      message: err.message,
+      cause: cause ?? null,
+      stack: err.stack,
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -19,6 +19,8 @@ import {
   Save,
   X,
   Plus,
+  Trash2,
+  Cake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -56,6 +58,7 @@ interface EventDetailModalProps {
   people?: Person[];
   onPersonClick?: (person: Person) => void;
   onPeopleChange?: (eventId: string, people: Person[]) => void;
+  onEventDelete?: (event: CalendarEvent) => void | Promise<void>;
   colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
@@ -71,6 +74,7 @@ export function EventDetailModal({
   people = [],
   onPersonClick,
   onPeopleChange,
+  onEventDelete,
   colorPalette,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
@@ -798,12 +802,32 @@ export function EventDetailModal({
         )}
         style={dialogStyle}
       >
+        {/* Delete (trash) icon - to the left of the close X */}
+        {onEventDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-12 top-4 rounded-sm opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive z-10"
+            onClick={async () => {
+              if (!confirm('Delete this event? This cannot be undone.')) return;
+              await onEventDelete(displayEvent);
+            }}
+            title="Delete event"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
         {/* Notion-style header with color accent */}
         <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
 
         <div className="px-6 py-8 pb-16 relative min-w-0 overflow-x-hidden">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
+              {/* Correspondence calendar: birthday cake icon leftmost */}
+              {(displayEvent.calendar ?? '').toLowerCase().includes('correspondence') ||
+              (displayEvent.calendarId ?? '').toLowerCase().includes('correspondence') ? (
+                <Cake className="h-7 w-7 flex-shrink-0 text-muted-foreground" aria-hidden />
+              ) : null}
               {/* Person avatars - to the left of the title, overlapping */}
               {matchedPeople.length > 0 && (
                 <div className="flex items-center flex-shrink-0">

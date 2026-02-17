@@ -144,7 +144,7 @@ function getEventColor(event: CalendarEvent, calendarColor?: string): string {
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-// Monday-first to match MiniCalendar in CalendarSidebar
+// Monday-first week
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 interface MonthGridProps {

@@ -3,10 +3,11 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
-import { getEventsForDay } from '@/lib/calendar-utils';
+import { getAllDayEventsForDay, getTimedEventsForDay } from '@/lib/calendar-utils';
 import { getContrastTextColor } from '@/lib/color-utils';
 import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
+import { Cake } from 'lucide-react';
 
 interface MonthlyCalendarViewProps {
   currentMonth: Date;
@@ -62,7 +63,6 @@ export function MonthlyCalendarView({
 
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-
   const isToday = (date: Date | null) => {
     if (!date) return false;
     const today = new Date();
@@ -79,6 +79,12 @@ export function MonthlyCalendarView({
       date.getMonth() === currentMonth.getMonth() &&
       date.getFullYear() === currentMonth.getFullYear()
     );
+  };
+
+  const isCorrespondenceCalendar = (event: CalendarEvent) => {
+    const cal = (event.calendar ?? '').toLowerCase();
+    const id = (event.calendarId ?? '').toLowerCase();
+    return cal.includes('correspondence') || id.includes('correspondence');
   };
 
   return (
@@ -106,49 +112,118 @@ export function MonthlyCalendarView({
       <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="min-w-[800px]">
-            <div className="grid relative" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+            <div
+              className="grid relative"
+              style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
+            >
               {weeks.map((week, weekIndex) =>
                 week.map((day, dayIndex) => {
-                  const dayEvents = day ? getEventsForDay(events, day) : [];
+                  const allDayEvents = day ? getAllDayEventsForDay(events, day) : [];
+                  const timedEvents = day ? getTimedEventsForDay(events, day) : [];
                   return (
                     <div
                       key={`${weekIndex}-${dayIndex}`}
                       className={cn(
-                        'border-r border-b min-h-[100px] p-2 relative min-w-0',
-                        isToday(day) && 'bg-blue-50 dark:bg-blue-950/20'
+                        'border-r border-b min-h-[100px] p-2 relative min-w-0 transition-colors duration-200',
+                        isToday(day) && 'bg-blue-50 dark:bg-blue-950/20',
+                        day && 'hover:bg-accent/20',
+                        !day && 'hover:bg-muted/20'
                       )}
                     >
-                      <div
-                        className={cn(
-                          'text-sm font-semibold mb-1 cursor-pointer hover:underline',
-                          isToday(day) && 'text-blue-600 dark:text-blue-400',
-                          !isCurrentMonth(day) && 'text-muted-foreground opacity-50'
-                        )}
-                        onClick={(e) => {
-                          if (day) {
-                            e.stopPropagation();
-                            // Pass a second parameter to indicate we want to switch to weekly view
-                            onNavigate(day, true);
-                          }
-                        }}
-                      >
-                        {day ? day.getDate() : ''}
+                      {/* Date number and all-day events on same row */}
+                      <div className="flex items-start gap-1 mb-1 min-h-[1.5rem] w-full">
+                        <div
+                          className={cn(
+                            'text-sm font-semibold cursor-pointer hover:underline flex-shrink-0',
+                            isToday(day) && 'text-blue-600 dark:text-blue-400',
+                            !isCurrentMonth(day) && 'text-muted-foreground opacity-50'
+                          )}
+                          onClick={(e) => {
+                            if (day) {
+                              e.stopPropagation();
+                              onNavigate(day, true);
+                            }
+                          }}
+                        >
+                          {day ? day.getDate() : ''}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-0.5 flex-1 min-w-0">
+                          {allDayEvents.map((event) => {
+                            const eventColor = event.color || '#4285f4';
+                            const textColor = getContrastTextColor(eventColor);
+                            const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
+                            const matchedPeople =
+                              event.linkedPeople && event.linkedPeople.length > 0
+                                ? event.linkedPeople
+                                : people.length > 0
+                                  ? getMatchedPeopleFromEvent(event.title, people)
+                                  : [];
+                            return (
+                              <div
+                                key={event.id}
+                                className="text-xs px-1.5 py-0.5 rounded cursor-pointer hover:opacity-90 flex items-center gap-1 min-w-0 max-w-full overflow-hidden"
+                                style={{
+                                  backgroundColor: eventColor,
+                                  color: textColorValue,
+                                }}
+                                title={event.title}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEventClick?.(event);
+                                }}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onEventRightClick?.(event, e);
+                                }}
+                              >
+                                {isCorrespondenceCalendar(event) && (
+                                  <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
+                                )}
+                                {matchedPeople.length > 0 && (
+                                  <div className="flex items-center flex-shrink-0">
+                                    {matchedPeople.map((person: Person, index: number) => (
+                                      <div
+                                        key={person.id}
+                                        style={{
+                                          marginLeft: index > 0 ? '-8px' : '0',
+                                          zIndex: matchedPeople.length - index,
+                                        }}
+                                        className="relative"
+                                      >
+                                        <PersonAvatar
+                                          person={person}
+                                          size="sm"
+                                          onClick={() => onPersonClick?.(person)}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <span className="truncate min-w-0">{event.title}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
+                      {/* Timed events - all shown, no truncation */}
                       <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map((event) => {
+                        {timedEvents.map((event) => {
                           const eventColor = event.color || '#4285f4';
                           const textColor = getContrastTextColor(eventColor);
                           const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
-                          // Use linked people from database, fallback to title matching
-                          const matchedPeople = event.linkedPeople && event.linkedPeople.length > 0
-                            ? event.linkedPeople
-                            : (people.length > 0 ? getMatchedPeopleFromEvent(event.title, people) : []);
-                          
+                          const matchedPeople =
+                            event.linkedPeople && event.linkedPeople.length > 0
+                              ? event.linkedPeople
+                              : people.length > 0
+                                ? getMatchedPeopleFromEvent(event.title, people)
+                                : [];
+
                           return (
                             <div
                               key={event.id}
                               className="text-xs px-2 py-0.5 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1"
-                              style={{ 
+                              style={{
                                 backgroundColor: eventColor,
                                 color: textColorValue,
                               }}
@@ -166,6 +241,9 @@ export function MonthlyCalendarView({
                                 onEventRightClick?.(event, e);
                               }}
                             >
+                              {isCorrespondenceCalendar(event) && (
+                                <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
+                              )}
                               {matchedPeople.length > 0 && (
                                 <div className="flex items-center flex-shrink-0">
                                   {matchedPeople.map((person: Person, index: number) => (
@@ -190,11 +268,6 @@ export function MonthlyCalendarView({
                             </div>
                           );
                         })}
-                        {dayEvents.length > 3 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{dayEvents.length - 3} more
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
@@ -207,4 +280,3 @@ export function MonthlyCalendarView({
     </div>
   );
 }
-

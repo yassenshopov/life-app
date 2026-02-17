@@ -169,6 +169,18 @@ export async function GET(req: Request) {
           filteredEvents = cachedEvents;
         }
 
+        // Get calendar summaries so event.calendar shows name (e.g. "Correspondence") not just id
+        const uniqueCalendarIds = [...new Set((filteredEvents as any[]).map((e: any) => e.calendar_id))];
+        const { data: calendarRows } = await supabase
+          .from('google_calendars')
+          .select('calendar_id, summary')
+          .eq('user_id', userId)
+          .in('calendar_id', uniqueCalendarIds);
+        const calendarSummaryById: Record<string, string> = {};
+        for (const row of calendarRows || []) {
+          calendarSummaryById[row.calendar_id] = row.summary ?? '';
+        }
+
         // Return cached events
         const formattedEvents = filteredEvents.map((event: any) => {
           // Use is_all_day column if available, otherwise check event_data
@@ -236,7 +248,7 @@ export async function GET(req: Request) {
             start,
             end,
             color: event.color || '#4285f4', // This already has the event-specific color if it was set
-            calendar: event.organizer_display_name || event.calendar_id,
+            calendar: calendarSummaryById[event.calendar_id] || event.organizer_display_name || event.calendar_id,
             calendarId: event.calendar_id, // Include the actual calendar ID
             // Use column value if available, otherwise fallback to event_data
             // Check both null and undefined, and handle empty strings
@@ -487,7 +499,7 @@ export async function GET(req: Request) {
             start,
             end,
             color: eventColor,
-            calendar: event.organizer?.displayName || calendarId,
+            calendar: calInfo?.summary || event.organizer?.displayName || calendarId,
             calendarId: calendarId, // Include the actual calendar ID
             description: event.description,
             location: event.location,
