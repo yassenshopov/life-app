@@ -290,7 +290,6 @@ function MonthGrid({
                                         src={src}
                                         alt={p.name}
                                         className="h-full w-full object-cover"
-                                        unoptimized
                                       />
                                     ) : (
                                       <span className="text-muted-foreground">{initials}</span>
