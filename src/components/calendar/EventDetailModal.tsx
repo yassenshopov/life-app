@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEvent } from '@/components/HQCalendar';
-import { formatEventTime, isAllDayEvent, formatRecurrenceSummary } from '@/lib/calendar-utils';
+import { formatEventTime, isAllDayEvent, formatRecurrenceSummary, isCorrespondenceCalendar } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import {
   MapPin,
@@ -827,7 +827,6 @@ export function EventDetailModal({
                 size="icon"
                 className="rounded-sm opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive z-10"
                 onClick={async () => {
-                  if (!confirm('Delete this event? This cannot be undone.')) return;
                   await onEventDelete(displayEvent);
                 }}
                 title="Delete event"
@@ -844,8 +843,7 @@ export function EventDetailModal({
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
               {/* Correspondence calendar: birthday cake icon leftmost */}
-              {(displayEvent.calendar ?? '').toLowerCase().includes('correspondence') ||
-              (displayEvent.calendarId ?? '').toLowerCase().includes('correspondence') ? (
+              {isCorrespondenceCalendar(displayEvent.calendar, displayEvent.calendarId) ? (
                 <Cake className="h-7 w-7 flex-shrink-0 text-muted-foreground" aria-hidden />
               ) : null}
               {/* Person avatars - to the left of the title, overlapping */}

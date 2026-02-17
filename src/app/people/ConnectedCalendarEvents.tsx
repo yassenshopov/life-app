@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getColorFromColorId } from '@/lib/google-calendar-colors';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -60,33 +61,6 @@ interface ConnectedCalendarEventsProps {
   isLoading?: boolean;
   /** Map event id -> list of people linked to that event. Optional; when present, tooltip shows a People row if more than one. */
   eventPeopleMap?: EventPeopleMap;
-}
-
-/**
- * Map Google Calendar colorId to hex color
- * Google Calendar uses predefined color IDs (1-11) that map to specific colors
- */
-function getColorFromColorId(colorId: string | undefined | null, defaultColor: string = '#4285f4'): string {
-  if (!colorId) {
-    return defaultColor;
-  }
-
-  // Google Calendar color ID to hex mapping
-  const colorMap: Record<string, string> = {
-    '1': '#a4bdfc', // Lavender
-    '2': '#7ae7bf', // Sage
-    '3': '#dbadff', // Grape
-    '4': '#ff887c', // Flamingo
-    '5': '#fbd75b', // Banana
-    '6': '#ffb878', // Tangerine
-    '7': '#46d6db', // Peacock
-    '8': '#e1e1e1', // Graphite
-    '9': '#5484ed', // Blueberry
-    '10': '#51b749', // Basil
-    '11': '#dc2127', // Tomato
-  };
-
-  return colorMap[colorId] || defaultColor;
 }
 
 /**
@@ -340,7 +314,9 @@ export function ConnectedCalendarEvents({ events, isLoading = false, eventPeople
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push({ event, startDate });
     });
-    map.forEach((list) => list.sort((a, b) => a.startDate.getTime() - b.startDate.getTime()));
+    map.forEach((list) => {
+      list.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    });
     return map;
   }, [filteredEvents]);
 

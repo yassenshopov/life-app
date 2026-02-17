@@ -44,6 +44,10 @@ interface AnimatedCalendarEventProps {
   isBeingDragged?: boolean;
 }
 
+const MIN_DURATION_MINUTES = 15;
+const SNAP_MINUTES = 15;
+const DRAG_THRESHOLD_PX = 6;
+
 /**
  * Animated calendar event component
  */
@@ -67,9 +71,6 @@ export function AnimatedCalendarEvent({
   isBeingDragged = false,
 }: AnimatedCalendarEventProps) {
   const bgColor = event.color || '#4285f4';
-  const MIN_DURATION_MINUTES = 15;
-  const SNAP_MINUTES = 15;
-  const DRAG_THRESHOLD_PX = 6;
 
   /** Set on mousedown; drag only starts after pointer moves past DRAG_THRESHOLD_PX */
   const [pendingDrag, setPendingDrag] = React.useState<null | {
@@ -251,7 +252,6 @@ export function AnimatedCalendarEvent({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      onMoveEnd?.();
     };
   }, [moveState, onMove, onMoveEnd, getDropTarget, event]);
 

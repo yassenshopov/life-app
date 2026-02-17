@@ -495,24 +495,20 @@ export function WeeklyCalendarView({
                               onPersonClick={onPersonClick}
                               onResize={
                                 onEventUpdate
-                                  ? (evt, newStart, newEnd) =>
-                                      onEventUpdate(
-                                        evt.id,
-                                        evt.calendarId || evt.calendar || '',
-                                        newStart,
-                                        newEnd
-                                      )
+                                  ? (evt, newStart, newEnd) => {
+                                      const calendarId = evt.calendarId;
+                                      if (!calendarId) return;
+                                      onEventUpdate(evt.id, calendarId, newStart, newEnd);
+                                    }
                                   : undefined
                               }
                               onMove={
                                 onEventUpdate
-                                  ? (evt, newStart, newEnd) =>
-                                      onEventUpdate(
-                                        evt.id,
-                                        evt.calendarId || evt.calendar || '',
-                                        newStart,
-                                        newEnd
-                                      )
+                                  ? (evt, newStart, newEnd) => {
+                                      const calendarId = evt.calendarId;
+                                      if (!calendarId) return;
+                                      onEventUpdate(evt.id, calendarId, newStart, newEnd);
+                                    }
                                   : undefined
                               }
                               getDropTarget={getDropTarget}

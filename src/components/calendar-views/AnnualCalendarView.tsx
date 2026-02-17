@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
-import { isAllDayEvent } from '@/lib/calendar-utils';
+import { isAllDayEvent, getEventsForDay } from '@/lib/calendar-utils';
 
 interface AnnualCalendarViewProps {
   currentYear: Date;
@@ -61,18 +61,6 @@ export function AnnualCalendarView({
     return days;
   };
 
-  const getEventsForDay = (year: number, month: number, day: number | null) => {
-    if (!day) return [];
-    return events.filter((event) => {
-      const eventDate = new Date(event.start);
-      return (
-        eventDate.getDate() === day &&
-        eventDate.getMonth() === month &&
-        eventDate.getFullYear() === year
-      );
-    });
-  };
-
   const isToday = (year: number, month: number, day: number | null) => {
     if (!day) return false;
     const today = new Date();
@@ -87,7 +75,7 @@ export function AnnualCalendarView({
     if (isAllDayEvent(event)) return 'All day';
     const start = event.start instanceof Date ? event.start : new Date(event.start);
     const end = event.end instanceof Date ? event.end : new Date(event.end);
-    return `${start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} – ${end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    return `${format(start, 'p')} – ${format(end, 'p')}`;
   };
 
   const year = currentYear.getFullYear();
@@ -121,65 +109,77 @@ export function AnnualCalendarView({
                     {weeks.map((week, weekIndex) => (
                       <div key={weekIndex} className="grid grid-cols-7 gap-0.5">
                         {week.map((day, dayIndex) => {
-                          const dayEvents = getEventsForDay(year, monthIndex, day);
-                          const dayDate = day
-                            ? new Date(year, monthIndex, day)
-                            : null;
+                          const dayDate = day != null ? new Date(year, monthIndex, day) : null;
+                          const dayEvents = dayDate ? getEventsForDay(events, dayDate) : [];
+                          const dayButton = (
+                            <button
+                              key={dayIndex}
+                              onClick={() => {
+                                if (day != null) {
+                                  onNavigate(new Date(year, monthIndex, day));
+                                }
+                              }}
+                              disabled={day == null}
+                              className={cn(
+                                'h-6 w-6 p-0 text-[0.65rem] font-normal rounded-sm transition-colors',
+                                'hover:bg-accent hover:text-accent-foreground',
+                                'disabled:opacity-0 disabled:cursor-default',
+                                day != null && isToday(year, monthIndex, day) &&
+                                  'bg-blue-500 text-white font-semibold hover:bg-blue-600',
+                                dayEvents.length > 0 && day != null && !isToday(year, monthIndex, day) && 'bg-primary/20'
+                              )}
+                            >
+                              {day ?? ''}
+                            </button>
+                          );
+                          if (day == null) {
+                            return dayButton;
+                          }
                           return (
                             <Tooltip key={dayIndex}>
                               <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => {
-                                    if (day) {
-                                      onNavigate(new Date(year, monthIndex, day));
-                                    }
-                                  }}
-                                  disabled={!day}
-                                  className={cn(
-                                    'h-6 w-6 p-0 text-[0.65rem] font-normal rounded-sm transition-colors',
-                                    'hover:bg-accent hover:text-accent-foreground',
-                                    'disabled:opacity-0 disabled:cursor-default',
-                                    isToday(year, monthIndex, day) &&
-                                      'bg-blue-500 text-white font-semibold hover:bg-blue-600',
-                                    dayEvents.length > 0 && !isToday(year, monthIndex, day) && 'bg-primary/20'
-                                  )}
-                                >
-                                  {day}
-                                </button>
+                                {dayButton}
                               </TooltipTrigger>
                               <TooltipContent
                                 side="top"
                                 className="max-w-[240px] p-2"
                               >
-                                {dayDate ? (
-                                  <>
-                                    <div className="font-medium mb-1.5 border-b border-primary-foreground/20 pb-1">
-                                      {format(dayDate, 'EEE, MMM d')}
-                                    </div>
-                                    {dayEvents.length === 0 ? (
-                                      <p className="text-muted-foreground text-xs">No events</p>
-                                    ) : (
-                                      <ul className="space-y-1 text-xs">
-                                        {dayEvents.map((event) => (
-                                          <li
-                                            key={event.id}
-                                            className="flex flex-col gap-0.5 truncate pl-1.5"
-                                            style={{
-                                              borderLeft: `3px solid ${event.color || 'var(--primary)'}`,
-                                            }}
-                                          >
-                                            <span className="font-medium truncate" title={event.title}>
-                                              {event.title}
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                              {formatEventTimeForTooltip(event)}
-                                            </span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </>
-                                ) : null}
+                                <div className="font-medium mb-1.5 border-b border-primary-foreground/20 pb-1">
+                                  {format(dayDate!, 'EEE, MMM d')}
+                                </div>
+                                {dayEvents.length === 0 ? (
+                                  <p className="text-muted-foreground text-xs">No events</p>
+                                ) : (
+                                  <ul className="space-y-1 text-xs">
+                                    {dayEvents.map((event) => (
+                                      <li
+                                        key={event.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        className="flex flex-col gap-0.5 truncate pl-1.5 cursor-pointer hover:bg-accent/50 rounded -m-1 p-1"
+                                        style={{
+                                          borderLeft: `3px solid ${event.color || 'var(--primary)'}`,
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onEventClick?.(event);
+                                        }}
+                                        onContextMenu={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onEventRightClick?.(event, e);
+                                        }}
+                                      >
+                                        <span className="font-medium truncate" title={event.title}>
+                                          {event.title}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          {formatEventTimeForTooltip(event)}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
                               </TooltipContent>
                             </Tooltip>
                           );

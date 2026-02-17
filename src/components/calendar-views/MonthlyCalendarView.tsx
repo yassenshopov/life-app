@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
-import { getAllDayEventsForDay, getTimedEventsForDay } from '@/lib/calendar-utils';
+import { getAllDayEventsForDay, getTimedEventsForDay, isCorrespondenceCalendar } from '@/lib/calendar-utils';
 import { getContrastTextColor } from '@/lib/color-utils';
 import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
@@ -50,16 +50,29 @@ export function MonthlyCalendarView({
     [onEventUpdate]
   );
 
+  const DRAG_DISTANCE_THRESHOLD_PX = 8;
+
   const handleEventDragEnd = useCallback(
     (e: MouseEvent) => {
-      if (!draggingEvent || !onEventUpdate) return;
+      if (!draggingEvent || !onEventUpdate) {
+        setDraggingEvent(null);
+        return;
+      }
+
+      const dx = e.clientX - dragStartPos.current.x;
+      const dy = e.clientY - dragStartPos.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < DRAG_DISTANCE_THRESHOLD_PX) {
+        setDraggingEvent(null);
+        return;
+      }
 
       const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
-      const dayCell = dropTarget?.closest('[data-day-iso]');
-      const dayIso = dayCell?.getAttribute('data-day-iso');
-      if (dayIso) {
-        const dropDate = new Date(dayIso);
-        dropDate.setHours(0, 0, 0, 0);
+      const dayCell = dropTarget?.closest('[data-day]');
+      const dayStr = dayCell?.getAttribute('data-day');
+      if (dayStr) {
+        const [y, m, d] = dayStr.split('-').map(Number);
+        const dropDate = new Date(y, m - 1, d);
 
         const durationMs =
           draggingEvent.end.getTime() - draggingEvent.start.getTime();
@@ -80,13 +93,16 @@ export function MonthlyCalendarView({
           );
           newEnd = new Date(newStart.getTime() + durationMs);
         }
-        onEventUpdate(
-          draggingEvent.id,
-          draggingEvent.calendarId || draggingEvent.calendar || '',
-          newStart,
-          newEnd,
-          draggingEvent.isAllDay
-        );
+        const calendarId = draggingEvent.calendarId;
+        if (calendarId) {
+          onEventUpdate(
+            draggingEvent.id,
+            calendarId,
+            newStart,
+            newEnd,
+            draggingEvent.isAllDay
+          );
+        }
       }
       setDraggingEvent(null);
     },
@@ -153,12 +169,6 @@ export function MonthlyCalendarView({
     );
   };
 
-  const isCorrespondenceCalendar = (event: CalendarEvent) => {
-    const cal = (event.calendar ?? '').toLowerCase();
-    const id = (event.calendarId ?? '').toLowerCase();
-    return cal.includes('correspondence') || id.includes('correspondence');
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="overflow-x-auto">
@@ -201,7 +211,7 @@ export function MonthlyCalendarView({
                         day && 'hover:bg-accent/20',
                         !day && 'hover:bg-muted/20'
                       )}
-                      data-day-iso={day?.toISOString()}
+                      data-day={day ? `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}` : undefined}
                     >
                       {/* Date number and all-day events on same row */}
                       <div className="flex items-start gap-1 mb-1 min-h-[1.5rem] w-full">
@@ -260,7 +270,7 @@ export function MonthlyCalendarView({
                                   onEventRightClick?.(event, e);
                                 }}
                               >
-                                {isCorrespondenceCalendar(event) && (
+                                {isCorrespondenceCalendar(event.calendar, event.calendarId) && (
                                   <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
                                 )}
                                 {matchedPeople.length > 0 && (
@@ -334,7 +344,7 @@ export function MonthlyCalendarView({
                                 onEventRightClick?.(event, e);
                               }}
                             >
-                              {isCorrespondenceCalendar(event) && (
+                              {isCorrespondenceCalendar(event.calendar, event.calendarId) && (
                                 <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
                               )}
                               {matchedPeople.length > 0 && (

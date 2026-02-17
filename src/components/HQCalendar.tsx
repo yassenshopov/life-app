@@ -87,6 +87,56 @@ export interface CalendarEvent {
 
 export type CalendarViewMode = 'daily' | 'weekly' | 'monthly' | 'year' | 'schedule';
 
+function mapApiEventToCalendarEvent(apiEvent: {
+  id: string;
+  title?: string;
+  start: string | Date;
+  end: string | Date;
+  color?: string;
+  calendar?: string;
+  calendarId?: string;
+  description?: string;
+  location?: string;
+  htmlLink?: string;
+  hangoutLink?: string;
+  isAllDay?: boolean;
+  organizer?: CalendarEvent['organizer'];
+  attendees?: CalendarEvent['attendees'];
+  reminders?: CalendarEvent['reminders'];
+  recurrence?: CalendarEvent['recurrence'];
+  status?: string;
+  transparency?: string;
+  visibility?: string;
+  conferenceData?: CalendarEvent['conferenceData'];
+  created?: string | Date;
+  updated?: string | Date;
+}): CalendarEvent {
+  return {
+    id: apiEvent.id,
+    title: apiEvent.title ?? '',
+    start: new Date(apiEvent.start),
+    end: new Date(apiEvent.end),
+    color: apiEvent.color ?? '#4285f4',
+    calendar: apiEvent.calendar,
+    calendarId: apiEvent.calendarId ?? apiEvent.calendar,
+    description: apiEvent.description,
+    location: apiEvent.location,
+    htmlLink: apiEvent.htmlLink,
+    hangoutLink: apiEvent.hangoutLink,
+    isAllDay: apiEvent.isAllDay,
+    organizer: apiEvent.organizer,
+    attendees: apiEvent.attendees,
+    reminders: apiEvent.reminders,
+    recurrence: apiEvent.recurrence,
+    status: apiEvent.status,
+    transparency: apiEvent.transparency,
+    visibility: apiEvent.visibility,
+    conferenceData: apiEvent.conferenceData,
+    created: apiEvent.created ? new Date(apiEvent.created) : undefined,
+    updated: apiEvent.updated ? new Date(apiEvent.updated) : undefined,
+  };
+}
+
 interface HQCalendarProps {
   events?: CalendarEvent[];
   navigateToDate?: Date;
@@ -192,6 +242,7 @@ export function HQCalendar({
 
   const handleEventDelete = React.useCallback(
     async (event: CalendarEvent) => {
+      if (!confirm('Delete this event? This cannot be undone.')) return;
       const calendarId = event.calendarId || event.calendar;
       if (!calendarId) {
         console.error('No calendar ID for event', event.id);
@@ -253,35 +304,11 @@ export function HQCalendar({
         throw new Error(data.error || 'Failed to duplicate event');
       }
       const data = await response.json();
-      const newEvent: CalendarEvent = {
-        id: data.event.id,
-        title: data.event.title,
-        start: new Date(data.event.start),
-        end: new Date(data.event.end),
-        color: data.event.color,
-        calendar: data.event.calendar,
-        calendarId: data.event.calendarId,
-        description: data.event.description,
-        location: data.event.location,
-        htmlLink: data.event.htmlLink,
-        hangoutLink: data.event.hangoutLink,
-        isAllDay: data.event.isAllDay,
-        organizer: data.event.organizer,
-        attendees: data.event.attendees,
-        reminders: data.event.reminders,
-        recurrence: data.event.recurrence,
-        status: data.event.status,
-        transparency: data.event.transparency,
-        visibility: data.event.visibility,
-        conferenceData: data.event.conferenceData,
-        created: data.event.created,
-        updated: data.event.updated,
-      };
+      const newEvent = mapApiEventToCalendarEvent(data.event);
       allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
       setEvents((prev) =>
         [...prev, newEvent].sort((a, b) => a.start.getTime() - b.start.getTime())
       );
-      window.dispatchEvent(new CustomEvent('calendar-refresh'));
     } catch (error) {
       console.error('Error duplicating event:', error);
       alert(error instanceof Error ? error.message : 'Failed to duplicate event');
@@ -402,30 +429,7 @@ export function HQCalendar({
       const data = await response.json();
 
       // Add the new event to local state
-      const newEvent: CalendarEvent = {
-        id: data.event.id,
-        title: data.event.title,
-        start: new Date(data.event.start),
-        end: new Date(data.event.end),
-        color: data.event.color,
-        calendar: data.event.calendar,
-        calendarId: data.event.calendarId,
-        description: data.event.description,
-        location: data.event.location,
-        htmlLink: data.event.htmlLink,
-        hangoutLink: data.event.hangoutLink,
-        isAllDay: data.event.isAllDay,
-        organizer: data.event.organizer,
-        attendees: data.event.attendees,
-        reminders: data.event.reminders,
-        recurrence: data.event.recurrence,
-        status: data.event.status,
-        transparency: data.event.transparency,
-        visibility: data.event.visibility,
-        conferenceData: data.event.conferenceData,
-        created: data.event.created,
-        updated: data.event.updated,
-      };
+      const newEvent = mapApiEventToCalendarEvent(data.event);
 
       // Update cache
       allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
@@ -480,7 +484,7 @@ export function HQCalendar({
     fetchPeople();
   }, []);
 
-  const previousEventForRevertRef = React.useRef<CalendarEvent | null>(null);
+  const previousEventForRevertRef = React.useRef<Map<string, CalendarEvent>>(new Map());
 
   const handleEventUpdate = async (
     eventId: string,
@@ -489,13 +493,16 @@ export function HQCalendar({
     endTime: Date,
     isAllDay?: boolean
   ) => {
+    if (!(previousEventForRevertRef.current instanceof Map)) {
+      previousEventForRevertRef.current = new Map();
+    }
     const start = startTime instanceof Date ? startTime : new Date(startTime);
     const end = endTime instanceof Date ? endTime : new Date(endTime);
 
     // Optimistic update: use functional setState so we always read latest state
     setEvents((prevEvents) => {
       const prevEvent = prevEvents.find((e) => e.id === eventId);
-      previousEventForRevertRef.current = prevEvent ?? null;
+      if (prevEvent) previousEventForRevertRef.current.set(eventId, prevEvent);
       if (!prevEvent) return prevEvents;
       const optimistic: CalendarEvent = {
         ...prevEvent,
@@ -574,10 +581,11 @@ export function HQCalendar({
             : e
         )
       );
+      previousEventForRevertRef.current.delete(eventId);
       // Do not dispatch calendar-refresh here; it triggers a full refetch that overwrites state
     } catch (error) {
       console.error('Error updating event:', error);
-      const previousEvent = previousEventForRevertRef.current;
+      const previousEvent = previousEventForRevertRef.current.get(eventId);
       if (previousEvent) {
         setEvents((prevEvents) =>
           prevEvents.map((e) => (e.id === eventId ? previousEvent : e))
@@ -586,6 +594,7 @@ export function HQCalendar({
           e.id === eventId ? previousEvent : e
         );
       }
+      previousEventForRevertRef.current.delete(eventId);
       throw error; // Re-throw to let the component handle it
     }
   };

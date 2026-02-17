@@ -135,14 +135,31 @@ export function PersonDetailsModal({
       setEventPeopleMap({});
       return;
     }
+    const ac = new AbortController();
     fetch('/api/events/people/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventIds }),
+      signal: ac.signal,
     })
-      .then((res) => res.json())
-      .then((data) => setEventPeopleMap(data.eventPeopleMap ?? {}))
-      .catch(() => setEventPeopleMap({}));
+      .then((res) => {
+        if (!res.ok) {
+          console.error('Batch event people fetch failed:', res.status, res.statusText);
+          setEventPeopleMap({});
+          return;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data != null) setEventPeopleMap(data.eventPeopleMap ?? {});
+      })
+      .catch((err) => {
+        if (err?.name !== 'AbortError') {
+          console.error('Error fetching event people batch:', err);
+        }
+        setEventPeopleMap({});
+      });
+    return () => ac.abort();
   }, [events]);
 
   // Extract color from person's image

@@ -170,14 +170,22 @@ export function CalendarSettingsDialog({
     if (calendars.length === 0) return;
     setIsRefreshingAll(true);
     try {
-      await Promise.all(
+      const results = await Promise.allSettled(
         calendars.map((calendar) =>
-          fetch(`/api/google-calendar/events/refresh?calendarId=${calendar.id}`, { method: 'POST' })
+          fetch(
+            `/api/google-calendar/events/refresh?calendarId=${encodeURIComponent(calendar.id)}`,
+            { method: 'POST' }
+          )
         )
       );
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          console.error('Error refreshing calendar:', calendars[i]?.id, result.reason);
+        } else if (!result.value.ok) {
+          console.error('Refresh failed for calendar:', calendars[i]?.id, result.value.status);
+        }
+      });
       window.dispatchEvent(new CustomEvent('calendar-refresh'));
-    } catch (error) {
-      console.error('Error refreshing calendars:', error);
     } finally {
       setIsRefreshingAll(false);
     }
