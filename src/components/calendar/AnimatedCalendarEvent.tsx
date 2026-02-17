@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '@/components/HQCalendar';
@@ -26,6 +27,21 @@ interface AnimatedCalendarEventProps {
   onPersonClick?: (person: Person) => void;
   /** Called when user resizes the event by dragging top or bottom edge. Omit or use only in daily/weekly for timed events. */
   onResize?: (event: CalendarEvent, newStart: Date, newEnd: Date) => void;
+  /** Called when user moves the event by dragging the block. Omit or use only in daily/weekly for timed events. */
+  onMove?: (event: CalendarEvent, newStart: Date, newEnd: Date) => void;
+  /** Optional: map (clientX, clientY) to drop target (e.g. for weekly view to resolve day + time). If omitted, move uses same day + vertical delta. */
+  getDropTarget?: (clientX: number, clientY: number) => { date: Date; minutes: number } | null;
+  /** Optional: return viewport (left, top) and optional width for the ghost at a snapped grid cell. When provided, ghost snaps to grid instead of following cursor. */
+  getGhostPosition?: (
+    date: Date,
+    minutes: number
+  ) => { left: number; top: number; width?: number } | null;
+  /** Called when drag starts (so parent can hide all instances of this event in multi-column views). */
+  onMoveStart?: (eventId: string) => void;
+  /** Called when drag ends. */
+  onMoveEnd?: () => void;
+  /** When true, this instance is hidden (e.g. same event is being dragged from another column). */
+  isBeingDragged?: boolean;
 }
 
 /**
@@ -43,10 +59,43 @@ export function AnimatedCalendarEvent({
   people = [],
   onPersonClick,
   onResize,
+  onMove,
+  getDropTarget,
+  getGhostPosition,
+  onMoveStart,
+  onMoveEnd,
+  isBeingDragged = false,
 }: AnimatedCalendarEventProps) {
   const bgColor = event.color || '#4285f4';
   const MIN_DURATION_MINUTES = 15;
   const SNAP_MINUTES = 15;
+  const DRAG_THRESHOLD_PX = 6;
+
+  /** Set on mousedown; drag only starts after pointer moves past DRAG_THRESHOLD_PX */
+  const [pendingDrag, setPendingDrag] = React.useState<null | {
+    startX: number;
+    startY: number;
+    startEventStart: Date;
+    startEventEnd: Date;
+    offsetX: number;
+    offsetY: number;
+    ghostWidth: number;
+    ghostHeight: number;
+  }>(null);
+
+  const [moveState, setMoveState] = React.useState<null | {
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    startEventStart: Date;
+    startEventEnd: Date;
+    /** Offset from event top-left to mousedown point (so ghost stays under cursor) */
+    offsetX: number;
+    offsetY: number;
+    ghostWidth: number;
+    ghostHeight: number;
+  }>(null);
 
   const [resizeState, setResizeState] = React.useState<null | {
     edge: 'top' | 'bottom';
@@ -71,6 +120,140 @@ export function AnimatedCalendarEvent({
     },
     [onResize, isPreview, event.isAllDay, event.start, event.end]
   );
+
+  const handleMoveStart = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!onMove || isPreview || event.isAllDay) return;
+      // Don't start move if user clicked on a resize handle
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('[aria-label="Resize event start"]') ||
+        target.closest('[aria-label="Resize event end"]')
+      ) {
+        return;
+      }
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+      setPendingDrag({
+        startX: e.clientX,
+        startY: e.clientY,
+        startEventStart: new Date(event.start),
+        startEventEnd: new Date(event.end),
+        offsetX,
+        offsetY,
+        ghostWidth: rect.width,
+        ghostHeight: rect.height,
+      });
+    },
+    [onMove, isPreview, event.isAllDay, event.start, event.end]
+  );
+
+  React.useEffect(() => {
+    if (!pendingDrag) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - pendingDrag.startX;
+      const dy = e.clientY - pendingDrag.startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance >= DRAG_THRESHOLD_PX) {
+        setMoveState({
+          ...pendingDrag,
+          currentX: e.clientX,
+          currentY: e.clientY,
+        });
+        onMoveStart?.(event.id);
+        setPendingDrag(null);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setPendingDrag(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [pendingDrag, onMoveStart, event.id]);
+
+  React.useEffect(() => {
+    if (!moveState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setMoveState((prev) => (prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null));
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!moveState) return;
+
+      const durationMs =
+        moveState.startEventEnd.getTime() - moveState.startEventStart.getTime();
+      const durationMinutes = durationMs / (1000 * 60);
+
+      let newStart: Date;
+      let newEnd: Date;
+
+      if (getDropTarget) {
+        const target = getDropTarget(e.clientX, e.clientY);
+        if (target) {
+          newStart = new Date(target.date);
+          newStart.setHours(0, 0, 0, 0);
+          const snappedMinutes = Math.max(
+            0,
+            Math.min(24 * 60 - 1, Math.round(target.minutes / SNAP_MINUTES) * SNAP_MINUTES)
+          );
+          newStart.setMinutes(snappedMinutes);
+          newEnd = new Date(newStart.getTime() + durationMinutes * 60 * 1000);
+        } else {
+          onMoveEnd?.();
+          setMoveState(null);
+          return;
+        }
+      } else {
+        const deltaPx = e.clientY - moveState.startY;
+        const deltaMinutes = deltaPx / PIXELS_PER_MINUTE;
+        const startMinutesFromMidnight =
+          moveState.startEventStart.getHours() * 60 + moveState.startEventStart.getMinutes();
+        const endMinutesFromMidnight =
+          moveState.startEventEnd.getHours() * 60 + moveState.startEventEnd.getMinutes();
+        const newStartMinutes = Math.max(
+          0,
+          Math.min(
+            24 * 60 - 1 - durationMinutes,
+            Math.round((startMinutesFromMidnight + deltaMinutes) / SNAP_MINUTES) * SNAP_MINUTES
+          )
+        );
+        const newEndMinutes = Math.min(
+          24 * 60 - 1,
+          newStartMinutes + Math.round(durationMinutes / SNAP_MINUTES) * SNAP_MINUTES
+        );
+        newStart = new Date(moveState.startEventStart);
+        newStart.setHours(0, 0, 0, 0);
+        newStart.setMinutes(newStartMinutes);
+        newEnd = new Date(moveState.startEventStart);
+        newEnd.setHours(0, 0, 0, 0);
+        newEnd.setMinutes(newEndMinutes);
+      }
+
+      justMovedRef.current = true;
+      onMoveEnd?.();
+      onMove(event, newStart, newEnd);
+      setMoveState(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      onMoveEnd?.();
+    };
+  }, [moveState, onMove, onMoveEnd, getDropTarget, event]);
 
   React.useEffect(() => {
     if (!resizeState) return;
@@ -139,13 +322,19 @@ export function AnimatedCalendarEvent({
   }, [resizeState, onResize, event]);
 
   const canResize = Boolean(onResize && !isPreview && !event.isAllDay);
+  const canMove = Boolean(onMove && !isPreview && !event.isAllDay);
   const justResizedRef = React.useRef(false);
+  const justMovedRef = React.useRef(false);
   const textColor = getContrastTextColor(bgColor);
   const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff'; // gray-900 or white
 
   const handleClick = (e: React.MouseEvent) => {
     if (justResizedRef.current) {
       justResizedRef.current = false;
+      return;
+    }
+    if (justMovedRef.current) {
+      justMovedRef.current = false;
       return;
     }
     if (!isPreview) {
@@ -217,11 +406,106 @@ export function AnimatedCalendarEvent({
     }
   }, [style, resizeState]);
 
+  const ghostPlacement = React.useMemo(() => {
+    if (!moveState) return null;
+    const durationMinutes =
+      (moveState.startEventEnd.getTime() - moveState.startEventStart.getTime()) / (1000 * 60);
+    const ghostHeightSnapped = durationMinutes * PIXELS_PER_MINUTE;
+
+    if (getDropTarget && getGhostPosition) {
+      const target = getDropTarget(moveState.currentX, moveState.currentY);
+      if (target) {
+        const pos = getGhostPosition(target.date, target.minutes);
+        if (pos) {
+          return {
+            left: pos.left,
+            top: pos.top,
+            width: pos.width ?? moveState.ghostWidth,
+            height: ghostHeightSnapped,
+          };
+        }
+      }
+    }
+    return {
+      left: moveState.currentX - moveState.offsetX,
+      top: moveState.currentY - moveState.offsetY,
+      width: moveState.ghostWidth,
+      height: moveState.ghostHeight,
+    };
+  }, [moveState, getDropTarget, getGhostPosition]);
+
+  /** Preview start/end for the ghost label while dragging (updates with drop target). */
+  const ghostTimePreview = React.useMemo(() => {
+    if (!moveState) return null;
+    const durationMs =
+      moveState.startEventEnd.getTime() - moveState.startEventStart.getTime();
+    const durationMinutes = durationMs / (1000 * 60);
+
+    if (getDropTarget) {
+      const target = getDropTarget(moveState.currentX, moveState.currentY);
+      if (target) {
+        const snappedMinutes = Math.max(
+          0,
+          Math.min(
+            24 * 60 - 1,
+            Math.round(target.minutes / SNAP_MINUTES) * SNAP_MINUTES
+          )
+        );
+        const previewStart = new Date(target.date);
+        previewStart.setHours(0, 0, 0, 0);
+        previewStart.setMinutes(snappedMinutes);
+        const previewEnd = new Date(previewStart.getTime() + durationMinutes * 60 * 1000);
+        return { start: previewStart, end: previewEnd };
+      }
+    }
+    return { start: new Date(moveState.startEventStart), end: new Date(moveState.startEventEnd) };
+  }, [moveState, getDropTarget]);
+
+  const dragGhost =
+    typeof document !== 'undefined' &&
+    moveState &&
+    ghostPlacement &&
+    createPortal(
+      <div
+        aria-hidden
+        className="rounded px-2 text-xs overflow-hidden pointer-events-none"
+        style={{
+          position: 'fixed',
+          left: ghostPlacement.left,
+          top: ghostPlacement.top,
+          width: ghostPlacement.width,
+          height: ghostPlacement.height,
+          backgroundColor: bgColor,
+          color: textColorValue,
+          zIndex: 10000,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+          opacity: 0.98,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          paddingLeft: '0.5rem',
+          paddingRight: '0.5rem',
+        }}
+      >
+        <div className="font-medium truncate" style={{ color: textColorValue }}>
+          {event.title}
+        </div>
+        <div className="text-[10px] opacity-90 truncate" style={{ color: textColorValue }}>
+          {ghostTimePreview
+            ? `${formatEventTime(ghostTimePreview.start, timeFormat)} – ${formatEventTime(ghostTimePreview.end, timeFormat)}`
+            : formatEventTime(timeToDisplay, timeFormat)}
+        </div>
+      </div>,
+      document.body
+    );
+
   return (
-    <motion.div
+    <>
+      {dragGhost}
+      <motion.div
       initial={{ opacity: 0, scale: 0.95, y: -5 }}
       animate={{
-        opacity: isPreview ? 0.4 : 1,
+        opacity: moveState || isBeingDragged ? 0 : isPreview ? 0.4 : 1,
         scale: 1,
         y: 0,
       }}
@@ -232,6 +516,7 @@ export function AnimatedCalendarEvent({
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      onMouseDown={canMove ? handleMoveStart : undefined}
       className={cn(
         'absolute left-1 right-1 px-2 text-xs pointer-events-auto overflow-hidden',
         // Less padding for short events (<=1hr)
@@ -243,10 +528,15 @@ export function AnimatedCalendarEvent({
         // No rounded corners if touching both sides
         isPreview
           ? 'cursor-default border-2 border-dashed'
-          : 'cursor-pointer hover:opacity-90 transition-opacity'
+          : canMove
+            ? moveState
+              ? 'cursor-grabbing'
+              : 'cursor-grab hover:opacity-90 transition-opacity'
+            : 'cursor-pointer hover:opacity-90 transition-opacity'
       )}
       style={{
         ...effectiveStyle,
+        ...(moveState || isBeingDragged ? { opacity: 0, pointerEvents: 'none' } : {}),
         backgroundColor: isPreview ? `${bgColor}40` : bgColor,
         color: textColorValue,
         borderColor: isPreview ? bgColor : undefined,
@@ -319,7 +609,7 @@ export function AnimatedCalendarEvent({
           className={cn('opacity-90 truncate', showExtraInfo ? 'text-[10px]' : 'text-[9px]')}
           style={{ color: textColorValue }}
         >
-          {formatEventTime(timeToDisplay, timeFormat)}
+          {formatEventTime(eventStart, timeFormat)} – {formatEventTime(eventEnd, timeFormat)}
         </div>
         {/* Location or Description - only show if event is >= 1 hour */}
         {showExtraInfo && (event.location || event.description) && (
@@ -336,5 +626,6 @@ export function AnimatedCalendarEvent({
         )}
       </div>
     </motion.div>
+    </>
   );
 }

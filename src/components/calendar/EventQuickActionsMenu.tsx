@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { Check, Palette, Trash2 } from 'lucide-react';
+import { Check, Copy, Palette, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
@@ -29,11 +29,12 @@ interface EventQuickActionsMenuProps {
   event: { id: string; color?: string };
   calendarColor?: string; // The default calendar color
   onColorChange: (color: string | null) => void; // null means use calendar default
+  onDuplicate?: () => void;
   onDelete?: () => void;
   children: React.ReactNode;
 }
 
-export function EventQuickActionsMenu({ event, calendarColor, onColorChange, onDelete, children }: EventQuickActionsMenuProps) {
+export function EventQuickActionsMenu({ event, calendarColor, onColorChange, onDuplicate, onDelete, children }: EventQuickActionsMenuProps) {
   const [open, setOpen] = React.useState(true);
   const [showCustomPicker, setShowCustomPicker] = React.useState(false);
   const [customColor, setCustomColor] = React.useState('#000000');
@@ -227,25 +228,45 @@ export function EventQuickActionsMenu({ event, calendarColor, onColorChange, onD
             </DropdownMenuPrimitive.Item>
           </div>
 
-          {/* Delete event */}
-          {onDelete && (
+          {/* Duplicate & Delete */}
+          {(onDuplicate || onDelete) && (
             <div className="border-t mt-1">
-              <DropdownMenuPrimitive.Item
-                className={cn(
-                  'relative flex cursor-pointer items-center gap-2 rounded-sm outline-none px-2 py-1.5',
-                  'focus:bg-destructive/10 focus:text-destructive',
-                  'hover:bg-destructive/10 hover:text-destructive',
-                  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
-                )}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onDelete();
-                  setOpen(false);
-                }}
-              >
-                <Trash2 className="h-4 w-4 flex-shrink-0" />
-                <span className="text-xs flex-1">Delete event</span>
-              </DropdownMenuPrimitive.Item>
+              {onDuplicate && (
+                <DropdownMenuPrimitive.Item
+                  className={cn(
+                    'relative flex cursor-pointer items-center gap-2 rounded-sm outline-none px-2 py-1.5',
+                    'focus:bg-accent focus:text-accent-foreground',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
+                  )}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onDuplicate();
+                    setOpen(false);
+                  }}
+                >
+                  <Copy className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs flex-1">Duplicate event</span>
+                </DropdownMenuPrimitive.Item>
+              )}
+              {onDelete && (
+                <DropdownMenuPrimitive.Item
+                  className={cn(
+                    'relative flex cursor-pointer items-center gap-2 rounded-sm outline-none px-2 py-1.5',
+                    'focus:bg-destructive/10 focus:text-destructive',
+                    'hover:bg-destructive/10 hover:text-destructive',
+                    'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
+                  )}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onDelete();
+                    setOpen(false);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs flex-1">Delete event</span>
+                </DropdownMenuPrimitive.Item>
+              )}
             </div>
           )}
         </DropdownMenuPrimitive.Content>

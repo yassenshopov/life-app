@@ -227,6 +227,67 @@ export function HQCalendar({
     [selectedEvent?.id]
   );
 
+  const handleEventDuplicate = React.useCallback(async (event: CalendarEvent) => {
+    const calendarId = event.calendarId || event.calendar;
+    if (!calendarId) {
+      console.error('No calendar ID for event', event.id);
+      return;
+    }
+    setContextMenuEvent(null);
+    try {
+      const response = await fetch('/api/google-calendar/events/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: event.title,
+          startTime: new Date(event.start).toISOString(),
+          endTime: new Date(event.end).toISOString(),
+          isAllDay: event.isAllDay ?? false,
+          description: event.description,
+          location: event.location,
+          calendarId,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to duplicate event');
+      }
+      const data = await response.json();
+      const newEvent: CalendarEvent = {
+        id: data.event.id,
+        title: data.event.title,
+        start: new Date(data.event.start),
+        end: new Date(data.event.end),
+        color: data.event.color,
+        calendar: data.event.calendar,
+        calendarId: data.event.calendarId,
+        description: data.event.description,
+        location: data.event.location,
+        htmlLink: data.event.htmlLink,
+        hangoutLink: data.event.hangoutLink,
+        isAllDay: data.event.isAllDay,
+        organizer: data.event.organizer,
+        attendees: data.event.attendees,
+        reminders: data.event.reminders,
+        recurrence: data.event.recurrence,
+        status: data.event.status,
+        transparency: data.event.transparency,
+        visibility: data.event.visibility,
+        conferenceData: data.event.conferenceData,
+        created: data.event.created,
+        updated: data.event.updated,
+      };
+      allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
+      setEvents((prev) =>
+        [...prev, newEvent].sort((a, b) => a.start.getTime() - b.start.getTime())
+      );
+      window.dispatchEvent(new CustomEvent('calendar-refresh'));
+    } catch (error) {
+      console.error('Error duplicating event:', error);
+      alert(error instanceof Error ? error.message : 'Failed to duplicate event');
+    }
+  }, []);
+
   const handleColorChange = async (color: string | null) => {
     if (!contextMenuEvent) return;
 
@@ -1447,6 +1508,7 @@ export function HQCalendar({
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
               onEventRightClick={handleEventRightClick}
+              onEventUpdate={handleEventUpdate}
               people={people}
               onPersonClick={handlePersonClick}
             />
@@ -1497,6 +1559,7 @@ export function HQCalendar({
         timeFormat={timeFormat}
         onEventUpdate={handleEventUpdate}
         onEventDelete={handleEventDelete}
+        onEventDuplicate={handleEventDuplicate}
         people={people}
         onPersonClick={handlePersonClick}
         colorPalette={colorPalette}
@@ -1588,6 +1651,7 @@ export function HQCalendar({
               event={contextMenuEvent.event}
               calendarColor={contextMenuEvent.calendarColor}
               onColorChange={handleColorChange}
+              onDuplicate={() => handleEventDuplicate(contextMenuEvent.event)}
               onDelete={() => handleEventDelete(contextMenuEvent.event)}
             >
               <div style={{ width: 0, height: 0 }} />

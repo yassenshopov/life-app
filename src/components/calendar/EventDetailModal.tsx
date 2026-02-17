@@ -20,6 +20,7 @@ import {
   X,
   Plus,
   Trash2,
+  Copy,
   Cake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,6 +60,7 @@ interface EventDetailModalProps {
   onPersonClick?: (person: Person) => void;
   onPeopleChange?: (eventId: string, people: Person[]) => void;
   onEventDelete?: (event: CalendarEvent) => void | Promise<void>;
+  onEventDuplicate?: (event: CalendarEvent) => void | Promise<void>;
   colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
@@ -75,6 +77,7 @@ export function EventDetailModal({
   onPersonClick,
   onPeopleChange,
   onEventDelete,
+  onEventDuplicate,
   colorPalette,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
@@ -802,20 +805,37 @@ export function EventDetailModal({
         )}
         style={dialogStyle}
       >
-        {/* Delete (trash) icon - to the left of the close X */}
-        {onEventDelete && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-12 top-4 rounded-sm opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive z-10"
-            onClick={async () => {
-              if (!confirm('Delete this event? This cannot be undone.')) return;
-              await onEventDelete(displayEvent);
-            }}
-            title="Delete event"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        {/* Duplicate & Delete - to the left of the close X */}
+        {(onEventDuplicate || onEventDelete) && (
+          <div className="absolute right-12 top-4 flex items-center gap-1 z-10">
+            {onEventDuplicate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-accent z-10"
+                onClick={async () => {
+                  await onEventDuplicate(displayEvent);
+                }}
+                title="Duplicate event"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            )}
+            {onEventDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive z-10"
+                onClick={async () => {
+                  if (!confirm('Delete this event? This cannot be undone.')) return;
+                  await onEventDelete(displayEvent);
+                }}
+                title="Delete event"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         )}
         {/* Notion-style header with color accent */}
         <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />

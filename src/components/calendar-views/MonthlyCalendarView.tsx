@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
 import { getAllDayEventsForDay, getTimedEventsForDay } from '@/lib/calendar-utils';
@@ -15,6 +15,13 @@ interface MonthlyCalendarViewProps {
   onNavigate: (date: Date, switchToWeekly?: boolean) => void;
   onEventClick?: (event: CalendarEvent) => void;
   onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
+  onEventUpdate?: (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date,
+    isAllDay?: boolean
+  ) => Promise<void>;
   people?: Person[];
   onPersonClick?: (person: Person) => void;
 }
@@ -25,9 +32,74 @@ export function MonthlyCalendarView({
   onNavigate,
   onEventClick,
   onEventRightClick,
+  onEventUpdate,
   people = [],
   onPersonClick,
 }: MonthlyCalendarViewProps) {
+  const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+
+  const handleEventDragStart = useCallback(
+    (event: CalendarEvent, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!onEventUpdate) return;
+      setDraggingEvent(event);
+      dragStartPos.current = { x: e.clientX, y: e.clientY };
+    },
+    [onEventUpdate]
+  );
+
+  const handleEventDragEnd = useCallback(
+    (e: MouseEvent) => {
+      if (!draggingEvent || !onEventUpdate) return;
+
+      const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+      const dayCell = dropTarget?.closest('[data-day-iso]');
+      const dayIso = dayCell?.getAttribute('data-day-iso');
+      if (dayIso) {
+        const dropDate = new Date(dayIso);
+        dropDate.setHours(0, 0, 0, 0);
+
+        const durationMs =
+          draggingEvent.end.getTime() - draggingEvent.start.getTime();
+        let newStart: Date;
+        let newEnd: Date;
+        if (draggingEvent.isAllDay) {
+          newStart = new Date(dropDate);
+          newStart.setHours(0, 0, 0, 0);
+          newEnd = new Date(dropDate);
+          newEnd.setHours(23, 59, 59, 999);
+        } else {
+          newStart = new Date(dropDate);
+          newStart.setHours(
+            draggingEvent.start.getHours(),
+            draggingEvent.start.getMinutes(),
+            0,
+            0
+          );
+          newEnd = new Date(newStart.getTime() + durationMs);
+        }
+        onEventUpdate(
+          draggingEvent.id,
+          draggingEvent.calendarId || draggingEvent.calendar || '',
+          newStart,
+          newEnd,
+          draggingEvent.isAllDay
+        );
+      }
+      setDraggingEvent(null);
+    },
+    [draggingEvent, onEventUpdate]
+  );
+
+  useEffect(() => {
+    if (!draggingEvent) return;
+    const onMouseUp = (e: MouseEvent) => handleEventDragEnd(e);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => window.removeEventListener('mouseup', onMouseUp);
+  }, [draggingEvent, handleEventDragEnd]);
+
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -129,6 +201,7 @@ export function MonthlyCalendarView({
                         day && 'hover:bg-accent/20',
                         !day && 'hover:bg-muted/20'
                       )}
+                      data-day-iso={day?.toISOString()}
                     >
                       {/* Date number and all-day events on same row */}
                       <div className="flex items-start gap-1 mb-1 min-h-[1.5rem] w-full">
@@ -161,7 +234,12 @@ export function MonthlyCalendarView({
                             return (
                               <div
                                 key={event.id}
-                                className="text-xs px-1.5 py-0.5 rounded cursor-pointer hover:opacity-90 flex items-center gap-1 min-w-0 max-w-full overflow-hidden"
+                                className={cn(
+                                  'text-xs px-1.5 py-0.5 rounded flex items-center gap-1 min-w-0 max-w-full overflow-hidden',
+                                  onEventUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                                  'hover:opacity-90',
+                                  draggingEvent?.id === event.id && 'opacity-70 ring-2 ring-offset-1 ring-foreground/20'
+                                )}
                                 style={{
                                   backgroundColor: eventColor,
                                   color: textColorValue,
@@ -171,6 +249,11 @@ export function MonthlyCalendarView({
                                   e.stopPropagation();
                                   onEventClick?.(event);
                                 }}
+                                onMouseDown={
+                                  onEventUpdate
+                                    ? (e) => handleEventDragStart(event, e)
+                                    : undefined
+                                }
                                 onContextMenu={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -222,7 +305,12 @@ export function MonthlyCalendarView({
                           return (
                             <div
                               key={event.id}
-                              className="text-xs px-2 py-0.5 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1"
+                              className={cn(
+                                'text-xs px-2 py-0.5 rounded truncate flex items-center gap-1',
+                                onEventUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                                'hover:opacity-90',
+                                draggingEvent?.id === event.id && 'opacity-70 ring-2 ring-offset-1 ring-foreground/20'
+                              )}
                               style={{
                                 backgroundColor: eventColor,
                                 color: textColorValue,
@@ -235,6 +323,11 @@ export function MonthlyCalendarView({
                                 e.stopPropagation();
                                 onEventClick?.(event);
                               }}
+                              onMouseDown={
+                                onEventUpdate
+                                  ? (e) => handleEventDragStart(event, e)
+                                  : undefined
+                              }
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();

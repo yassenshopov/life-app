@@ -73,6 +73,8 @@ export function WeeklyCalendarView({
   colorPalette,
 }: WeeklyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const [draggedEventId, setDraggedEventId] = React.useState<string | null>(null);
 
   // Smooth scrolling implementation
   React.useEffect(() => {
@@ -189,6 +191,51 @@ export function WeeklyCalendarView({
   // Get the week days (Monday to Sunday)
   const weekDays = React.useMemo(() => getWeekDays(currentWeek), [currentWeek]);
 
+  const getDropTarget = React.useCallback(
+    (clientX: number, clientY: number): { date: Date; minutes: number } | null => {
+      const grid = gridRef.current;
+      const scrollContainer = scrollContainerRef.current;
+      if (!grid || !scrollContainer) return null;
+      const rect = grid.getBoundingClientRect();
+      const scrollTop = scrollContainer.scrollTop;
+      const yInContent = clientY - rect.top + scrollTop;
+      const minutes = Math.max(
+        0,
+        Math.min(24 * 60 - 1, Math.round(yInContent / PIXELS_PER_MINUTE / 15) * 15)
+      );
+      const x = clientX - rect.left;
+      const timeColWidth = 60;
+      const dayColWidth = (rect.width - timeColWidth) / 7;
+      const dayIndex = Math.floor((x - timeColWidth) / dayColWidth);
+      if (dayIndex < 0 || dayIndex > 6) return null;
+      const day = weekDays[dayIndex];
+      return { date: new Date(day), minutes };
+    },
+    [weekDays]
+  );
+
+  const getGhostPosition = React.useCallback(
+    (
+      date: Date,
+      minutes: number
+    ): { left: number; top: number; width?: number } | null => {
+      const grid = gridRef.current;
+      const scrollContainer = scrollContainerRef.current;
+      if (!grid || !scrollContainer) return null;
+      const dayIndex = weekDays.findIndex((d) => isSameDay(d, date));
+      if (dayIndex < 0) return null;
+      const rect = grid.getBoundingClientRect();
+      const scrollTop = scrollContainer.scrollTop;
+      const timeColWidth = 60;
+      const dayColWidth = (rect.width - timeColWidth) / 7;
+      const left = rect.left + timeColWidth + dayIndex * dayColWidth + 4;
+      const width = dayColWidth - 8;
+      const top = rect.top + minutes * PIXELS_PER_MINUTE - scrollTop;
+      return { left, top, width };
+    },
+    [weekDays]
+  );
+
   // Time slots from midnight (00:00) to 11 PM
   const timeSlots = React.useMemo(() => generateTimeSlots(), []);
 
@@ -287,7 +334,11 @@ export function WeeklyCalendarView({
       >
         <div className="overflow-x-auto hide-scrollbar">
           <div className="min-w-[800px]">
-            <div className="grid relative" style={{ gridTemplateColumns: '60px repeat(7, 1fr)' }}>
+            <div
+              ref={gridRef}
+              className="grid relative"
+              style={{ gridTemplateColumns: '60px repeat(7, 1fr)' }}
+            >
               {/* Time column */}
               <div
                 className="text-primary transition-all duration-1000"
@@ -453,6 +504,22 @@ export function WeeklyCalendarView({
                                       )
                                   : undefined
                               }
+                              onMove={
+                                onEventUpdate
+                                  ? (evt, newStart, newEnd) =>
+                                      onEventUpdate(
+                                        evt.id,
+                                        evt.calendarId || evt.calendar || '',
+                                        newStart,
+                                        newEnd
+                                      )
+                                  : undefined
+                              }
+                              getDropTarget={getDropTarget}
+                              getGhostPosition={getGhostPosition}
+                              onMoveStart={setDraggedEventId}
+                              onMoveEnd={() => setDraggedEventId(null)}
+                              isBeingDragged={draggedEventId === event.id}
                             />
                           );
                         })}

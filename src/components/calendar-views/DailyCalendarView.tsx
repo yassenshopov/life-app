@@ -70,6 +70,8 @@ export function DailyCalendarView({
   colorPalette,
 }: DailyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const [draggedEventId, setDraggedEventId] = React.useState<string | null>(null);
 
   // Smooth scrolling implementation
   React.useEffect(() => {
@@ -210,6 +212,47 @@ export function DailyCalendarView({
     day: 'numeric',
   });
 
+  const SNAP_MINUTES = 15;
+  const getDropTarget = React.useCallback(
+    (clientX: number, clientY: number): { date: Date; minutes: number } | null => {
+      const scroll = scrollContainerRef.current;
+      const grid = gridRef.current;
+      if (!scroll || !grid || grid.children.length < 2) return null;
+      const scrollRect = scroll.getBoundingClientRect();
+      const dayCol = grid.children[1] as HTMLElement;
+      if (!dayCol) return null;
+      const dayRect = dayCol.getBoundingClientRect();
+      if (clientX < dayRect.left || clientX > dayRect.right) return null;
+      const yInContent = clientY - scrollRect.top + scroll.scrollTop;
+      const minutes = Math.max(
+        0,
+        Math.min(24 * 60 - 1, Math.round(yInContent / PIXELS_PER_MINUTE / SNAP_MINUTES) * SNAP_MINUTES)
+      );
+      return { date: new Date(currentDate), minutes };
+    },
+    [currentDate]
+  );
+
+  const getGhostPosition = React.useCallback(
+    (
+      _date: Date,
+      minutes: number
+    ): { left: number; top: number; width?: number } | null => {
+      const scroll = scrollContainerRef.current;
+      const grid = gridRef.current;
+      if (!scroll || !grid || grid.children.length < 2) return null;
+      const dayCol = grid.children[1] as HTMLElement;
+      if (!dayCol) return null;
+      const dayRect = dayCol.getBoundingClientRect();
+      const scrollRect = scroll.getBoundingClientRect();
+      const top = scrollRect.top + minutes * PIXELS_PER_MINUTE - scroll.scrollTop;
+      const left = dayRect.left + 4;
+      const width = dayRect.width - 8;
+      return { left, top, width };
+    },
+    []
+  );
+
   return (
     <div className="flex flex-col h-full">
       <div className="overflow-x-auto">
@@ -289,7 +332,11 @@ export function DailyCalendarView({
       >
         <div className="overflow-x-auto hide-scrollbar">
           <div className="min-w-[400px]">
-            <div className="grid relative" style={{ gridTemplateColumns: '60px 1fr' }}>
+            <div
+              ref={gridRef}
+              className="grid relative"
+              style={{ gridTemplateColumns: '60px 1fr' }}
+            >
               {/* Time column */}
               <div
                 className="text-primary transition-all duration-1000"
@@ -441,6 +488,22 @@ export function DailyCalendarView({
                                   )
                               : undefined
                           }
+                          onMove={
+                            onEventUpdate
+                              ? (evt, newStart, newEnd) =>
+                                  onEventUpdate(
+                                    evt.id,
+                                    evt.calendarId || evt.calendar || '',
+                                    newStart,
+                                    newEnd
+                                  )
+                              : undefined
+                          }
+                          getDropTarget={getDropTarget}
+                          getGhostPosition={getGhostPosition}
+                          onMoveStart={setDraggedEventId}
+                          onMoveEnd={() => setDraggedEventId(null)}
+                          isBeingDragged={draggedEventId === event.id}
                         />
                       );
                     })}
