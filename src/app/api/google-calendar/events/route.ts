@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseServiceRoleClient } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/ensure-user';
+import { getColorFromColorId } from '@/lib/google-calendar-colors';
 
 // Dynamic import for googleapis
 let google: any;
@@ -18,33 +19,6 @@ interface GoogleCalendarCredentials {
   access_token: string;
   refresh_token: string;
   expiry_date?: number;
-}
-
-/**
- * Map Google Calendar colorId to hex color
- * Google Calendar uses predefined color IDs (1-11) that map to specific colors
- */
-function getColorFromColorId(colorId: string | undefined | null, calendarColor: string): string {
-  if (!colorId) {
-    return calendarColor; // Fall back to calendar color if no event-specific color
-  }
-
-  // Google Calendar color ID to hex mapping
-  const colorMap: Record<string, string> = {
-    '1': '#a4bdfc', // Lavender
-    '2': '#7ae7bf', // Sage
-    '3': '#dbadff', // Grape
-    '4': '#ff887c', // Flamingo
-    '5': '#fbd75b', // Banana
-    '6': '#ffb878', // Tangerine
-    '7': '#46d6db', // Peacock
-    '8': '#e1e1e1', // Graphite
-    '9': '#5484ed', // Blueberry
-    '10': '#51b749', // Basil
-    '11': '#dc2127', // Tomato
-  };
-
-  return colorMap[colorId] || calendarColor; // Fall back to calendar color if colorId not recognized
 }
 
 export async function GET(req: Request) {
@@ -169,6 +143,20 @@ export async function GET(req: Request) {
           filteredEvents = cachedEvents;
         }
 
+        // Get calendar summaries so event.calendar shows name (e.g. "Correspondence") not just id
+        const uniqueCalendarIds = [...new Set((filteredEvents as any[]).map((e: any) => e.calendar_id))];
+        let calendarSummaryById: Record<string, string> = {};
+        if (uniqueCalendarIds.length > 0) {
+          const { data: calendarRows } = await supabase
+            .from('google_calendars')
+            .select('calendar_id, summary')
+            .eq('user_id', userId)
+            .in('calendar_id', uniqueCalendarIds);
+          for (const row of calendarRows || []) {
+            calendarSummaryById[row.calendar_id] = row.summary ?? '';
+          }
+        }
+
         // Return cached events
         const formattedEvents = filteredEvents.map((event: any) => {
           // Use is_all_day column if available, otherwise check event_data
@@ -236,7 +224,7 @@ export async function GET(req: Request) {
             start,
             end,
             color: event.color || '#4285f4', // This already has the event-specific color if it was set
-            calendar: event.organizer_display_name || event.calendar_id,
+            calendar: calendarSummaryById[event.calendar_id] || event.organizer_display_name || event.calendar_id,
             calendarId: event.calendar_id, // Include the actual calendar ID
             // Use column value if available, otherwise fallback to event_data
             // Check both null and undefined, and handle empty strings
@@ -487,7 +475,7 @@ export async function GET(req: Request) {
             start,
             end,
             color: eventColor,
-            calendar: event.organizer?.displayName || calendarId,
+            calendar: calInfo?.summary || event.organizer?.displayName || calendarId,
             calendarId: calendarId, // Include the actual calendar ID
             description: event.description,
             location: event.location,

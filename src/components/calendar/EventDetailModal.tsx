@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEvent } from '@/components/HQCalendar';
-import { formatEventTime, isAllDayEvent, formatRecurrenceSummary } from '@/lib/calendar-utils';
+import { formatEventTime, isAllDayEvent, formatRecurrenceSummary, isCorrespondenceCalendar } from '@/lib/calendar-utils';
 import { TimeFormat } from '@/components/CalendarSettingsDialog';
 import {
   MapPin,
@@ -19,6 +19,9 @@ import {
   Save,
   X,
   Plus,
+  Trash2,
+  Copy,
+  Cake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -56,6 +59,8 @@ interface EventDetailModalProps {
   people?: Person[];
   onPersonClick?: (person: Person) => void;
   onPeopleChange?: (eventId: string, people: Person[]) => void;
+  onEventDelete?: (event: CalendarEvent) => void | Promise<void>;
+  onEventDuplicate?: (event: CalendarEvent) => void | Promise<void>;
   colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
@@ -71,6 +76,8 @@ export function EventDetailModal({
   people = [],
   onPersonClick,
   onPeopleChange,
+  onEventDelete,
+  onEventDuplicate,
   colorPalette,
 }: EventDetailModalProps) {
   // All hooks must be called before any early returns
@@ -798,12 +805,47 @@ export function EventDetailModal({
         )}
         style={dialogStyle}
       >
+        {/* Duplicate & Delete - to the left of the close X */}
+        {(onEventDuplicate || onEventDelete) && (
+          <div className="absolute right-12 top-4 flex items-center gap-1 z-10">
+            {onEventDuplicate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-accent z-10"
+                onClick={async () => {
+                  await onEventDuplicate(displayEvent);
+                }}
+                title="Duplicate event"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            )}
+            {onEventDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-sm opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive z-10"
+                onClick={async () => {
+                  await onEventDelete(displayEvent);
+                }}
+                title="Delete event"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
         {/* Notion-style header with color accent */}
         <div className="h-1 w-full transition-colors" style={{ backgroundColor: displayEvent.color || '#4285f4' }} />
 
         <div className="px-6 py-8 pb-16 relative min-w-0 overflow-x-hidden">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-3xl font-semibold mb-2 flex items-center gap-2">
+              {/* Correspondence calendar: birthday cake icon leftmost */}
+              {isCorrespondenceCalendar(displayEvent.calendar, displayEvent.calendarId) ? (
+                <Cake className="h-7 w-7 flex-shrink-0 text-muted-foreground" aria-hidden />
+              ) : null}
               {/* Person avatars - to the left of the title, overlapping */}
               {matchedPeople.length > 0 && (
                 <div className="flex items-center flex-shrink-0">

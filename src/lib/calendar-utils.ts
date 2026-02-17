@@ -48,6 +48,15 @@ export function eventOverlapsDay(event: CalendarEvent, day: Date): boolean {
 }
 
 /**
+ * Check if a calendar is the correspondence calendar (by name or id).
+ */
+export function isCorrespondenceCalendar(calendar?: string, calendarId?: string): boolean {
+  const cal = (calendar ?? '').toLowerCase();
+  const id = (calendarId ?? '').toLowerCase();
+  return cal.includes('correspondence') || id.includes('correspondence');
+}
+
+/**
  * Get events for a specific day (including multi-day events)
  */
 export function getEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {

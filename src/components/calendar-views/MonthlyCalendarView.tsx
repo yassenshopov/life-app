@@ -1,12 +1,116 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
-import { getEventsForDay } from '@/lib/calendar-utils';
+import { getAllDayEventsForDay, getTimedEventsForDay, isCorrespondenceCalendar } from '@/lib/calendar-utils';
 import { getContrastTextColor } from '@/lib/color-utils';
 import { Person, getMatchedPeopleFromEvent } from '@/lib/people-matching';
 import { PersonAvatar } from '@/components/calendar/PersonAvatar';
+import { Cake } from 'lucide-react';
+
+interface MonthlyEventChipProps {
+  event: CalendarEvent;
+  people: Person[];
+  draggingEvent: CalendarEvent | null;
+  onEventClick?: (event: CalendarEvent) => void;
+  onEventUpdate?: (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date,
+    isAllDay?: boolean
+  ) => Promise<void>;
+  handleEventDragStart: (event: CalendarEvent, e: React.MouseEvent) => void;
+  onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
+  onPersonClick?: (person: Person) => void;
+  isAllDay?: boolean;
+}
+
+function MonthlyEventChip({
+  event,
+  people,
+  draggingEvent,
+  onEventClick,
+  onEventUpdate,
+  handleEventDragStart,
+  onEventRightClick,
+  onPersonClick,
+  isAllDay = false,
+}: MonthlyEventChipProps) {
+  const eventColor = event.color || '#4285f4';
+  const textColor = getContrastTextColor(eventColor);
+  const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
+  const matchedPeople =
+    event.linkedPeople && event.linkedPeople.length > 0
+      ? (event.linkedPeople as Person[])
+      : people.length > 0
+        ? getMatchedPeopleFromEvent(event.title, people)
+        : [];
+
+  const title = isAllDay
+    ? event.title
+    : `${event.title} - ${event.start.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      })}`;
+
+  return (
+    <div
+      className={cn(
+        'text-xs rounded flex items-center gap-1',
+        isAllDay ? 'px-1.5 py-0.5 min-w-0 max-w-full overflow-hidden' : 'px-2 py-0.5 truncate',
+        onEventUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+        'hover:opacity-90',
+        draggingEvent?.id === event.id && 'opacity-70 ring-2 ring-offset-1 ring-foreground/20'
+      )}
+      style={{
+        backgroundColor: eventColor,
+        color: textColorValue,
+      }}
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEventClick?.(event);
+      }}
+      onMouseDown={
+        onEventUpdate ? (e) => handleEventDragStart(event, e) : undefined
+      }
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onEventRightClick?.(event, e);
+      }}
+    >
+      {isCorrespondenceCalendar(event.calendar, event.calendarId) && (
+        <Cake className="h-3 w-3 flex-shrink-0" aria-hidden />
+      )}
+      {matchedPeople.length > 0 && (
+        <div className="flex items-center flex-shrink-0">
+          {matchedPeople.map((person: Person, index: number) => (
+            <div
+              key={person.id}
+              style={{
+                marginLeft: index > 0 ? '-8px' : '0',
+                zIndex: matchedPeople.length - index,
+              }}
+              className="relative"
+            >
+              <PersonAvatar
+                person={person}
+                size="sm"
+                onClick={() => onPersonClick?.(person)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <span className={cn('truncate', isAllDay ? 'min-w-0' : 'flex-1')}>
+        {event.title}
+      </span>
+    </div>
+  );
+}
 
 interface MonthlyCalendarViewProps {
   currentMonth: Date;
@@ -14,6 +118,13 @@ interface MonthlyCalendarViewProps {
   onNavigate: (date: Date, switchToWeekly?: boolean) => void;
   onEventClick?: (event: CalendarEvent) => void;
   onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
+  onEventUpdate?: (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date,
+    isAllDay?: boolean
+  ) => Promise<void>;
   people?: Person[];
   onPersonClick?: (person: Person) => void;
 }
@@ -24,9 +135,93 @@ export function MonthlyCalendarView({
   onNavigate,
   onEventClick,
   onEventRightClick,
+  onEventUpdate,
   people = [],
   onPersonClick,
 }: MonthlyCalendarViewProps) {
+  const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+
+  const handleEventDragStart = useCallback(
+    (event: CalendarEvent, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!onEventUpdate) return;
+      setDraggingEvent(event);
+      dragStartPos.current = { x: e.clientX, y: e.clientY };
+    },
+    [onEventUpdate]
+  );
+
+  const DRAG_DISTANCE_THRESHOLD_PX = 8;
+
+  const handleEventDragEnd = useCallback(
+    (e: MouseEvent) => {
+      if (!draggingEvent || !onEventUpdate) {
+        setDraggingEvent(null);
+        return;
+      }
+
+      const dx = e.clientX - dragStartPos.current.x;
+      const dy = e.clientY - dragStartPos.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < DRAG_DISTANCE_THRESHOLD_PX) {
+        setDraggingEvent(null);
+        return;
+      }
+
+      const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+      const dayCell = dropTarget?.closest('[data-day]');
+      const dayStr = dayCell?.getAttribute('data-day');
+      if (dayStr) {
+        const [y, m, d] = dayStr.split('-').map(Number);
+        const dropDate = new Date(y, m - 1, d);
+
+        const durationMs =
+          draggingEvent.end.getTime() - draggingEvent.start.getTime();
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        let newStart: Date;
+        let newEnd: Date;
+        if (draggingEvent.isAllDay) {
+          const days = Math.round(durationMs / DAY_MS) || 1;
+          newStart = new Date(dropDate);
+          newStart.setHours(0, 0, 0, 0);
+          newEnd = new Date(newStart);
+          newEnd.setDate(newEnd.getDate() + (days - 1));
+          newEnd.setHours(23, 59, 59, 999);
+        } else {
+          newStart = new Date(dropDate);
+          newStart.setHours(
+            draggingEvent.start.getHours(),
+            draggingEvent.start.getMinutes(),
+            0,
+            0
+          );
+          newEnd = new Date(newStart.getTime() + durationMs);
+        }
+        const calendarId = draggingEvent.calendarId;
+        if (calendarId) {
+          onEventUpdate(
+            draggingEvent.id,
+            calendarId,
+            newStart,
+            newEnd,
+            draggingEvent.isAllDay
+          );
+        }
+      }
+      setDraggingEvent(null);
+    },
+    [draggingEvent, onEventUpdate]
+  );
+
+  useEffect(() => {
+    if (!draggingEvent) return;
+    const onMouseUp = (e: MouseEvent) => handleEventDragEnd(e);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => window.removeEventListener('mouseup', onMouseUp);
+  }, [draggingEvent, handleEventDragEnd]);
+
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -61,7 +256,6 @@ export function MonthlyCalendarView({
   }, [days]);
 
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
 
   const isToday = (date: Date | null) => {
     if (!date) return false;
@@ -106,95 +300,74 @@ export function MonthlyCalendarView({
       <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="min-w-[800px]">
-            <div className="grid relative" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+            <div
+              className="grid relative"
+              style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
+            >
               {weeks.map((week, weekIndex) =>
                 week.map((day, dayIndex) => {
-                  const dayEvents = day ? getEventsForDay(events, day) : [];
+                  const allDayEvents = day ? getAllDayEventsForDay(events, day) : [];
+                  const timedEvents = day ? getTimedEventsForDay(events, day) : [];
                   return (
                     <div
                       key={`${weekIndex}-${dayIndex}`}
                       className={cn(
-                        'border-r border-b min-h-[100px] p-2 relative min-w-0',
-                        isToday(day) && 'bg-blue-50 dark:bg-blue-950/20'
+                        'border-r border-b min-h-[100px] p-2 relative min-w-0 transition-colors duration-200',
+                        isToday(day) && 'bg-blue-50 dark:bg-blue-950/20',
+                        day && 'hover:bg-accent/20',
+                        !day && 'hover:bg-muted/20'
                       )}
+                      data-day={day ? `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}` : undefined}
                     >
-                      <div
-                        className={cn(
-                          'text-sm font-semibold mb-1 cursor-pointer hover:underline',
-                          isToday(day) && 'text-blue-600 dark:text-blue-400',
-                          !isCurrentMonth(day) && 'text-muted-foreground opacity-50'
-                        )}
-                        onClick={(e) => {
-                          if (day) {
-                            e.stopPropagation();
-                            // Pass a second parameter to indicate we want to switch to weekly view
-                            onNavigate(day, true);
-                          }
-                        }}
-                      >
-                        {day ? day.getDate() : ''}
-                      </div>
-                      <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map((event) => {
-                          const eventColor = event.color || '#4285f4';
-                          const textColor = getContrastTextColor(eventColor);
-                          const textColorValue = textColor === 'dark' ? '#1f2937' : '#ffffff';
-                          // Use linked people from database, fallback to title matching
-                          const matchedPeople = event.linkedPeople && event.linkedPeople.length > 0
-                            ? event.linkedPeople
-                            : (people.length > 0 ? getMatchedPeopleFromEvent(event.title, people) : []);
-                          
-                          return (
-                            <div
+                      {/* Date number and all-day events on same row */}
+                      <div className="flex items-start gap-1 mb-1 min-h-[1.5rem] w-full">
+                        <div
+                          className={cn(
+                            'text-sm font-semibold cursor-pointer hover:underline flex-shrink-0',
+                            isToday(day) && 'text-blue-600 dark:text-blue-400',
+                            !isCurrentMonth(day) && 'text-muted-foreground opacity-50'
+                          )}
+                          onClick={(e) => {
+                            if (day) {
+                              e.stopPropagation();
+                              onNavigate(day, true);
+                            }
+                          }}
+                        >
+                          {day ? day.getDate() : ''}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-0.5 flex-1 min-w-0">
+                          {allDayEvents.map((event) => (
+                            <MonthlyEventChip
                               key={event.id}
-                              className="text-xs px-2 py-0.5 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1"
-                              style={{ 
-                                backgroundColor: eventColor,
-                                color: textColorValue,
-                              }}
-                              title={`${event.title} - ${event.start.toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEventClick?.(event);
-                              }}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onEventRightClick?.(event, e);
-                              }}
-                            >
-                              {matchedPeople.length > 0 && (
-                                <div className="flex items-center flex-shrink-0">
-                                  {matchedPeople.map((person: Person, index: number) => (
-                                    <div
-                                      key={person.id}
-                                      style={{
-                                        marginLeft: index > 0 ? '-8px' : '0',
-                                        zIndex: matchedPeople.length - index,
-                                      }}
-                                      className="relative"
-                                    >
-                                      <PersonAvatar
-                                        person={person}
-                                        size="sm"
-                                        onClick={() => onPersonClick?.(person)}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <span className="truncate flex-1">{event.title}</span>
-                            </div>
-                          );
-                        })}
-                        {dayEvents.length > 3 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{dayEvents.length - 3} more
-                          </div>
-                        )}
+                              event={event}
+                              people={people}
+                              draggingEvent={draggingEvent}
+                              onEventClick={onEventClick}
+                              onEventUpdate={onEventUpdate}
+                              handleEventDragStart={handleEventDragStart}
+                              onEventRightClick={onEventRightClick}
+                              onPersonClick={onPersonClick}
+                              isAllDay
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {/* Timed events - all shown, no truncation */}
+                      <div className="space-y-1">
+                        {timedEvents.map((event) => (
+                          <MonthlyEventChip
+                            key={event.id}
+                            event={event}
+                            people={people}
+                            draggingEvent={draggingEvent}
+                            onEventClick={onEventClick}
+                            onEventUpdate={onEventUpdate}
+                            handleEventDragStart={handleEventDragStart}
+                            onEventRightClick={onEventRightClick}
+                            onPersonClick={onPersonClick}
+                          />
+                        ))}
                       </div>
                     </div>
                   );
@@ -207,4 +380,3 @@ export function MonthlyCalendarView({
     </div>
   );
 }
-

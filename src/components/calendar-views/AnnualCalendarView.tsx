@@ -3,6 +3,14 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '../HQCalendar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { format } from 'date-fns';
+import { isAllDayEvent } from '@/lib/calendar-utils';
 
 interface AnnualCalendarViewProps {
   currentYear: Date;
@@ -53,18 +61,6 @@ export function AnnualCalendarView({
     return days;
   };
 
-  const getEventsForDay = (year: number, month: number, day: number | null) => {
-    if (!day) return [];
-    return events.filter((event) => {
-      const eventDate = new Date(event.start);
-      return (
-        eventDate.getDate() === day &&
-        eventDate.getMonth() === month &&
-        eventDate.getFullYear() === year
-      );
-    });
-  };
-
   const isToday = (year: number, month: number, day: number | null) => {
     if (!day) return false;
     const today = new Date();
@@ -75,67 +71,157 @@ export function AnnualCalendarView({
     );
   };
 
+  const formatEventTimeForTooltip = (event: CalendarEvent) => {
+    if (isAllDayEvent(event)) return 'All day';
+    const start = event.start instanceof Date ? event.start : new Date(event.start);
+    const end = event.end instanceof Date ? event.end : new Date(event.end);
+    return `${format(start, 'p')} – ${format(end, 'p')}`;
+  };
+
   const year = currentYear.getFullYear();
+
+  const eventsByDay = React.useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    const dateKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    for (const event of events) {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      while (day <= endDay) {
+        const k = dateKey(day);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k)!.push(event);
+        day.setDate(day.getDate() + 1);
+      }
+    }
+    return map;
+  }, [events]);
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <div className="grid grid-cols-3 gap-4 p-4">
-          {months.map((monthName, monthIndex) => {
-            const days = getDaysInMonth(year, monthIndex);
-            const weeks: (number | null)[][] = [];
-            for (let i = 0; i < days.length; i += 7) {
-              weeks.push(days.slice(i, i + 7));
-            }
+      <TooltipProvider delayDuration={300}>
+        <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="grid grid-cols-3 gap-4 p-4">
+            {months.map((monthName, monthIndex) => {
+              const days = getDaysInMonth(year, monthIndex);
+              const weeks: (number | null)[][] = [];
+              for (let i = 0; i < days.length; i += 7) {
+                weeks.push(days.slice(i, i + 7));
+              }
 
-            return (
-              <div key={monthIndex} className="p-2">
-                <div className="text-sm font-semibold mb-2 text-center">{monthName}</div>
-                <div className="grid grid-cols-7 gap-0.5 mb-1">
-                  {weekDays.map((day, index) => (
-                    <div
-                      key={index}
-                      className="text-[0.65rem] text-muted-foreground font-normal text-center"
-                    >
-                      {day}
-                    </div>
-                  ))}
+              return (
+                <div key={monthIndex} className="p-2">
+                  <div className="text-sm font-semibold mb-2 text-center">{monthName}</div>
+                  <div className="grid grid-cols-7 gap-0.5 mb-1">
+                    {weekDays.map((day, index) => (
+                      <div
+                        key={index}
+                        className="text-[0.65rem] text-muted-foreground font-normal text-center"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-0.5">
+                    {weeks.map((week, weekIndex) => (
+                      <div key={weekIndex} className="grid grid-cols-7 gap-0.5">
+                        {week.map((day, dayIndex) => {
+                          const dayDate = day != null ? new Date(year, monthIndex, day) : null;
+                          const dayKey =
+                            dayDate
+                              ? `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                              : '';
+                          const dayEvents = dayKey ? eventsByDay.get(dayKey) ?? [] : [];
+                          const dayButton = (
+                            <button
+                              onClick={() => {
+                                if (day != null) {
+                                  onNavigate(new Date(year, monthIndex, day));
+                                }
+                              }}
+                              disabled={day == null}
+                              className={cn(
+                                'h-6 w-6 p-0 text-[0.65rem] font-normal rounded-sm transition-colors',
+                                'hover:bg-accent hover:text-accent-foreground',
+                                'disabled:opacity-0 disabled:cursor-default',
+                                day != null && isToday(year, monthIndex, day) &&
+                                  'bg-blue-500 text-white font-semibold hover:bg-blue-600',
+                                dayEvents.length > 0 && day != null && !isToday(year, monthIndex, day) && 'bg-primary/20'
+                              )}
+                            >
+                              {day ?? ''}
+                            </button>
+                          );
+                          if (day == null) {
+                            return <React.Fragment key={dayIndex}>{dayButton}</React.Fragment>;
+                          }
+                          return (
+                            <Tooltip key={dayIndex}>
+                              <TooltipTrigger asChild>
+                                {dayButton}
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                className="max-w-[240px] p-2"
+                              >
+                                <div className="font-medium mb-1.5 border-b border-primary-foreground/20 pb-1">
+                                  {format(dayDate!, 'EEE, MMM d')}
+                                </div>
+                                {dayEvents.length === 0 ? (
+                                  <p className="text-muted-foreground text-xs">No events</p>
+                                ) : (
+                                  <ul className="space-y-1 text-xs">
+                                    {dayEvents.map((event) => (
+                                      <li
+                                        key={event.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        className="flex flex-col gap-0.5 pl-1.5 cursor-pointer hover:bg-accent/50 rounded -m-1 p-1"
+                                        style={{
+                                          borderLeft: `3px solid ${event.color || 'var(--primary)'}`,
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onEventClick?.(event);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            if (e.key === ' ') e.preventDefault(); // avoid page scroll
+                                            e.stopPropagation();
+                                            onEventClick?.(event);
+                                          }
+                                        }}
+                                        onContextMenu={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onEventRightClick?.(event, e);
+                                        }}
+                                      >
+                                        <span className="font-medium truncate" title={event.title}>
+                                          {event.title}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          {formatEventTimeForTooltip(event)}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  {weeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="grid grid-cols-7 gap-0.5">
-                      {week.map((day, dayIndex) => {
-                        const dayEvents = getEventsForDay(year, monthIndex, day);
-                        return (
-                          <button
-                            key={dayIndex}
-                            onClick={() => {
-                              if (day) {
-                                onNavigate(new Date(year, monthIndex, day));
-                              }
-                            }}
-                            disabled={!day}
-                            className={cn(
-                              'h-6 w-6 p-0 text-[0.65rem] font-normal rounded-sm transition-colors',
-                              'hover:bg-accent hover:text-accent-foreground',
-                              'disabled:opacity-0 disabled:cursor-default',
-                              isToday(year, monthIndex, day) &&
-                                'bg-blue-500 text-white font-semibold hover:bg-blue-600',
-                              dayEvents.length > 0 && !isToday(year, monthIndex, day) && 'bg-primary/20'
-                            )}
-                          >
-                            {day}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </TooltipProvider>
     </div>
   );
 }

@@ -5,10 +5,9 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreVertical,
-  Maximize2,
-  Minimize2,
   HelpCircle,
   RefreshCw,
+  Undo2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,10 +33,13 @@ import { EventDetailModal } from '@/components/calendar/EventDetailModal';
 import { NewEventModal } from '@/components/calendar/NewEventModal';
 import { KeyboardShortcutsDialog } from '@/components/calendar/KeyboardShortcutsDialog';
 import { PersonDetailsModal } from '@/app/people/PersonDetailsModal';
-import { EventColorMenu } from '@/components/calendar/EventColorMenu';
+import { EventQuickActionsMenu } from '@/components/calendar/EventQuickActionsMenu';
+import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { motion } from 'framer-motion';
 import { getMatchedPeopleFromEvent, Person } from '@/lib/people-matching';
 import { fetchEventPeople } from '@/lib/fetch-event-people';
+import { getContrastTextColorHex } from '@/lib/color-utils';
 
 // Calendar event interface
 export interface CalendarEvent {
@@ -89,6 +91,56 @@ export interface CalendarEvent {
 
 export type CalendarViewMode = 'daily' | 'weekly' | 'monthly' | 'year' | 'schedule';
 
+function mapApiEventToCalendarEvent(apiEvent: {
+  id: string;
+  title?: string;
+  start: string | Date;
+  end: string | Date;
+  color?: string;
+  calendar?: string;
+  calendarId?: string;
+  description?: string;
+  location?: string;
+  htmlLink?: string;
+  hangoutLink?: string;
+  isAllDay?: boolean;
+  organizer?: CalendarEvent['organizer'];
+  attendees?: CalendarEvent['attendees'];
+  reminders?: CalendarEvent['reminders'];
+  recurrence?: CalendarEvent['recurrence'];
+  status?: string;
+  transparency?: string;
+  visibility?: string;
+  conferenceData?: CalendarEvent['conferenceData'];
+  created?: string | Date;
+  updated?: string | Date;
+}): CalendarEvent {
+  return {
+    id: apiEvent.id,
+    title: apiEvent.title ?? '',
+    start: new Date(apiEvent.start),
+    end: new Date(apiEvent.end),
+    color: apiEvent.color ?? '#4285f4',
+    calendar: apiEvent.calendar,
+    calendarId: apiEvent.calendarId ?? apiEvent.calendar,
+    description: apiEvent.description,
+    location: apiEvent.location,
+    htmlLink: apiEvent.htmlLink,
+    hangoutLink: apiEvent.hangoutLink,
+    isAllDay: apiEvent.isAllDay,
+    organizer: apiEvent.organizer,
+    attendees: apiEvent.attendees,
+    reminders: apiEvent.reminders,
+    recurrence: apiEvent.recurrence,
+    status: apiEvent.status,
+    transparency: apiEvent.transparency,
+    visibility: apiEvent.visibility,
+    conferenceData: apiEvent.conferenceData,
+    created: apiEvent.created ? new Date(apiEvent.created) : undefined,
+    updated: apiEvent.updated ? new Date(apiEvent.updated) : undefined,
+  };
+}
+
 interface HQCalendarProps {
   events?: CalendarEvent[];
   navigateToDate?: Date;
@@ -111,7 +163,6 @@ export function HQCalendar({
     Array<{ id: string; summary: string; color?: string }>
   >([]);
   const [previewEvent, setPreviewEvent] = React.useState<CalendarEvent | null>(null);
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = React.useState(false);
   const [people, setPeople] = React.useState<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = React.useState<Person | null>(null);
@@ -192,6 +243,81 @@ export function HQCalendar({
       calendarColor: calendarColor || '#4285f4',
     });
   };
+
+  const handleEventDelete = React.useCallback(
+    async (event: CalendarEvent) => {
+      if (!confirm('Delete this event? This cannot be undone.')) return;
+      const calendarId = event.calendarId || event.calendar;
+      if (!calendarId) {
+        console.error('No calendar ID for event', event.id);
+        return;
+      }
+      setContextMenuEvent(null);
+      if (selectedEvent?.id === event.id) {
+        setIsEventModalOpen(false);
+        setSelectedEvent(null);
+      }
+      setEvents((prev) => prev.filter((e) => e.id !== event.id));
+      allCachedEventsRef.current = allCachedEventsRef.current.filter((e) => e.id !== event.id);
+      try {
+        const response = await fetch(
+          `/api/google-calendar/events/${encodeURIComponent(event.id)}?calendarId=${encodeURIComponent(calendarId)}`,
+          { method: 'DELETE' }
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to delete event');
+        }
+      } catch (error) {
+        console.error('Error deleting event:', error);
+        setEvents((prev) => [...prev, event].sort((a, b) => a.start.getTime() - b.start.getTime()));
+        allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [event]);
+        if (selectedEvent?.id === event.id) {
+          setSelectedEvent(event);
+          setIsEventModalOpen(true);
+        }
+        alert(error instanceof Error ? error.message : 'Failed to delete event');
+      }
+    },
+    [selectedEvent?.id]
+  );
+
+  const handleEventDuplicate = React.useCallback(async (event: CalendarEvent) => {
+    const calendarId = event.calendarId || event.calendar;
+    if (!calendarId) {
+      console.error('No calendar ID for event', event.id);
+      return;
+    }
+    setContextMenuEvent(null);
+    try {
+      const response = await fetch('/api/google-calendar/events/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: event.title,
+          startTime: new Date(event.start).toISOString(),
+          endTime: new Date(event.end).toISOString(),
+          isAllDay: event.isAllDay ?? false,
+          description: event.description,
+          location: event.location,
+          calendarId,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to duplicate event');
+      }
+      const data = await response.json();
+      const newEvent = mapApiEventToCalendarEvent(data.event);
+      allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
+      setEvents((prev) =>
+        [...prev, newEvent].sort((a, b) => a.start.getTime() - b.start.getTime())
+      );
+    } catch (error) {
+      console.error('Error duplicating event:', error);
+      alert(error instanceof Error ? error.message : 'Failed to duplicate event');
+    }
+  }, []);
 
   const handleColorChange = async (color: string | null) => {
     if (!contextMenuEvent) return;
@@ -307,30 +433,7 @@ export function HQCalendar({
       const data = await response.json();
 
       // Add the new event to local state
-      const newEvent: CalendarEvent = {
-        id: data.event.id,
-        title: data.event.title,
-        start: new Date(data.event.start),
-        end: new Date(data.event.end),
-        color: data.event.color,
-        calendar: data.event.calendar,
-        calendarId: data.event.calendarId,
-        description: data.event.description,
-        location: data.event.location,
-        htmlLink: data.event.htmlLink,
-        hangoutLink: data.event.hangoutLink,
-        isAllDay: data.event.isAllDay,
-        organizer: data.event.organizer,
-        attendees: data.event.attendees,
-        reminders: data.event.reminders,
-        recurrence: data.event.recurrence,
-        status: data.event.status,
-        transparency: data.event.transparency,
-        visibility: data.event.visibility,
-        conferenceData: data.event.conferenceData,
-        created: data.event.created,
-        updated: data.event.updated,
-      };
+      const newEvent = mapApiEventToCalendarEvent(data.event);
 
       // Update cache
       allCachedEventsRef.current = mergeEvents(allCachedEventsRef.current, [newEvent]);
@@ -385,6 +488,9 @@ export function HQCalendar({
     fetchPeople();
   }, []);
 
+  const previousEventForRevertRef = React.useRef<Map<string, CalendarEvent>>(new Map());
+  const { toast: toastFn } = useToast();
+
   const handleEventUpdate = async (
     eventId: string,
     calendarId: string,
@@ -392,6 +498,104 @@ export function HQCalendar({
     endTime: Date,
     isAllDay?: boolean
   ) => {
+    const start = startTime instanceof Date ? startTime : new Date(startTime);
+    const end = endTime instanceof Date ? endTime : new Date(endTime);
+
+    // Skip update and PATCH if datetime did not change (e.g. drag-and-drop back to same slot)
+    const current = allCachedEventsRef.current.find((e) => e.id === eventId);
+    if (current) {
+      const sameStart = current.start.getTime() === start.getTime();
+      const sameEnd = current.end.getTime() === end.getTime();
+      const sameAllDay = (current.isAllDay ?? false) === (isAllDay ?? false);
+      if (sameStart && sameEnd && sameAllDay) return;
+    }
+
+    // Optimistic update: use functional setState so we always read latest state
+    setEvents((prevEvents) => {
+      const prevEvent = prevEvents.find((e) => e.id === eventId);
+      if (!prevEvent) return prevEvents;
+      previousEventForRevertRef.current.set(eventId, prevEvent);
+      const optimistic: CalendarEvent = {
+        ...prevEvent,
+        start,
+        end,
+        isAllDay: isAllDay ?? prevEvent.isAllDay,
+      };
+      return prevEvents.map((e) => (e.id === eventId ? optimistic : e));
+    });
+    allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+      e.id === eventId ? { ...e, start, end, isAllDay: isAllDay ?? e.isAllDay } : e
+    );
+
+    // Capture for Undo toast: color from currently playing track (Spotify) when on calendar page, else event color
+    const previousEvent = previousEventForRevertRef.current.get(eventId);
+    const eventColor = allCachedEventsRef.current.find((e) => e.id === eventId)?.color ?? '#4285f4';
+    const toastBgColor = colorPalette?.primary ?? eventColor;
+    const rgbToHex = (rgb: string) => {
+      const m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (!m) return eventColor;
+      const [_, r, g, b] = m;
+      return '#' + [r, g, b].map((x) => Math.min(255, Math.max(0, parseInt(x, 10))).toString(16).padStart(2, '0')).join('');
+    };
+    const toastTextColor = getContrastTextColorHex(colorPalette?.primary ? rgbToHex(colorPalette.primary) : eventColor);
+
+    const toastResult = toastFn({
+      title: '',
+      description: '',
+      className:
+        'fixed left-1/2 bottom-6 -translate-x-1/2 z-[100] w-auto max-w-[min(90vw,20rem)] min-w-0 shadow-lg border-0 !p-0',
+      style: {
+        backgroundColor: toastBgColor,
+        color: toastTextColor,
+      } as React.CSSProperties,
+      action: (
+        <ToastAction
+          altText="Undo"
+          className="gap-1.5 border-0 bg-white/20 hover:bg-white/30 text-inherit focus:ring-white/40"
+          style={{ color: toastTextColor } as React.CSSProperties}
+          onClick={async () => {
+            if (!previousEvent?.calendarId) return;
+            try {
+              const res = await fetch(`/api/google-calendar/events/${eventId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  calendarId: previousEvent.calendarId,
+                  startTime: previousEvent.start.toISOString(),
+                  endTime: previousEvent.end.toISOString(),
+                  isAllDay: previousEvent.isAllDay,
+                }),
+              });
+              if (!res.ok) throw new Error('Failed to revert');
+              const revertData = await res.json();
+              const revertedEvent = mapApiEventToCalendarEvent({
+                ...revertData.event,
+                id: revertData.event?.id ?? eventId,
+              });
+              allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+                e.id === eventId ? revertedEvent : e
+              );
+              setEvents((prev) =>
+                prev.map((e) => (e.id === eventId ? revertedEvent : e))
+              );
+              previousEventForRevertRef.current.delete(eventId);
+              toastResult.dismiss();
+            } catch (err) {
+              console.error('Revert failed:', err);
+              toastFn({
+                title: 'Could not undo',
+                description: 'The change could not be reverted.',
+                variant: 'destructive',
+              });
+            }
+          }}
+        >
+          <Undo2 className="h-4 w-4 shrink-0" />
+          Undo
+        </ToastAction>
+      ),
+    });
+
     try {
       const response = await fetch(`/api/google-calendar/events/${eventId}`, {
         method: 'PATCH',
@@ -413,56 +617,37 @@ export function HQCalendar({
 
       const data = await response.json();
 
-      // Update the event in cache
-      const updatedEvent: CalendarEvent = {
-        id: eventId,
-        title: data.event.title || '',
-        start: new Date(data.event.start),
-        end: new Date(data.event.end),
-        color: data.event.color || '#4285f4',
-        calendar: data.event.calendar,
-        calendarId: data.event.calendarId || data.event.calendar,
-        description: data.event.description,
-        location: data.event.location,
-        htmlLink: data.event.htmlLink,
-        hangoutLink: data.event.hangoutLink,
-        isAllDay: data.event.isAllDay,
-        organizer: data.event.organizer,
-        attendees: data.event.attendees,
-        reminders: data.event.reminders,
-        recurrence: data.event.recurrence,
-        status: data.event.status,
-        transparency: data.event.transparency,
-        visibility: data.event.visibility,
-        conferenceData: data.event.conferenceData,
-        created: data.event.created ? new Date(data.event.created) : undefined,
-        updated: data.event.updated ? new Date(data.event.updated) : undefined,
-      };
+      // Update the event in cache from server response (optimistic already applied)
+      const updatedEvent = mapApiEventToCalendarEvent({
+        ...data.event,
+        id: data.event.id ?? eventId,
+      });
 
-      // Update cache
       allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
         e.id === eventId ? updatedEvent : e
       );
-
-      // Update the event in the local state
       setEvents((prevEvents) =>
-        prevEvents.map((e) =>
-          e.id === eventId
-            ? {
-                ...e,
-                start: new Date(data.event.start),
-                end: new Date(data.event.end),
-                isAllDay: data.event.isAllDay,
-              }
-            : e
-        )
+        prevEvents.map((e) => (e.id === eventId ? updatedEvent : e))
       );
-
-      // Trigger a refresh to ensure everything is in sync
-      window.dispatchEvent(new CustomEvent('calendar-refresh'));
+      // Keep previousEventForRevertRef so Undo still works until toast is dismissed
     } catch (error) {
       console.error('Error updating event:', error);
-      throw error; // Re-throw to let the component handle it
+      const previousEvent = previousEventForRevertRef.current.get(eventId);
+      if (previousEvent) {
+        setEvents((prevEvents) =>
+          prevEvents.map((e) => (e.id === eventId ? previousEvent : e))
+        );
+        allCachedEventsRef.current = allCachedEventsRef.current.map((e) =>
+          e.id === eventId ? previousEvent : e
+        );
+      }
+      previousEventForRevertRef.current.delete(eventId);
+      toastFn({
+        title: 'Update failed',
+        description: 'The change could not be saved. You can try again.',
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
 
@@ -840,44 +1025,9 @@ export function HQCalendar({
           }
 
           // Convert event data to CalendarEvent format
-          return (data.events || []).map((event: any) => {
-            const startDate = event.start instanceof Date ? event.start : new Date(event.start);
-            const endDate = event.end instanceof Date ? event.end : new Date(event.end);
-            const hexColor = event.color || '#4285f4';
-
-            return {
-              id: event.id,
-              title: event.title,
-              start: startDate,
-              end: endDate,
-              color: hexColor,
-              calendar: event.calendar,
-              calendarId: event.calendarId || event.calendar,
-              description: event.description,
-              location: event.location,
-              htmlLink: event.htmlLink,
-              hangoutLink: event.hangoutLink,
-              isAllDay: event.isAllDay,
-              organizer: event.organizer,
-              attendees: event.attendees,
-              reminders: event.reminders,
-              recurrence: event.recurrence,
-              status: event.status,
-              transparency: event.transparency,
-              visibility: event.visibility,
-              conferenceData: event.conferenceData,
-              created: event.created
-                ? event.created instanceof Date
-                  ? event.created
-                  : new Date(event.created)
-                : undefined,
-              updated: event.updated
-                ? event.updated instanceof Date
-                  ? event.updated
-                  : new Date(event.updated)
-                : undefined,
-            };
-          });
+          return (data.events || []).map((event: any) =>
+            mapApiEventToCalendarEvent(event)
+          );
         });
 
         // Wait for all fetches to complete
@@ -976,29 +1126,12 @@ export function HQCalendar({
     };
   }, [viewMode, currentDate, forceRefresh]); // Removed timeRange and initialEvents from dependencies
 
-  const toggleFullscreen = React.useCallback(() => {
-    setIsFullscreen((prev) => !prev);
-  }, []);
-
   // Keyboard shortcuts for view mode switching
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input, textarea, or contenteditable
       const target = event.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-
-      // Handle Escape key to exit fullscreen (only if fullscreen is active and no modals are open)
-      if (
-        event.key === 'Escape' &&
-        isFullscreen &&
-        !isEventModalOpen &&
-        !isNewEventModalOpen &&
-        !settingsOpen &&
-        !isShortcutsDialogOpen
-      ) {
-        setIsFullscreen(false);
         return;
       }
 
@@ -1055,10 +1188,6 @@ export function HQCalendar({
             scheduleViewRef.current?.scrollToToday();
           }
           break;
-        case 'f':
-          // Toggle fullscreen with 'f' key
-          toggleFullscreen();
-          break;
       }
     };
 
@@ -1066,15 +1195,7 @@ export function HQCalendar({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [
-    viewMode,
-    isFullscreen,
-    isEventModalOpen,
-    isNewEventModalOpen,
-    settingsOpen,
-    isShortcutsDialogOpen,
-    toggleFullscreen,
-  ]);
+  }, [viewMode, isEventModalOpen, isNewEventModalOpen, settingsOpen, isShortcutsDialogOpen]);
 
   const goToToday = () => {
     const today = new Date();
@@ -1232,10 +1353,7 @@ export function HQCalendar({
 
   return (
     <Card
-      className={cn(
-        'w-full h-screen transition-all duration-1000 flex flex-col border-0',
-        isFullscreen && 'fixed inset-0 z-[9999] m-0 rounded-none w-screen max-w-none'
-      )}
+      className="w-full h-screen transition-all duration-1000 flex flex-col border-0"
       style={cardStyle}
     >
       <CardHeader className="pb-4">
@@ -1313,15 +1431,6 @@ export function HQCalendar({
             >
               {dateRangeString}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              className="ml-2"
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -1425,6 +1534,7 @@ export function HQCalendar({
               onNavigate={handleNavigate}
               onEventClick={handleEventClick}
               onEventRightClick={handleEventRightClick}
+              onEventUpdate={handleEventUpdate}
               people={people}
               onPersonClick={handlePersonClick}
             />
@@ -1474,6 +1584,8 @@ export function HQCalendar({
         onClose={handleCloseEventModal}
         timeFormat={timeFormat}
         onEventUpdate={handleEventUpdate}
+        onEventDelete={handleEventDelete}
+        onEventDuplicate={handleEventDuplicate}
         people={people}
         onPersonClick={handlePersonClick}
         colorPalette={colorPalette}
@@ -1561,13 +1673,15 @@ export function HQCalendar({
               top: contextMenuEvent.y,
             }}
           >
-            <EventColorMenu
+            <EventQuickActionsMenu
               event={contextMenuEvent.event}
               calendarColor={contextMenuEvent.calendarColor}
               onColorChange={handleColorChange}
+              onDuplicate={() => handleEventDuplicate(contextMenuEvent.event)}
+              onDelete={() => handleEventDelete(contextMenuEvent.event)}
             >
               <div style={{ width: 0, height: 0 }} />
-            </EventColorMenu>
+            </EventQuickActionsMenu>
           </div>
         </>
       )}

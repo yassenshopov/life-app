@@ -30,11 +30,28 @@ interface DailyCalendarViewProps {
   onNavigate: (date: Date) => void;
   onEventClick?: (event: CalendarEvent) => void;
   onEventRightClick?: (event: CalendarEvent, e: React.MouseEvent) => void;
-  onEventUpdate?: (eventId: string, calendarId: string, startTime: Date, endTime: Date) => Promise<void>;
+  onEventUpdate?: (
+    eventId: string,
+    calendarId: string,
+    startTime: Date,
+    endTime: Date
+  ) => Promise<void>;
   onEmptySpaceClick?: (date: Date, time: Date) => void;
   previewEvent?: CalendarEvent | null;
-  people?: Array<{ id: string; name: string; nicknames?: string[] | null; image?: any; image_url?: string | null }>;
-  onPersonClick?: (person: { id: string; name: string; nicknames?: string[] | null; image?: any; image_url?: string | null }) => void;
+  people?: Array<{
+    id: string;
+    name: string;
+    nicknames?: string[] | null;
+    image?: any;
+    image_url?: string | null;
+  }>;
+  onPersonClick?: (person: {
+    id: string;
+    name: string;
+    nicknames?: string[] | null;
+    image?: any;
+    image_url?: string | null;
+  }) => void;
   colorPalette?: { primary: string; secondary: string; accent: string } | null;
 }
 
@@ -53,7 +70,9 @@ export function DailyCalendarView({
   colorPalette,
 }: DailyCalendarViewProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const [draggedEventId, setDraggedEventId] = React.useState<string | null>(null);
+
   // Smooth scrolling implementation
   React.useEffect(() => {
     const container = scrollContainerRef.current;
@@ -77,9 +96,12 @@ export function DailyCalendarView({
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      
+
       targetScrollTop += e.deltaY;
-      targetScrollTop = Math.max(0, Math.min(targetScrollTop, container.scrollHeight - container.clientHeight));
+      targetScrollTop = Math.max(
+        0,
+        Math.min(targetScrollTop, container.scrollHeight - container.clientHeight)
+      );
 
       if (!isScrolling) {
         isScrolling = true;
@@ -99,10 +121,13 @@ export function DailyCalendarView({
         const currentScroll = container.scrollTop;
         const delta = touch.clientY - (container as any).lastTouchY;
         (container as any).lastTouchY = touch.clientY;
-        
+
         targetScrollTop = currentScroll - delta;
-        targetScrollTop = Math.max(0, Math.min(targetScrollTop, container.scrollHeight - container.clientHeight));
-        
+        targetScrollTop = Math.max(
+          0,
+          Math.min(targetScrollTop, container.scrollHeight - container.clientHeight)
+        );
+
         if (!isScrolling) {
           isScrolling = true;
           smoothScroll();
@@ -127,7 +152,7 @@ export function DailyCalendarView({
       container.removeEventListener('touchstart', handleTouchStart);
     };
   }, []);
-  
+
   // Scroll to current time if viewing today
   React.useEffect(() => {
     if (!scrollContainerRef.current || !isToday(currentDate)) return;
@@ -149,9 +174,9 @@ export function DailyCalendarView({
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const ease = 1 - Math.pow(1 - progress, 3); // Ease out cubic
-      
+
       container.scrollTop = startScroll + (targetScroll - startScroll) * ease;
-      
+
       if (progress < 1) {
         requestAnimationFrame(animateScroll);
       }
@@ -168,7 +193,7 @@ export function DailyCalendarView({
     () => getAllDayEventsForDay(events, currentDate),
     [events, currentDate]
   );
-  
+
   const timedEvents = React.useMemo(
     () => getTimedEventsForDay(events, currentDate),
     [events, currentDate]
@@ -187,29 +212,80 @@ export function DailyCalendarView({
     day: 'numeric',
   });
 
+  const SNAP_MINUTES = 15;
+  const getDropTarget = React.useCallback(
+    (clientX: number, clientY: number): { date: Date; minutes: number } | null => {
+      const scroll = scrollContainerRef.current;
+      const grid = gridRef.current;
+      if (!scroll || !grid || grid.children.length < 2) return null;
+      const scrollRect = scroll.getBoundingClientRect();
+      const dayCol = grid.children[1] as HTMLElement;
+      if (!dayCol) return null;
+      const dayRect = dayCol.getBoundingClientRect();
+      if (clientX < dayRect.left || clientX > dayRect.right) return null;
+      const yInContent = clientY - scrollRect.top + scroll.scrollTop;
+      const minutes = Math.max(
+        0,
+        Math.min(24 * 60 - 1, Math.round(yInContent / PIXELS_PER_MINUTE / SNAP_MINUTES) * SNAP_MINUTES)
+      );
+      return { date: new Date(currentDate), minutes };
+    },
+    [currentDate]
+  );
+
+  const getGhostPosition = React.useCallback(
+    (
+      _date: Date,
+      minutes: number
+    ): { left: number; top: number; width?: number } | null => {
+      const scroll = scrollContainerRef.current;
+      const grid = gridRef.current;
+      if (!scroll || !grid || grid.children.length < 2) return null;
+      const dayCol = grid.children[1] as HTMLElement;
+      if (!dayCol) return null;
+      const dayRect = dayCol.getBoundingClientRect();
+      const scrollRect = scroll.getBoundingClientRect();
+      const top = scrollRect.top + minutes * PIXELS_PER_MINUTE - scroll.scrollTop;
+      const left = dayRect.left + 4;
+      const width = dayRect.width - 8;
+      return { left, top, width };
+    },
+    []
+  );
+
   return (
     <div className="flex flex-col h-full">
       <div className="overflow-x-auto">
         <div className="min-w-[400px]">
           {/* Day header - Fixed */}
-          <div 
-            className="grid sticky top-0 z-10 transition-all duration-1000" 
+          <div
+            className="grid sticky top-0 z-10 transition-all duration-1000"
             style={{
               gridTemplateColumns: '60px 1fr',
-              borderBottom: colorPalette 
+              borderBottom: colorPalette
                 ? `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`
                 : undefined,
-              ...(colorPalette ? {
-                backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.1)'),
-              } : { backgroundColor: 'hsl(var(--background))' })
+              ...(colorPalette
+                ? {
+                    backgroundColor: colorPalette.primary
+                      .replace('rgb', 'rgba')
+                      .replace(')', ', 0.1)'),
+                  }
+                : { backgroundColor: 'hsl(var(--background))' }),
             }}
           >
-            <div 
+            <div
               className="p-2 text-foreground transition-all duration-1000"
-              style={colorPalette ? {
-                backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.12)'),
-                borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
-              } : undefined}
+              style={
+                colorPalette
+                  ? {
+                      backgroundColor: colorPalette.primary
+                        .replace('rgb', 'rgba')
+                        .replace(')', ', 0.12)'),
+                      borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                    }
+                  : undefined
+              }
             >
               <div className="text-xs text-muted-foreground font-medium mb-1">All Day</div>
             </div>
@@ -218,19 +294,31 @@ export function DailyCalendarView({
                 'flex flex-col transition-all duration-1000',
                 isToday(currentDate) && 'bg-blue-50 dark:bg-blue-950/20'
               )}
-              style={colorPalette ? {
-                ...(colorPalette && !isToday(currentDate) ? {
-                  backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.08)'),
-                } : {}),
-                borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
-              } : undefined}
+              style={
+                colorPalette
+                  ? {
+                      ...(colorPalette && !isToday(currentDate)
+                        ? {
+                            backgroundColor: colorPalette.primary
+                              .replace('rgb', 'rgba')
+                              .replace(')', ', 0.08)'),
+                          }
+                        : {}),
+                      borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                    }
+                  : undefined
+              }
             >
               <div className="p-2 text-center">
                 <div className="text-xs text-muted-foreground font-medium">{dateString}</div>
               </div>
               {/* All-day events */}
               {allDayEvents.length > 0 && (
-                <AllDayEvents events={allDayEvents} className="flex-1" onEventClick={onEventClick} />
+                <AllDayEvents
+                  events={allDayEvents}
+                  className="flex-1"
+                  onEventClick={onEventClick}
+                />
               )}
             </div>
           </div>
@@ -244,31 +332,47 @@ export function DailyCalendarView({
       >
         <div className="overflow-x-auto hide-scrollbar">
           <div className="min-w-[400px]">
-            <div className="grid relative" style={{ gridTemplateColumns: '60px 1fr' }}>
+            <div
+              ref={gridRef}
+              className="grid relative"
+              style={{ gridTemplateColumns: '60px 1fr' }}
+            >
               {/* Time column */}
-              <div 
+              <div
                 className="text-primary transition-all duration-1000"
-                style={colorPalette ? {
-                  backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.12)'),
-                  borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
-                } : { backgroundColor: 'hsl(var(--background))' }}
+                style={
+                  colorPalette
+                    ? {
+                        backgroundColor: colorPalette.primary
+                          .replace('rgb', 'rgba')
+                          .replace(')', ', 0.12)'),
+                        borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                      }
+                    : { backgroundColor: 'hsl(var(--background))' }
+                }
               >
                 {timeSlots.map((hour) => (
                   <div
                     key={hour}
                     className="h-[45px] relative px-2 transition-all duration-1000"
-                    style={{ 
+                    style={{
                       minHeight: '45px',
-                      borderBottom: colorPalette 
+                      borderBottom: colorPalette
                         ? `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`
-                        : '1px solid hsl(var(--foreground) / 0.2)'
+                        : '1px solid hsl(var(--foreground) / 0.2)',
                     }}
                   >
-                    <div 
+                    <div
                       className="absolute -top-2 right-2 text-xs text-foreground font-medium px-2 transition-all duration-1000"
-                      style={colorPalette ? {
-                        backgroundColor: colorPalette.primary.replace('rgb', 'rgba').replace(')', ', 0.12)'),
-                      } : { backgroundColor: 'hsl(var(--background))' }}
+                      style={
+                        colorPalette
+                          ? {
+                              backgroundColor: colorPalette.primary
+                                .replace('rgb', 'rgba')
+                                .replace(')', ', 0.12)'),
+                            }
+                          : { backgroundColor: 'hsl(var(--background))' }
+                      }
                     >
                       {formatTime(hour, timeFormat)}
                     </div>
@@ -282,49 +386,56 @@ export function DailyCalendarView({
                   'relative transition-all duration-1000',
                   isToday(currentDate) && 'bg-blue-50/30 dark:bg-blue-950/10'
                 )}
-                style={colorPalette ? {
-                  borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
-                } : undefined}
+                style={
+                  colorPalette
+                    ? {
+                        borderRight: `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')}`,
+                      }
+                    : undefined
+                }
               >
                 {/* Time slot grid - clickable for new events */}
                 {timeSlots.map((hour) => (
                   <div
                     key={hour}
-                    className="h-[45px] relative cursor-pointer hover:bg-accent/30 transition-all duration-1000"
-                    style={{ 
+                    className="h-[45px] relative cursor-pointer transition-all duration-200 hover:bg-accent/40"
+                    style={{
                       minHeight: '45px',
-                      borderBottom: colorPalette 
+                      borderBottom: colorPalette
                         ? `1px solid ${colorPalette.accent.replace('rgb', 'rgba').replace(')', ', 0.15)')}`
-                        : '1px solid hsl(var(--foreground) / 0.2)'
+                        : '1px solid hsl(var(--foreground) / 0.2)',
                     }}
                     onClick={(e) => {
                       if (!onEmptySpaceClick) return;
-                      
+
                       // Check if click is on empty space (not on an event)
                       const target = e.target as HTMLElement;
-                      if (target.closest('.event-content') || target.closest('[style*="absolute"]')) {
+                      if (
+                        target.closest('.event-content') ||
+                        target.closest('[style*="absolute"]')
+                      ) {
                         return;
                       }
 
                       // Get the column element
                       const column = e.currentTarget.parentElement;
                       if (!column) return;
-                      
+
                       const columnRect = column.getBoundingClientRect();
                       const scrollContainer = scrollContainerRef.current;
                       const scrollTop = scrollContainer?.scrollTop || 0;
-                      
+
                       // Calculate mouse position relative to column top, accounting for scroll
                       const mouseY = e.clientY - columnRect.top + scrollTop;
-                      
+
                       // Convert pixels to minutes (snap to 15-minute intervals)
-                      const minutes = Math.max(0, Math.round((mouseY / PIXELS_PER_MINUTE) / 15) * 15);
-                      
+                      const minutes = Math.max(0, Math.round(mouseY / PIXELS_PER_MINUTE / 15) * 15);
+
                       // Create date with the clicked time
                       const clickedTime = new Date(currentDate);
                       clickedTime.setHours(0, 0, 0, 0);
                       clickedTime.setMinutes(minutes);
-                      
+
                       onEmptySpaceClick(currentDate, clickedTime);
                     }}
                   />
@@ -341,9 +452,9 @@ export function DailyCalendarView({
                       const overlappingGroup = overlappingGroups.find((group) =>
                         group.some((e) => e.id === event.id)
                       ) || [event];
-                      
+
                       const style = calculateEventPosition(event, currentDate, overlappingGroup);
-                      
+
                       // Check for touching events (check all day events, not just overlapping ones)
                       let touchingTop = false;
                       let touchingBottom = false;
@@ -353,7 +464,7 @@ export function DailyCalendarView({
                         if (touch.top) touchingTop = true;
                         if (touch.bottom) touchingBottom = true;
                       }
-                      
+
                       return (
                         <AnimatedCalendarEvent
                           onRightClick={onEventRightClick}
@@ -366,20 +477,45 @@ export function DailyCalendarView({
                           touchingEvents={{ top: touchingTop, bottom: touchingBottom }}
                           people={people}
                           onPersonClick={onPersonClick}
+                          onResize={
+                            onEventUpdate
+                              ? (evt, newStart, newEnd) => {
+                                  const calendarId = evt.calendarId;
+                                  if (!calendarId) return;
+                                  onEventUpdate(evt.id, calendarId, newStart, newEnd);
+                                }
+                              : undefined
+                          }
+                          onMove={
+                            onEventUpdate
+                              ? (evt, newStart, newEnd) => {
+                                  const calendarId = evt.calendarId;
+                                  if (!calendarId) return;
+                                  onEventUpdate(evt.id, calendarId, newStart, newEnd);
+                                }
+                              : undefined
+                          }
+                          getDropTarget={getDropTarget}
+                          getGhostPosition={getGhostPosition}
+                          onMoveStart={setDraggedEventId}
+                          onMoveEnd={() => setDraggedEventId(null)}
+                          isBeingDragged={draggedEventId === event.id}
                         />
                       );
                     })}
                     {/* Preview event */}
-                    {previewEvent && !previewEvent.isAllDay && isSameDay(previewEvent.start, currentDate) && (
-                      <AnimatedCalendarEvent
-                        key={previewEvent.id}
-                        event={previewEvent}
-                        style={calculateEventPosition(previewEvent, currentDate)}
-                        timeFormat={timeFormat}
-                        currentDate={currentDate}
-                        isPreview={true}
-                      />
-                    )}
+                    {previewEvent &&
+                      !previewEvent.isAllDay &&
+                      isSameDay(previewEvent.start, currentDate) && (
+                        <AnimatedCalendarEvent
+                          key={previewEvent.id}
+                          event={previewEvent}
+                          style={calculateEventPosition(previewEvent, currentDate)}
+                          timeFormat={timeFormat}
+                          currentDate={currentDate}
+                          isPreview={true}
+                        />
+                      )}
                   </AnimatePresence>
                 </div>
               </div>
@@ -390,4 +526,3 @@ export function DailyCalendarView({
     </div>
   );
 }
-
