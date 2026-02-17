@@ -136,7 +136,6 @@ export function AnnualCalendarView({
                           const dayEvents = dayKey ? eventsByDay.get(dayKey) ?? [] : [];
                           const dayButton = (
                             <button
-                              key={dayIndex}
                               onClick={() => {
                                 if (day != null) {
                                   onNavigate(new Date(year, monthIndex, day));
@@ -156,7 +155,7 @@ export function AnnualCalendarView({
                             </button>
                           );
                           if (day == null) {
-                            return dayButton;
+                            return <React.Fragment key={dayIndex}>{dayButton}</React.Fragment>;
                           }
                           return (
                             <Tooltip key={dayIndex}>
@@ -179,7 +178,7 @@ export function AnnualCalendarView({
                                         key={event.id}
                                         role="button"
                                         tabIndex={0}
-                                        className="flex flex-col gap-0.5 truncate pl-1.5 cursor-pointer hover:bg-accent/50 rounded -m-1 p-1"
+                                        className="flex flex-col gap-0.5 pl-1.5 cursor-pointer hover:bg-accent/50 rounded -m-1 p-1"
                                         style={{
                                           borderLeft: `3px solid ${event.color || 'var(--primary)'}`,
                                         }}

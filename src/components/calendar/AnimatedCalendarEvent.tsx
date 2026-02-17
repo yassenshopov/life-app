@@ -98,6 +98,20 @@ export function AnimatedCalendarEvent({
     ghostHeight: number;
   }>(null);
 
+  /** Mutable ref for drag position so move listeners don't re-attach on every mousemove */
+  const dragRef = React.useRef<null | {
+    currentX: number;
+    currentY: number;
+    startX: number;
+    startY: number;
+    startEventStart: Date;
+    startEventEnd: Date;
+    offsetX: number;
+    offsetY: number;
+    ghostWidth: number;
+    ghostHeight: number;
+  }>(null);
+
   const [resizeState, setResizeState] = React.useState<null | {
     edge: 'top' | 'bottom';
     startY: number;
@@ -188,15 +202,45 @@ export function AnimatedCalendarEvent({
   React.useEffect(() => {
     if (!moveState) return;
 
+    dragRef.current = {
+      currentX: moveState.currentX,
+      currentY: moveState.currentY,
+      startX: moveState.startX,
+      startY: moveState.startY,
+      startEventStart: moveState.startEventStart,
+      startEventEnd: moveState.startEventEnd,
+      offsetX: moveState.offsetX,
+      offsetY: moveState.offsetY,
+      ghostWidth: moveState.ghostWidth,
+      ghostHeight: moveState.ghostHeight,
+    };
+
+    let rafId = 0;
     const handleMouseMove = (e: MouseEvent) => {
-      setMoveState((prev) => (prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null));
+      const ref = dragRef.current;
+      if (!ref) return;
+      ref.currentX = e.clientX;
+      ref.currentY = e.clientY;
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        setMoveState((prev) =>
+          prev && dragRef.current
+            ? { ...prev, currentX: dragRef.current!.currentX, currentY: dragRef.current!.currentY }
+            : null
+        );
+      });
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      if (!moveState) return;
+      const ref = dragRef.current;
+      if (!ref) {
+        setMoveState(null);
+        return;
+      }
 
       const durationMs =
-        moveState.startEventEnd.getTime() - moveState.startEventStart.getTime();
+        ref.startEventEnd.getTime() - ref.startEventStart.getTime();
       const durationMinutes = durationMs / (1000 * 60);
 
       let newStart: Date;
@@ -216,15 +260,16 @@ export function AnimatedCalendarEvent({
         } else {
           onMoveEnd?.();
           setMoveState(null);
+          dragRef.current = null;
           return;
         }
       } else {
-        const deltaPx = e.clientY - moveState.startY;
+        const deltaPx = e.clientY - ref.startY;
         const deltaMinutes = deltaPx / PIXELS_PER_MINUTE;
         const startMinutesFromMidnight =
-          moveState.startEventStart.getHours() * 60 + moveState.startEventStart.getMinutes();
+          ref.startEventStart.getHours() * 60 + ref.startEventStart.getMinutes();
         const endMinutesFromMidnight =
-          moveState.startEventEnd.getHours() * 60 + moveState.startEventEnd.getMinutes();
+          ref.startEventEnd.getHours() * 60 + ref.startEventEnd.getMinutes();
         const newStartMinutes = Math.max(
           0,
           Math.min(
@@ -236,10 +281,10 @@ export function AnimatedCalendarEvent({
           24 * 60 - 1,
           newStartMinutes + Math.round(durationMinutes / SNAP_MINUTES) * SNAP_MINUTES
         );
-        newStart = new Date(moveState.startEventStart);
+        newStart = new Date(ref.startEventStart);
         newStart.setHours(0, 0, 0, 0);
         newStart.setMinutes(newStartMinutes);
-        newEnd = new Date(moveState.startEventStart);
+        newEnd = new Date(ref.startEventStart);
         newEnd.setHours(0, 0, 0, 0);
         newEnd.setMinutes(newEndMinutes);
       }
@@ -248,15 +293,17 @@ export function AnimatedCalendarEvent({
       onMoveEnd?.();
       onMove?.(event, newStart, newEnd);
       setMoveState(null);
+      dragRef.current = null;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [moveState, onMove, onMoveEnd, getDropTarget, event]);
+  }, [!!moveState, onMove, onMoveEnd, getDropTarget, event]);
 
   React.useEffect(() => {
     if (!resizeState) return;
@@ -505,6 +552,7 @@ export function AnimatedCalendarEvent({
     <>
       {dragGhost}
       <motion.div
+      data-calendar-event="true"
       initial={{ opacity: 0, scale: 0.95, y: -5 }}
       animate={{
         opacity: moveState || isBeingDragged ? 0 : isPreview ? 0.4 : 1,
@@ -562,14 +610,30 @@ export function AnimatedCalendarEvent({
             className="absolute left-0 right-0 top-0 h-2 cursor-n-resize z-10"
             style={{ marginTop: -2 }}
             onMouseDown={(e) => handleResizeStart('top', e)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                const synthetic = { preventDefault: () => {}, stopPropagation: () => {}, clientY: rect.top } as React.MouseEvent;
+                handleResizeStart('top', synthetic);
+              }
+            }}
           />
           <div
             role="button"
             tabIndex={0}
             aria-label="Resize event end"
-            className="absolute left-0 right-0 bottom-0 h-2 cursor-n-resize z-10"
+            className="absolute left-0 right-0 bottom-0 h-2 cursor-s-resize z-10"
             style={{ marginBottom: -2 }}
             onMouseDown={(e) => handleResizeStart('bottom', e)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                const synthetic = { preventDefault: () => {}, stopPropagation: () => {}, clientY: rect.bottom } as React.MouseEvent;
+                handleResizeStart('bottom', synthetic);
+              }
+            }}
           />
         </>
       )}

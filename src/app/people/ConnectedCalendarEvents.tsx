@@ -201,9 +201,9 @@ function MonthGrid({
             return (
               <Tooltip key={i}>
                 <TooltipTrigger asChild>
-                  <div className={cellClassName} role="button" tabIndex={0}>
+                  <button type="button" className={cellClassName}>
                     {day}
-                  </div>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent
                   side="top"
@@ -245,9 +245,10 @@ function MonthGrid({
                             <div className="flex flex-wrap items-center">
                               {eventPeopleMap[event.id].map((p, i) => {
                                 const src = getPersonImageUrl(p);
-                                const initials = p.name
+                                const initials = (p.name || '')
                                   .split(/\s+/)
-                                  .map((n) => n[0])
+                                  .filter(Boolean)
+                                  .map((seg) => (seg[0] ?? ''))
                                   .join('')
                                   .toUpperCase()
                                   .slice(0, 2);
@@ -341,16 +342,12 @@ export function ConnectedCalendarEvents({ events, isLoading = false, eventPeople
   const canPrev = yearIndex < availableYears.length - 1;
   const canNext = yearIndex > 0;
 
-  // Get the most recent PAST event for "Last interaction"
+  // Get the most recent PAST event for "Last interaction" (derive from filteredEvents)
   const mostRecentPastEvent = useMemo(() => {
-    return events
-      .map((event) => ({ event, startDate: parseEventStart(event) }))
-      .filter(
-        (item): item is { event: CalendarEvent; startDate: Date } =>
-          item.startDate !== null && !isFuture(item.startDate)
-      )
-      .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())[0];
-  }, [events]);
+    const past = filteredEvents.filter(({ startDate }) => !isFuture(startDate));
+    if (past.length === 0) return undefined;
+    return past.sort((a, b) => b.startDate.getTime() - a.startDate.getTime())[0];
+  }, [filteredEvents]);
 
   const mostRecentEventStart = mostRecentPastEvent?.startDate || null;
   const timeSinceLastEvent = mostRecentEventStart
@@ -366,7 +363,7 @@ export function ConnectedCalendarEvents({ events, isLoading = false, eventPeople
         <div className="flex items-center justify-center py-8">
           <Spinner size="md" />
         </div>
-      ) : availableYears.length === 0 ? (
+      ) : filteredEvents.length === 0 ? (
         <div className="text-sm text-muted-foreground py-4">
           No connected calendar events found.
         </div>

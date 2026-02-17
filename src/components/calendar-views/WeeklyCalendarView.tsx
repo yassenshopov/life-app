@@ -421,7 +421,7 @@ export function WeeklyCalendarView({
                           const target = e.target as HTMLElement;
                           if (
                             target.closest('.event-content') ||
-                            target.closest('[style*="absolute"]')
+                            target.closest('[data-calendar-event="true"]')
                           ) {
                             return;
                           }
@@ -497,7 +497,13 @@ export function WeeklyCalendarView({
                                 onEventUpdate
                                   ? (evt, newStart, newEnd) => {
                                       const calendarId = evt.calendarId;
-                                      if (!calendarId) return;
+                                      if (!calendarId) {
+                                        console.warn(
+                                          '[WeeklyCalendarView] Resize skipped: event has no calendarId',
+                                          { eventId: evt.id }
+                                        );
+                                        return;
+                                      }
                                       onEventUpdate(evt.id, calendarId, newStart, newEnd);
                                     }
                                   : undefined
@@ -506,7 +512,13 @@ export function WeeklyCalendarView({
                                 onEventUpdate
                                   ? (evt, newStart, newEnd) => {
                                       const calendarId = evt.calendarId;
-                                      if (!calendarId) return;
+                                      if (!calendarId) {
+                                        console.warn(
+                                          '[WeeklyCalendarView] Move skipped: event has no calendarId',
+                                          { eventId: evt.id }
+                                        );
+                                        return;
+                                      }
                                       onEventUpdate(evt.id, calendarId, newStart, newEnd);
                                     }
                                   : undefined

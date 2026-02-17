@@ -179,12 +179,15 @@ export function MonthlyCalendarView({
 
         const durationMs =
           draggingEvent.end.getTime() - draggingEvent.start.getTime();
+        const DAY_MS = 24 * 60 * 60 * 1000;
         let newStart: Date;
         let newEnd: Date;
         if (draggingEvent.isAllDay) {
+          const days = Math.round(durationMs / DAY_MS) || 1;
           newStart = new Date(dropDate);
           newStart.setHours(0, 0, 0, 0);
-          newEnd = new Date(dropDate);
+          newEnd = new Date(newStart);
+          newEnd.setDate(newEnd.getDate() + (days - 1));
           newEnd.setHours(23, 59, 59, 999);
         } else {
           newStart = new Date(dropDate);

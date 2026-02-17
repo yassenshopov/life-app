@@ -513,8 +513,8 @@ export function HQCalendar({
     // Optimistic update: use functional setState so we always read latest state
     setEvents((prevEvents) => {
       const prevEvent = prevEvents.find((e) => e.id === eventId);
-      if (prevEvent) previousEventForRevertRef.current.set(eventId, prevEvent);
       if (!prevEvent) return prevEvents;
+      previousEventForRevertRef.current.set(eventId, prevEvent);
       const optimistic: CalendarEvent = {
         ...prevEvent,
         start,
